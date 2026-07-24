@@ -25,7 +25,7 @@ export function WabiSabiCard({ children, className = '', hover = true }: WabiSab
       }
     >
       <div
-        className="absolute -right-4 -top-4 h-16 w-16 rotate-45 opacity-50"
+        className="pointer-events-none absolute -right-4 -top-4 h-16 w-16 rotate-45 opacity-50"
         style={{
           background: `linear-gradient(135deg, color-mix(in srgb, var(--ws-accent) 8%, transparent) 0%, transparent 100%)`,
         }}

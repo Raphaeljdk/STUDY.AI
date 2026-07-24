@@ -103,3 +103,37 @@ Stage Summary:
 - Plataforma completa e funcional
 - 5 temas Wabi-Sabi funcionais
 - AI Chat integrado com backend LLM
+
+---
+Task ID: study-features
+Agent: Main
+Task: Build complete study functionality - notebook editor, flashcards, pomodoro timer, dynamic stats
+
+Work Log:
+- Updated Prisma schema with Notebook, Flashcard, StudySession models (SM-2 algorithm fields)
+- Pushed DB schema with `bun run db:push`
+- Created 6 new API routes:
+  - `/api/notebooks` (GET list, POST create)
+  - `/api/notebooks/[id]` (GET single, PATCH update content/title/color, DELETE)
+  - `/api/flashcards` (GET list with optional filters, POST create)
+  - `/api/flashcards/[id]` (PATCH with SM-2 review algorithm or edit, DELETE)
+  - `/api/sessions` (GET list, POST create pomodoro session)
+  - `/api/stats` (GET aggregated stats: notebooks, flashcards, due flashcards, study time)
+- Completely rewrote DashboardView.tsx (1100+ lines) with:
+  - Tab-based navigation: Dashboard, Cadernos, Flashcards, Pomodoro, Sensei IA, Admin
+  - DashboardHome: Dynamic stats from API, recent notebooks, quick access buttons that navigate
+  - NotebooksList: Create notebooks with color picker, grid view, delete
+  - NotebookEditor: Full text editor with auto-save (1s debounce), title editing, inline flashcard creation sidebar
+  - FlashcardsManager: Create flashcards, view all with SM-2 stats
+  - FlashcardReviewer: 3D flip card animation, SM-2 spaced repetition rating (Novamente/Dificil/Bom/Facil), progress bar, completion screen
+  - PomodoroTimer: 25/5/15 min modes, circular progress ring SVG, start/pause/reset, session saving, daily stats
+- Fixed WabiSabiCard decorative element blocking clicks (added pointer-events-none)
+- Fixed missing useCallback import that caused NotebookEditor crash
+- Removed unused imports (ChevronLeft, Save, FlipHorizontal, ThumbsUp, ThumbsDown)
+- Fixed duplicate setCreating(false) in notebook creation handler
+- Admin user seeded: admin@studyai.com / admin123 (SENSEI plan, ADMIN role)
+
+Stage Summary:
+- All features verified via Agent Browser: login, notebook CRUD, content editing with auto-save, flashcard creation (inside notebook), flashcard review with flip animation and SM-2 algorithm, pomodoro timer with circular progress
+- Lint passes clean (zero errors)
+- Dynamic dashboard stats work (1 Meus Cadernos, 1 flashcard, 0m study time)
