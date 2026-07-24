@@ -1,0 +1,236 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ===== WABI-SABI DESIGN SYSTEM ===== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-serif-jp);
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ===== THEME: WASHI PAPER (Default) ===== */
+[data-theme="washi-paper"], :root {
+  --ws-bg: #F8F6F0;
+  --ws-bg-dark: #F0EDE5;
+  --ws-ink: #1A1A1A;
+  --ws-charcoal: #2C2C2C;
+  --ws-accent: #D93838;
+  --ws-accent-hover: #B82828;
+  --ws-gold: #B8A088;
+  --ws-indigo: #4A5568;
+  --ws-verdigris: #5B8C5A;
+  --ws-glass: rgba(248, 246, 240, 0.85);
+  --ws-glass-border: rgba(26, 26, 26, 0.08);
+  --ws-text-primary: #1A1A1A;
+  --ws-text-secondary: #4A4A4A;
+  --ws-text-tertiary: #8A8A8A;
+  --ws-text-on-dark: #F8F6F0;
+  --ws-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --ws-shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.08);
+  --ws-shadow-enso: 0 0 100px rgba(217, 56, 56, 0.15);
+  --ws-radius-organic: 20px 18px 22px 19px;
+  --ws-radius-card: 12px 14px 10px 13px;
+  --ws-radius-button: 8px 10px 7px 9px;
+  --ws-transition: cubic-bezier(0.4, 0, 0.2, 1);
+  --background: #F8F6F0;
+  --foreground: #1A1A1A;
+}
+
+/* ===== THEME: SUMI INK (Dark) ===== */
+[data-theme="sumi-ink"] {
+  --ws-bg: #1A1A1A;
+  --ws-bg-dark: #141414;
+  --ws-ink: #F8F6F0;
+  --ws-charcoal: #2A2A2A;
+  --ws-accent: #D93838;
+  --ws-accent-hover: #E04545;
+  --ws-gold: #B8A088;
+  --ws-indigo: #7A8A9A;
+  --ws-verdigris: #7BAC7A;
+  --ws-glass: rgba(26, 26, 26, 0.85);
+  --ws-glass-border: rgba(248, 246, 240, 0.08);
+  --ws-text-primary: #F8F6F0;
+  --ws-text-secondary: #B8B8B8;
+  --ws-text-tertiary: #8A8A8A;
+  --ws-text-on-dark: #1A1A1A;
+  --ws-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --ws-shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.3);
+  --ws-shadow-enso: 0 0 100px rgba(217, 56, 56, 0.25);
+  --background: #1A1A1A;
+  --foreground: #F8F6F0;
+}
+
+/* ===== THEME: KOKE ISHI (Moss & Stone) ===== */
+[data-theme="koke-ishi"] {
+  --ws-bg: #F2F0EB;
+  --ws-bg-dark: #E8E5DE;
+  --ws-ink: #2C3E2D;
+  --ws-charcoal: #3A4A3B;
+  --ws-accent: #5B8C5A;
+  --ws-accent-hover: #4A7A49;
+  --ws-gold: #A0B898;
+  --ws-indigo: #4A5A50;
+  --ws-verdigris: #5B8C5A;
+  --ws-glass: rgba(242, 240, 235, 0.85);
+  --ws-glass-border: rgba(44, 62, 45, 0.08);
+  --ws-text-primary: #2C3E2D;
+  --ws-text-secondary: #5A6A5A;
+  --ws-text-tertiary: #8A9A8A;
+  --ws-text-on-dark: #F2F0EB;
+  --ws-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --ws-shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.07);
+  --ws-shadow-enso: 0 0 100px rgba(91, 140, 90, 0.15);
+  --background: #F2F0EB;
+  --foreground: #2C3E2D;
+}
+
+/* ===== THEME: MOMIJI (Autumn) ===== */
+[data-theme="momiji"] {
+  --ws-bg: #FBF7F0;
+  --ws-bg-dark: #F0EAE0;
+  --ws-ink: #4A2820;
+  --ws-charcoal: #5A3830;
+  --ws-accent: #C04020;
+  --ws-accent-hover: #A83818;
+  --ws-gold: #B8A088;
+  --ws-indigo: #6A5048;
+  --ws-verdigris: #7A8A5A;
+  --ws-glass: rgba(251, 247, 240, 0.85);
+  --ws-glass-border: rgba(74, 40, 32, 0.08);
+  --ws-text-primary: #4A2820;
+  --ws-text-secondary: #6A5048;
+  --ws-text-tertiary: #B8A088;
+  --ws-text-on-dark: #FBF7F0;
+  --ws-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --ws-shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.07);
+  --ws-shadow-enso: 0 0 100px rgba(192, 64, 32, 0.15);
+  --background: #FBF7F0;
+  --foreground: #4A2820;
+}
+
+/* ===== THEME: SAKURA (Cherry Blossom) ===== */
+[data-theme="sakura"] {
+  --ws-bg: #FFF5F5;
+  --ws-bg-dark: #FFE8EC;
+  --ws-ink: #4A2030;
+  --ws-charcoal: #5A2838;
+  --ws-accent: #D07088;
+  --ws-accent-hover: #C06078;
+  --ws-gold: #C0A0A8;
+  --ws-indigo: #6A4A58;
+  --ws-verdigris: #6A9A7A;
+  --ws-glass: rgba(255, 245, 245, 0.85);
+  --ws-glass-border: rgba(74, 32, 48, 0.08);
+  --ws-text-primary: #4A2030;
+  --ws-text-secondary: #6A4858;
+  --ws-text-tertiary: #C0A0A8;
+  --ws-text-on-dark: #FFF5F5;
+  --ws-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --ws-shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.06);
+  --ws-shadow-enso: 0 0 100px rgba(208, 112, 136, 0.15);
+  --background: #FFF5F5;
+  --foreground: #4A2030;
+}
+
+@layer base {
+  * {
+    outline-color: var(--ring, rgba(0,0,0,0.3));
+    outline-offset: 2px;
+  }
+  body {
+    background-color: var(--ws-bg);
+    color: var(--ws-text-primary);
+    font-family: var(--font-inter), 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* ===== WABI-SABI UTILITIES ===== */
+
+@layer utilities {
+  .bg-ws {
+    background-color: var(--ws-bg);
+  }
+  .bg-ws-dark {
+    background-color: var(--ws-bg-dark);
+  }
+  .text-ws-primary {
+    color: var(--ws-text-primary);
+  }
+  .text-ws-secondary {
+    color: var(--ws-text-secondary);
+  }
+  .text-ws-tertiary {
+    color: var(--ws-text-tertiary);
+  }
+  .text-ws-accent {
+    color: var(--ws-accent);
+  }
+  .bg-ws-glass {
+    background: var(--ws-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .border-ws-glass {
+    border-color: var(--ws-glass-border);
+  }
+  .shadow-ws-soft {
+    box-shadow: var(--ws-shadow-soft);
+  }
+  .shadow-ws-medium {
+    box-shadow: var(--ws-shadow-medium);
+  }
+  .shadow-ws-enso {
+    box-shadow: var(--ws-shadow-enso);
+  }
+  .rounded-ws-organic {
+    border-radius: 20px 18px 22px 19px;
+  }
+  .rounded-ws-card {
+    border-radius: 12px 14px 10px 13px;
+  }
+  .rounded-ws-button {
+    border-radius: 8px 10px 7px 9px;
+  }
+  .font-serif-jp {
+    font-family: var(--font-serif-jp), 'Noto Serif JP', serif;
+  }
+  .transition-ws {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ===== CUSTOM SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ws-text-tertiary);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ws-text-secondary);
+}
+
+/* ===== SELECTION ===== */
+::selection {
+  background: var(--ws-accent);
+  color: var(--ws-text-on-dark);
+}
+
+/* ===== SMOOTH SCROLL ===== */
+html {
+  scroll-behavior: smooth;
+}
