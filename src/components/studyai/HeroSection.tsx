@@ -95,10 +95,10 @@ export function HeroSection() {
               transition={{ duration: 0.8, delay: 0.9 }}
               className="mt-10 flex flex-wrap gap-4"
             >
-              <ZenButton variant="primary" size="lg">
+              <ZenButton variant="primary" size="lg" onClick={() => (window as any).__studyai_openAuth?.('register')}>
                 Começar Jornada <ArrowRight size={16} />
               </ZenButton>
-              <ZenButton variant="secondary" size="lg">
+              <ZenButton variant="secondary" size="lg" onClick={() => (window as any).__studyai_openAuth?.('login')}>
                 Ver Demonstração
               </ZenButton>
             </motion.div>

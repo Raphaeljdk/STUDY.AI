@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Serif_JP, Inter } from "next/font/google";
-import { ThemeProvider } from "next-themes";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -22,17 +22,8 @@ export const metadata: Metadata = {
   title: "StudyAI — A beleza de aprender na imperfeição",
   description:
     "Plataforma de estudos com estética Wabi-Sabi japonesa. Respeite seu ritmo natural de aprendizado com IA assistiva.",
-  keywords: [
-    "StudyAI",
-    "estudos",
-    "IA",
-    "aprendizado",
-    "Wabi-Sabi",
-    "tutor inteligente",
-  ],
-  icons: {
-    icon: "/favicon.ico",
-  },
+  keywords: ["StudyAI", "estudos", "IA", "aprendizado", "Wabi-Sabi", "tutor inteligente"],
+  icons: { icon: "/favicon.ico" },
 };
 
 export default function RootLayout({
@@ -46,21 +37,10 @@ export default function RootLayout({
         className={`${notoSerifJP.variable} ${inter.variable} antialiased`}
         style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif" }}
       >
-        <ThemeProvider
-          attribute="data-theme"
-          defaultTheme="washi-paper"
-          themes={[
-            "washi-paper",
-            "sumi-ink",
-            "koke-ishi",
-            "momiji",
-            "sakura",
-          ]}
-          enableSystem={false}
-        >
+        <Providers>
           {children}
           <Toaster />
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogIn, UserPlus } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
@@ -17,6 +17,10 @@ const navLinks = [
 export function HeaderZen() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const openAuth = (mode: 'login' | 'register') => {
+    (window as any).__studyai_openAuth?.(mode);
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -61,10 +65,13 @@ export function HeaderZen() {
         </nav>
 
         {/* Right side */}
-        <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           <ThemeSelector />
-          <ZenButton variant="primary" size="sm">
-            Começar Jornada
+          <ZenButton variant="ghost" size="sm" onClick={() => openAuth('login')}>
+            <LogIn size={15} /> Entrar
+          </ZenButton>
+          <ZenButton variant="primary" size="sm" onClick={() => openAuth('register')}>
+            <UserPlus size={15} /> Cadastrar
           </ZenButton>
         </div>
 
@@ -105,9 +112,12 @@ export function HeaderZen() {
               <div className="mt-4 flex items-center gap-4">
                 <ThemeSelector />
               </div>
-              <div className="mt-4">
-                <ZenButton variant="primary" size="md" className="w-full">
-                  Começar Jornada
+              <div className="mt-4 flex gap-3">
+                <ZenButton variant="secondary" size="md" className="flex-1" onClick={() => { openAuth('login'); setMobileOpen(false); }}>
+                  <LogIn size={15} /> Entrar
+                </ZenButton>
+                <ZenButton variant="primary" size="md" className="flex-1" onClick={() => { openAuth('register'); setMobileOpen(false); }}>
+                  <UserPlus size={15} /> Cadastrar
                 </ZenButton>
               </div>
             </nav>

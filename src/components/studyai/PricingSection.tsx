@@ -122,6 +122,7 @@ export function PricingSection() {
                   variant={plan.highlighted ? 'primary' : 'secondary'}
                   size="md"
                   className="w-full"
+                  onClick={() => (window as any).__studyai_openAuth?.('register')}
                 >
                   {plan.cta}
                 </ZenButton>
