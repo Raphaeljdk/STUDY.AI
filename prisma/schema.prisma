@@ -21,10 +21,49 @@ enum Plan {
 model User {
   id        String   @id @default(cuid())
   name      String
-   email     String   @unique
-   password  String
+  email     String   @unique
+  password  String
   role      Role     @default(USER)
   plan      Plan     @default(FREE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  notebooks    Notebook[]
+  studySessions StudySession[]
+}
+
+model Notebook {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("")
+  color     String   @default("#c0392b")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcards Flashcard[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Flashcard {
+  id         String   @id @default(cuid())
+  front      String
+  back       String
+  notebookId String?
+  notebook   Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+  userId     String
+  easeFactor Float    @default(2.5)
+  interval   Int      @default(0)
+  repetitions Int     @default(0)
+ nextReview DateTime @default(now())
+ createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model StudySession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  Int      // seconds
+  type      String   @default("pomodoro")
+  createdAt DateTime @default(now())
 }
