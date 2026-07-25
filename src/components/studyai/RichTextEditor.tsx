@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -231,19 +231,6 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
           )}
         </div>
       </div>
-
-      {/* Bubble Menu (appears on text selection) */}
-      <BubbleMenu editor={editor} tippyOptions={{ duration: 150 }}>
-        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-1 py-0.5 shadow-lg">
-          <ToolbarBtn onClick={toggleBold} active={editor.isActive('bold')} title="Negrito"><Bold size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={toggleItalic} active={editor.isActive('italic')} title="Italico"><Italic size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={toggleUnderline} active={editor.isActive('underline')} title="Sublinhar"><UnderlineIcon size={14} /></ToolbarBtn>
-          <ToolbarBtn onClick={toggleStrike} active={editor.isActive('strike')} title="Riscado"><Strikethrough size={14} /></ToolbarBtn>
-          <Divider />
-          <ToolbarBtn onClick={toggleH2} active={editor.isActive('heading', { level: 2 })} title="Subtitulo"><span className="text-[10px] font-bold">H2</span></ToolbarBtn>
-          <ToolbarBtn onClick={toggleQuote} active={editor.isActive('blockquote')} title="Citacao"><Quote size={14} /></ToolbarBtn>
-        </div>
-      </BubbleMenu>
 
       {/* Editor Content */}
       <div className="prose-editor">
