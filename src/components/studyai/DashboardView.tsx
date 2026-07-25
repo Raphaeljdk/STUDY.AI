@@ -53,7 +53,7 @@ class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: R
 }
 
 // Safe rich text editor with fallback to plain textarea
-function SafeEditor({ content, onChange, placeholder }: { content: string; onChange: (html: string) => void; placeholder: string }) {
+function SafeEditor({ content, onChange, placeholder, onError }: { content: string; onChange: (html: string) => void; placeholder: string; onError?: (msg: string) => void }) {
   const [editorReady, setEditorReady] = useState(false);
   const [editorFailed, setEditorFailed] = useState(false);
   const [EditorComp, setEditorComp] = useState<React.ComponentType<{ content: string; onChange: (html: string) => void; placeholder: string }> | null>(null);
@@ -65,6 +65,7 @@ function SafeEditor({ content, onChange, placeholder }: { content: string; onCha
       .catch((err) => {
         console.warn('[SafeEditor] RichTextEditor failed to load, using fallback:', err);
         setEditorFailed(true);
+        onError?.(err?.message || 'Editor falhou ao carregar');
       });
   }, []);
 
@@ -76,12 +77,17 @@ function SafeEditor({ content, onChange, placeholder }: { content: string; onCha
 
   if (editorFailed) {
     return (
-      <textarea
-        value={content}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className="min-h-[400px] w-full resize-none bg-transparent p-5 text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
-      />
+      <div>
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--ws-accent)]/10 px-3 py-2 text-xs text-[var(--ws-accent)]">
+          <AlertCircle size={14} /> Editor avancado indisponivel. Usando editor simples.
+        </div>
+        <textarea
+          value={content}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className="min-h-[400px] w-full resize-none bg-transparent p-5 text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+        />
+      </div>
     );
   }
 
@@ -175,11 +181,7 @@ export function DashboardView() {
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
           {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
-          {activeTab === 'notebook-edit' && editNotebookId && (
-            <SectionErrorBoundary key={`eb-${editNotebookId}`} name="NotebookEditor">
-              <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />
-            </SectionErrorBoundary>
-          )}
+          {activeTab === 'notebook-edit' && editNotebookId && <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />}
           {activeTab === 'flashcards' && <FlashcardsManager key="fc" onReview={() => setActiveTab('flashcard-review')} />}
           {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
           {activeTab === 'timer' && <PomodoroTimer key="pom" />}
@@ -556,6 +558,7 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
   const [fcBack, setFcBack] = useState('');
   const [creatingFc, setCreatingFc] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchedRef = useRef(false);
 
@@ -691,7 +694,7 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
             <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Edit3 size={14} className="mr-1.5 inline" /> Suas Anotacoes</h2>
             <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salva automaticamente</span>
           </div>
-          <SafeEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." />
+          <SafeEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." onError={(msg) => setEditorError(msg)} />
         </WabiSabiCard>
 
         <div className="space-y-4">
