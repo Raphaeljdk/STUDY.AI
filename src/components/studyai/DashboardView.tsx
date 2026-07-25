@@ -15,7 +15,18 @@ import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
-import { RichTextEditor } from './RichTextEditor';
+import dynamic from 'next/dynamic';
+const RichTextEditor = dynamic(() => import('./RichTextEditor').then(m => ({ default: m.RichTextEditor })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <div className="text-center">
+        <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+        <p className="text-xs text-[var(--ws-text-tertiary)]">Carregando editor...</p>
+      </div>
+    </div>
+  ),
+});
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
