@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useMemo, useId } from 'react';
 
 interface EnsoCircleProps {
   size?: number;
@@ -46,7 +46,8 @@ export function EnsoCircle({
     return d;
   }, [size, imperfection]);
 
-  const gradientId = `enso-glow-${Math.random().toString(36).slice(2, 8)}`;
+  const stableId = useId();
+  const gradientId = `enso-glow-${stableId.replace(/:/g, '')}`;
 
   return (
     <motion.svg
