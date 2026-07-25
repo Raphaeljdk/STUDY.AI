@@ -24,12 +24,13 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(USER)
-  plan      Plan     @default(FREE)
+  plan      Plan     @default(SENSEI)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  notebooks    Notebook[]
-  studySessions StudySession[]
+  notebooks      Notebook[]
+  studySessions  StudySession[]
+  chatMessages   ChatMessage[]
 }
 
 model Notebook {
@@ -37,6 +38,7 @@ model Notebook {
   title     String
   content   String   @default("")
   color     String   @default("#c0392b")
+  icon      String   @default("book")
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   flashcards Flashcard[]
@@ -63,7 +65,16 @@ model StudySession {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  duration  Int      // seconds
+  duration  Int
   type      String   @default("pomodoro")
+  createdAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
   createdAt DateTime @default(now())
 }
