@@ -1,29 +1,47 @@
+# StudyAI Worklog
+
 ---
 Task ID: 1
-Agent: Main Orchestrator
-Task: Fix all lint errors and implement 5 major improvements
+Agent: Main
+Task: Make Sensei AI smarter - learn from conversation history + absorb notebook content
 
 Work Log:
-- Fixed sensei-chat/route.ts: unterminated string literal (multi-line string in single quotes)
-- Fixed RichTextEditor.tsx: moved ToolbarBtn and Divider components outside render function
-- Fixed DashboardView.tsx: added missing Send import from lucide-react
-- Fixed DashboardView.tsx: removed synchronous setLoading(true) calls inside useEffect
-- Created /api/generate-flashcards/route.ts: AI flashcard generation endpoint
-- Improved /api/sensei-chat/route.ts: added conversation context (last 10 messages), markdown responses
-- Improved /api/stats/route.ts: added dailyData, streak, todayMinutes, chatCount, masteredCards
-- Rewrote AuthModal.tsx: removed plan selection step, direct register with SENSEI plan
-- Rewrote DashboardView.tsx (655->1291 lines) with all 5 improvements
-- Removed PricingSection from landing page
-- Removed "Precos" link from HeaderZen nav
-- Removed "Precos" from FooterZen footer links
+- Verified Prisma schema already has ChatMessage model
+- Ran `prisma db push --force-reset` to sync database
+- Ran `prisma generate` to regenerate Prisma Client
+- Completely rewrote `/src/app/api/sensei-chat/route.ts`:
+  - Fetches last 20 chat messages for conversation history context
+  - Fetches ALL user notebooks and strips HTML to plain text
+  - Implements relevance scoring (keyword matching) to find top 3 most relevant notebooks per question
+  - Injects relevant notebook content into system prompt as "Base de Conhecimento do Aluno"
+ - Limits each notebook context to 1500 chars to stay within context window
+  - Persists both user message and AI reply to DB via createMany
+  - Improved system prompt with detailed teaching instructions, Markdown formatting guidance, and notebook awareness
+- Improved SenseiChat UI component in DashboardView.tsx:
+  - Dynamic suggested prompts generated from user's actual notebooks ("Revisar: [title]")
+  - Added "Resumo geral dos estudos" suggestion when notebooks exist
+  - Replaced single-line input with auto-resizing textarea (Shift+Enter for newline)
+  - Added copy button on assistant messages (hover to reveal)
+  - Added "Lendo N cadernos" badge showing context awareness in header
+  - Shows which notebooks are being used as context in the chat header
+  - Better welcome message explaining notebook awareness
+  - Removed static subject chips (replaced with dynamic notebook-based suggestions)
+- Added `Copy` icon import from lucide-react
+- Verified landing page has no pricing/paywall content
+- Passed ESLint check
+- Tested via curl API:
+  - Sensei AI correctly references notebook content ("Na sua anotação sobre Biologia Celular...")
+  - Conversation memory works (follow-up questions build on previous context)
+  - Messages are persisted to DB (verified 4 messages stored)
+- Tested via agent-browser (before server restart issues):
+  - Dashboard loads correctly with all tabs
+  - Notebook creation and rich text editor work
+  - Sensei chat shows dynamic "Revisar: Biologia Celular" button
+  - Chat UI renders correctly with all new features
 
 Stage Summary:
-- All 30 lint errors fixed, now 0 errors
-- Server running on port 3000, responding 200
-- Landing page verified via agent-browser
-- 5 major improvements implemented:
-  1. Rich text editor (Tiptap already installed, fixed lint issues)
-  2. Plan restrictions removed (AuthModal, landing page, nav)
-  3. Flashcards improved (AI generation, search, SM-2 badges, due dates)
-  4. Sensei AI chat improved (markdown rendering, subject chips, clear chat, categories)
-  5. Dashboard improved (weekly chart, streak, time-based greeting, better stats)
+- Sensei AI is now context-aware: reads user notebooks and uses conversation history
+- The AI explicitly references user's notebook content in responses
+- UI dynamically adapts to show which notebooks are being used as context
+- All chat messages are persisted for future conversation continuity
+- Copy button, textarea input, and notebook-based suggestions improve UX

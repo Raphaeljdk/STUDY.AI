@@ -1,0 +1,492 @@
+   800→function FlashcardReviewer({ onBack }: { onBack: () => void }) {
+   801→  const [cards, setCards] = useState<FlashcardItem[]>([]);
+   802→  const [loading, setLoading] = useState(true);
+   803→  const [currentIndex, setCurrentIndex] = useState(0);
+   804→  const [flipped, setFlipped] = useState(false);
+   805→  const [done, setDone] = useState(false);
+   806→  const [reviewed, setReviewed] = useState(0);
+   807→  const [ratings, setRatings] = useState<number[]>([]);
+   808→  const fetchedRef = useRef(false);
+   809→
+   810→  useEffect(() => {
+   811→    if (fetchedRef.current) return;
+   812→    fetchedRef.current = true;
+   813→    fetch('/api/flashcards?due=true').then(r => r.json()).then(d => {
+   814→      if (d.flashcards) setCards(d.flashcards);
+   815→    }).catch(() => {}).finally(() => setLoading(false));
+   816→  }, []);
+   817→
+   818→  const handleReview = useCallback(async (quality: number) => {
+   819→    const card = cards[currentIndex];
+   820→    if (!card) return;
+   821→    try {
+   822→      await fetch(`/api/flashcards/${card.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: quality }) });
+   823→    } catch {}
+   824→    setReviewed(prev => prev + 1);
+   825→    setRatings(prev => [...prev, quality]);
+   826→    setFlipped(false);
+   827→    if (currentIndex + 1 >= cards.length) setDone(true);
+   828→    else setCurrentIndex(prev => prev + 1);
+   829→  }, [cards, currentIndex]);
+   830→
+   831→  // Keyboard shortcuts
+   832→  useEffect(() => {
+   833→    if (done || !flipped || cards.length === 0) return;
+   834→    const handleKey = (e: KeyboardEvent) => {
+   835→      if (e.key === '1') handleReview(1);
+   836→      else if (e.key === '2') handleReview(2);
+   837→      else if (e.key === '3') handleReview(3);
+   838→      else if (e.key === '4') handleReview(5);
+   839→    };
+   840→    window.addEventListener('keydown', handleKey);
+   841→    return () => window.removeEventListener('keydown', handleKey);
+   842→  }, [flipped, done, cards.length, handleReview]);
+   843→
+   844→  // Completion stats
+   845→  const avgRating = ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : '0';
+   846→  const hardCount = ratings.filter(r => r <= 2).length;
+   847→  const easyCount = ratings.filter(r => r >= 4).length;
+   848→
+   849→  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>;
+   850→  if (cards.length === 0) return (
+   851→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="py-16 text-center">
+   852→      <Check size={48} className="mx-auto mb-4 text-[var(--ws-verdigris)]" strokeWidth={1} />
+   853→      <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhuma carta para revisar agora</p>
+   854→      <button onClick={onBack} className="mt-4 text-sm text-[var(--ws-accent)] hover:underline">Voltar</button>
+   855→    </motion.div>
+   856→  );
+   857→  if (done) return (
+   858→    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto max-w-md py-16 text-center">
+   859→      <EnsoCircle size={80} strokeWidth={2} color="var(--ws-verdigris)" imperfection={0.1} animate={false} />
+   860→      <h2 className="mt-6 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)]">Sessao Completa!</h2>
+   861→      <p className="mt-2 text-sm text-[var(--ws-text-tertiary)]">Voce revisou {reviewed} cartas</p>
+   862→
+   863→      <div className="mt-8 grid grid-cols-3 gap-4">
+   864→        <WabiSabiCard hover={false}>
+   865→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-accent)]">{avgRating}</p>
+   866→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Media</p>
+   867→        </WabiSabiCard>
+   868→        <WabiSabiCard hover={false}>
+   869→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-gold)]">{hardCount}</p>
+   870→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Dificeis</p>
+   871→        </WabiSabiCard>
+   872→        <WabiSabiCard hover={false}>
+   873→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-verdigris)]">{easyCount}</p>
+   874→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Faceis</p>
+   875→        </WabiSabiCard>
+   876→      </div>
+   877→
+   878→      <ZenButton variant="primary" size="md" className="mt-8" onClick={onBack}>Voltar aos Flashcards</ZenButton>
+   879→    </motion.div>
+   880→  );
+   881→
+   882→  const card = cards[currentIndex];
+   883→  return (
+   884→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+   885→      {/* Progress header */}
+   886→      <div className="mb-6">
+   887→        <div className="mb-4 flex items-center justify-between">
+   888→          <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]">
+   889→            <ArrowLeft size={16} /> Voltar
+   890→          </button>
+   891→          <div className="flex items-center gap-3">
+   892→            <span className="font-serif-jp text-sm font-bold text-[var(--ws-text-primary)]">{currentIndex + 1} <span className="font-normal text-[var(--ws-text-tertiary)]">de {cards.length}</span></span>
+   893→            <span className="rounded-ws-button bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] px-2.5 py-1 text-xs font-medium text-[var(--ws-accent)]">{reviewed} revisadas</span>
+   894→          </div>
+   895→        </div>
+   896→        <div className="h-1.5 w-full rounded-full bg-[var(--ws-glass-border)]">
+   897→          <motion.div className="h-1.5 rounded-full bg-[var(--ws-accent)]" initial={{ width: 0 }} animate={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }} transition={{ duration: 0.3 }} />
+   898→        </div>
+   899→      </div>
+   900→
+   901→      <div className="mx-auto max-w-xl">
+   902→        {/* Flashcard */}
+   903→        <div
+   904→          className="perspective-1000 cursor-pointer"
+   905→          onClick={() => !flipped && setFlipped(true)}
+   906→          style={{ perspective: 1000 }}
+   907→        >
+   908→          <motion.div className="min-h-[280px] relative" animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.6, type: 'spring', stiffness: 100 }} style={{ transformStyle: 'preserve-3d' }}>
+   909→            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-8 backdrop-blur-xl" style={{ backfaceVisibility: 'hidden' }}>
+   910→              <p className="mb-4 text-xs font-medium text-[var(--ws-accent)]">PERGUNTA</p>
+   911→              <p className="text-center text-lg font-medium leading-relaxed text-[var(--ws-text-primary)]">{card.front}</p>
+   912→              <p className="mt-6 text-xs text-[var(--ws-text-tertiary)]">Clique para ver a resposta</p>
+   913→            </div>
+   914→            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-ws-organic border border-[var(--ws-accent)]/20 bg-[var(--ws-bg)] p-8" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+   915→              <p className="mb-4 text-xs font-medium text-[var(--ws-verdigris)]">RESPOSTA</p>
+   916→              <p className="text-center text-base leading-relaxed text-[var(--ws-text-primary)]">{card.back}</p>
+   917→            </div>
+   918→          </motion.div>
+   919→        </div>
+   920→
+   921→        {/* Rating Buttons */}
+   922→        <AnimatePresence>{flipped && (
+   923→          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
+   924→            <p className="mb-3 text-center text-xs text-[var(--ws-text-tertiary)]">Como voce se saiu? (teclas 1-4)</p>
+   925→            <div className="flex flex-wrap justify-center gap-3">
+   926→              {([
+   927→                ['Novamente', '1 min', 1, '1'],
+   928→                ['Dificil', '6 min', 2, '2'],
+   929→                ['Bom', '10 min', 3, '3'],
+   930→                ['Facil', '4 dias', 5, '4'],
+   931→              ] as const).map(([label, sub, q, key]) => (
+   932→                <button
+   933→                  key={label}
+   934→                  onClick={() => handleReview(q)}
+   935→                  className="group flex flex-col items-center gap-1 rounded-ws-button border border-[var(--ws-glass-border)] px-5 py-3 transition-all hover:border-[var(--ws-accent)]/30 hover:shadow-md"
+   936→                >
+   937→                  <span className="text-sm font-medium text-[var(--ws-text-primary)]">{label}</span>
+   938→                  <span className="text-[10px] text-[var(--ws-text-tertiary)]">{sub}</span>
+   939→                  <span className="mt-1 rounded bg-[var(--ws-bg)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--ws-text-tertiary)] opacity-0 transition-opacity group-hover:opacity-100">{key}</span>
+   940→                </button>
+   941→              ))}
+   942→            </div>
+   943→          </motion.div>
+   944→        )}</AnimatePresence>
+   945→      </div>
+   946→    </motion.div>
+   947→  );
+   948→}
+   949→
+   950→// ========== POMODORO TIMER ==========
+   951→function PomodoroTimer() {
+   952→  const [mode, setMode] = useState<'focus' | 'short' | 'long'>('focus');
+   953→  const [timeLeft, setTimeLeft] = useState(25 * 60);
+   954→  const [isRunning, setIsRunning] = useState(false);
+   955→  const [totalToday, setTotalToday] = useState(0);
+   956→  const [sessions, setSessions] = useState<{ duration: number; createdAt: string }[]>([]);
+   957→  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   958→  const durations = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
+   959→  const modeLabels = { focus: 'Foco', short: 'Pausa Curta', long: 'Pausa Longa' };
+   960→  const fetchedRef = useRef(false);
+   961→
+   962→  useEffect(() => {
+   963→    if (fetchedRef.current) return;
+   964→    fetchedRef.current = true;
+   965→    fetch('/api/sessions').then(r => r.json()).then(d => {
+   966→      if (d.sessions) {
+   967→        const today = new Date().toDateString();
+   968→        setTotalToday(d.sessions.filter((s: any) => new Date(s.createdAt).toDateString() === today).reduce((sum: number, s: any) => sum + s.duration, 0));
+   969→        setSessions(d.sessions.slice(0, 10));
+   970→      }
+   971→    });
+   972→  }, []);
+   973→
+   974→  useEffect(() => {
+   975→    if (isRunning) {
+   976→      intervalRef.current = setInterval(() => {
+   977→        setTimeLeft(prev => {
+   978→          if (prev <= 1) {
+   979→            setIsRunning(false);
+   980→            if (mode === 'focus') {
+   981→              const dur = durations.focus - prev;
+   982→              fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: dur, type: 'pomodoro' }) });
+   983→              setTotalToday(t => t + dur);
+   984→            }
+   985→            return 0;
+   986→          }
+   987→          return prev - 1;
+   988→        });
+   989→      }, 1000);
+   990→    } else if (intervalRef.current) clearInterval(intervalRef.current);
+   991→    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+   992→  }, [isRunning, mode, durations.focus]);
+   993→
+   994→  const switchMode = (m: 'focus' | 'short' | 'long') => { setMode(m); setTimeLeft(durations[m]); setIsRunning(false); };
+   995→  const minutes = Math.floor(timeLeft / 60);
+   996→  const seconds = timeLeft % 60;
+   997→  const progress = 1 - timeLeft / durations[mode];
+   998→
+   999→  return (
+  1000→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+  1001→      <div className="mb-8">
+  1002→        <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl"><Timer size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Pomodoro Timer</h1>
+  1003→        <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Estude com foco usando a tecnica Pomodoro</p>
+  1004→      </div>
+  1005→      <div className="mx-auto max-w-md">
+  1006→        <div className="mb-8 flex justify-center gap-2">
+  1007→          {(['focus', 'short', 'long'] as const).map(m => (
+  1008→            <button key={m} onClick={() => switchMode(m)} className={`rounded-ws-button px-4 py-2 text-sm font-medium transition-colors ${mode === m ? 'bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]'}`}>
+  1009→              {modeLabels[m]}
+  1010→            </button>
+  1011→          ))}
+  1012→        </div>
+  1013→        <WabiSabiCard className="mb-8" hover={false}>
+  1014→          <div className="flex flex-col items-center py-8">
+  1015→            <div className="relative flex h-56 w-56 items-center justify-center">
+  1016→              <svg className="absolute inset-0 -rotate-90" viewBox="0 0 200 200">
+  1017→                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--ws-glass-border)" strokeWidth="4" />
+  1018→                <motion.circle cx="100" cy="100" r="90" fill="none" stroke="var(--ws-accent)" strokeWidth="4" strokeLinecap="round" strokeDasharray={2 * Math.PI * 90} animate={{ strokeDashoffset: 2 * Math.PI * 90 * (1 - progress) }} transition={{ duration: 0.5 }} />
+  1019→              </svg>
+  1020→              <div className="text-center">
+  1021→                <p className="font-serif-jp text-5xl font-bold text-[var(--ws-text-primary)]">{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</p>
+  1022→                <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">{modeLabels[mode]}</p>
+  1023→              </div>
+  1024→            </div>
+  1025→            <div className="mt-8 flex gap-4">
+  1026→              <button onClick={() => switchMode(mode)} className="rounded-ws-button p-3 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-primary)]" title="Reiniciar"><RotateCcw size={18} /></button>
+  1027→              <ZenButton variant="primary" size="lg" onClick={() => setIsRunning(!isRunning)} className="px-12">{isRunning ? 'Pausar' : 'Iniciar'}</ZenButton>
+  1028→            </div>
+  1029→          </div>
+  1030→        </WabiSabiCard>
+  1031→        <WabiSabiCard hover={false}>
+  1032→          <h3 className="mb-3 text-sm font-semibold text-[var(--ws-text-secondary)]"><Clock size={14} className="mr-1.5 inline" /> Hoje</h3>
+  1033→          <p className="font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">{Math.round(totalToday / 60)} min</p>
+  1034→          <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">de tempo de foco</p>
+  1035→          {sessions.length > 0 && (
+  1036→            <div className="mt-4 max-h-48 space-y-2 overflow-y-auto border-t border-[var(--ws-glass-border)] pt-4">
+  1037→              {sessions.map((s, i) => (
+  1038→                <div key={i} className="flex items-center justify-between text-xs">
+  1039→                  <span className="text-[var(--ws-text-tertiary)]">{new Date(s.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+  1040→                  <span className="font-medium text-[var(--ws-text-primary)]">{Math.round(s.duration / 60)} min</span>
+  1041→                </div>
+  1042→              ))}
+  1043→            </div>
+  1044→          )}
+  1045→        </WabiSabiCard>
+  1046→      </div>
+  1047→    </motion.div>
+  1048→  );
+  1049→}
+  1050→
+  1051→// ========== SENSEI AI CHAT ==========
+  1052→const subjectChips = ['Matematica', 'Ciencias', 'Historia', 'Portugues', 'Filosofia', 'Programacao'];
+  1053→
+  1054→const suggestedPromptsByCategory = [
+  1055→  {
+  1056→    category: 'Estudo',
+  1057→    icon: BookOpen,
+  1058→    prompts: ['Me ajude a estudar para uma prova de matematica', 'Crie um plano de estudos para concursos', 'Como estudar de forma mais eficiente?'],
+  1059→  },
+  1060→  {
+  1061→    category: 'Conceitos',
+  1062→    icon: Brain,
+  1063→    prompts: ['Explique fotossintese de forma simples', 'O que e derivada em calculo?', 'Qual a diferenca entre mitose e meiose?'],
+  1064→  },
+  1065→  {
+  1066→    category: 'Produtividade',
+  1067→    icon: Target,
+  1068→    prompts: ['Dicas para memorizar melhor', 'Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo'],
+  1069→  },
+  1070→];
+  1071→
+  1072→function SenseiChat() {
+  1073→  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  1074→  const [input, setInput] = useState('');
+  1075→  const [isLoading, setIsLoading] = useState(false);
+  1076→  const [activeChip, setActiveChip] = useState<string | null>(null);
+  1077→  const scrollRef = useRef<HTMLDivElement>(null);
+  1078→  const fetchedRef = useRef(false);
+  1079→
+  1080→  useEffect(() => {
+  1081→    if (fetchedRef.current) return;
+  1082→    fetchedRef.current = true;
+  1083→    fetch('/api/chat').then(r => r.json()).then(d => {
+  1084→      if (d.messages && d.messages.length > 0) {
+  1085→        setMessages(d.messages);
+  1086→      } else {
+  1087→        setMessages([{
+  1088→          id: 'welcome',
+  1089→          role: 'assistant',
+  1090→          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.\n\nEstou aqui para ajudá-lo em sua jornada de aprendizado. Escolha um assunto acima ou digite sua pergunta.\n\n*O que gostaria de estudar hoje?*`,
+  1091→          createdAt: new Date().toISOString(),
+  1092→        }]);
+  1093→      }
+  1094→    }).catch(() => {
+  1095→      setMessages([{
+  1096→        id: 'welcome',
+  1097→        role: 'assistant',
+  1098→        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.\n\nEstou aqui para ajudá-lo em sua jornada de aprendizado.\n\n*O que gostaria de estudar hoje?*`,
+  1099→        createdAt: new Date().toISOString(),
+  1100→      }]);
+  1101→    });
+  1102→  }, []);
+  1103→
+  1104→  useEffect(() => {
+  1105→    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  1106→  }, [messages, isLoading]);
+  1107→
+  1108→  const handleSend = async (msgText?: string) => {
+  1109→    const userMsg = (msgText || input).trim();
+  1110→    if (!userMsg || isLoading) return;
+  1111→    const userMessage = { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: new Date().toISOString() };
+  1112→    setMessages(prev => [...prev, userMessage]);
+  1113→    setInput('');
+  1114→    setIsLoading(true);
+  1115→    try {
+  1116→      await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'user', message: userMsg }) });
+  1117→    } catch {}
+  1118→    try {
+  1119→      const contextPrefix = activeChip ? `[Contexto: ${activeChip}] ` : '';
+  1120→      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: contextPrefix + userMsg }) });
+  1121→      const data = await res.json();
+  1122→      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
+  1123→      setMessages(prev => [...prev, assistantMsg]);
+  1124→      try {
+  1125→        await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'assistant', message: data.reply }) });
+  1126→      } catch {}
+  1127→    } catch {
+  1128→      setMessages(prev => [...prev, {
+  1129→        id: (Date.now() + 1).toString(),
+  1130→        role: 'assistant',
+  1131→        content: 'Desculpe, ocorreu um erro. Tente novamente.',
+  1132→        createdAt: new Date().toISOString(),
+  1133→      }]);
+  1134→    }
+  1135→    setIsLoading(false);
+  1136→  };
+  1137→
+  1138→  const handleClear = async () => {
+  1139→    if (!confirm('Limpar toda a conversa?')) return;
+  1140→    try {
+  1141→      await fetch('/api/chat', { method: 'DELETE' });
+  1142→    } catch {}
+  1143→    setMessages([{
+  1144→      id: 'welcome-clear',
+  1145→      role: 'assistant',
+  1146→      content: `Conversa limpa! Estou pronto para ajudar.\n\n*Como posso ajudar?*`,
+  1147→      createdAt: new Date().toISOString(),
+  1148→    }]);
+  1149→  };
+  1150→
+  1151→  const isOnlyWelcome = messages.length <= 1;
+  1152→
+  1153→  return (
+  1154→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+  1155→      <div className="mb-6 flex items-start justify-between">
+  1156→        <div>
+  1157→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+  1158→            <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
+  1159→          </h1>
+  1160→          <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Seu tutor de IA pessoal para estudos</p>
+  1161→        </div>
+  1162→        {messages.length > 1 && (
+  1163→          <button
+  1164→            onClick={handleClear}
+  1165→            className="flex items-center gap-1.5 rounded-ws-button border border-[var(--ws-glass-border)] px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:border-red-300/50 hover:text-red-400"
+  1166→          >
+  1167→            <Trash size={12} /> Limpar conversa
+  1168→          </button>
+  1169→        )}
+  1170→      </div>
+  1171→
+  1172→      <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
+  1173→        {/* Header */}
+  1174→        <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
+  1175→          <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
+  1176→          <div>
+  1177→            <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
+  1178→            <p className="text-xs text-[var(--ws-text-tertiary)]">Seu tutor pessoal</p>
+  1179→          </div>
+  1180→          <div className="ml-auto flex items-center gap-2">
+  1181→            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
+  1182→            <span className="text-xs text-[var(--ws-text-tertiary)]">Online</span>
+  1183→          </div>
+  1184→        </div>
+  1185→
+  1186→        {/* Subject chips */}
+  1187→        <div className="flex gap-2 overflow-x-auto border-b border-[var(--ws-glass-border)] px-6 py-3 no-scrollbar">
+  1188→          {subjectChips.map(chip => (
+  1189→            <button
+  1190→              key={chip}
+  1191→              onClick={() => setActiveChip(activeChip === chip ? null : chip)}
+  1192→              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+  1193→                activeChip === chip
+  1194→                  ? 'bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)]'
+  1195→                  : 'border border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:border-[var(--ws-accent)]/30'
+  1196→              }`}
+  1197→            >
+  1198→              {chip}
+  1199→            </button>
+  1200→          ))}
+  1201→        </div>
+  1202→
+  1203→        {/* Messages */}
+  1204→        <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
+  1205→          <div className="space-y-6">
+  1206→            <AnimatePresence>
+  1207→              {messages.map((msg) => (
+  1208→                <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+  1209→                  {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
+  1210→                  <div className="flex flex-col">
+  1211→                    <div className={`max-w-[80%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-white/60 text-[var(--ws-text-primary)]'}`}>
+  1212→                      {msg.role === 'assistant' ? (
+  1213→                        <div className="prose-ws text-sm leading-relaxed [&_p]:mb-2 [&_p]:last:mb-0 [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_code]:rounded [&_code]:bg-[var(--ws-bg)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:rounded-lg [&_pre]:bg-[var(--ws-bg)] [&_pre]:p-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--ws-accent)] [&_blockquote]:pl-3 [&_blockquote]:italic">
+  1214→                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+  1215→                        </div>
+  1216→                      ) : (
+  1217→                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+  1218→                      )}
+  1219→                    </div>
+  1220→                    <span className={`mt-1 text-[10px] text-[var(--ws-text-tertiary)] ${msg.role === 'user' ? 'text-right' : ''}`}>
+  1221→                      {formatTimestamp(msg.createdAt)}
+  1222→                    </span>
+  1223→                  </div>
+  1224→                </motion.div>
+  1225→              ))}
+  1226→            </AnimatePresence>
+  1227→
+  1228→            {/* Loading animation */}
+  1229→            {isLoading && (
+  1230→              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+  1231→                <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />
+  1232→                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-5 py-3">
+  1233→                  <div className="flex items-center gap-1.5">
+  1234→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
+  1235→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
+  1236→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} />
+  1237→                  </div>
+  1238→                  <span className="ml-2 text-[10px] text-[var(--ws-text-tertiary)]">Sensei esta pensando...</span>
+  1239→                </div>
+  1240→              </motion.div>
+  1241→            )}
+  1242→          </div>
+  1243→
+  1244→          {/* Suggested prompts by category */}
+  1245→          {isOnlyWelcome && !isLoading && (
+  1246→            <div className="mt-6 space-y-4">
+  1247→              {suggestedPromptsByCategory.map((cat) => (
+  1248→                <div key={cat.category}>
+  1249→                  <div className="mb-2 flex items-center gap-1.5">
+  1250→                    <cat.icon size={12} className="text-[var(--ws-accent)]" />
+  1251→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">{cat.category}</span>
+  1252→                  </div>
+  1253→                  <div className="flex flex-wrap gap-2">
+  1254→                    {cat.prompts.map(p => (
+  1255→                      <button key={p} onClick={() => handleSend(p)} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+  1256→                        {p}
+  1257→                      </button>
+  1258→                    ))}
+  1259→                  </div>
+  1260→                </div>
+  1261→              ))}
+  1262→            </div>
+  1263→          )}
+  1264→        </div>
+  1265→
+  1266→        {/* Input */}
+  1267→        <div className="border-t border-[var(--ws-glass-border)] p-4">
+  1268→          <div className="flex items-center gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-4 py-3">
+  1269→            <input
+  1270→              type="text"
+  1271→              placeholder={activeChip ? `Pergunte sobre ${activeChip}...` : 'Faca uma pergunta sobre seus estudos...'}
+  1272→              className="flex-1 bg-transparent text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+  1273→              value={input}
+  1274→              onChange={e => setInput(e.target.value)}
+  1275→              onKeyDown={e => e.key === 'Enter' && handleSend()}
+  1276→            />
+  1277→            <button
+  1278→              onClick={() => handleSend()}
+  1279→              disabled={isLoading || !input.trim()}
+  1280→              className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
+  1281→              aria-label="Enviar"
+  1282→            >
+  1283→              <Send size={14} />
+  1284→            </button>
+  1285→          </div>
+  1286→        </div>
+  1287→      </div>
+  1288→    </motion.div>
+  1289→  );
+  1290→}
+  1291→

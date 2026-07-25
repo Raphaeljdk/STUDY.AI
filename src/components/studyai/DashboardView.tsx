@@ -9,7 +9,7 @@ import {
   LogOut, Shield, ChevronRight, Star, Send,
   Plus, Trash2, Edit3, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
-  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash
+  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
@@ -1049,45 +1049,36 @@ function PomodoroTimer() {
 }
 
 // ========== SENSEI AI CHAT ==========
-const subjectChips = ['Matematica', 'Ciencias', 'Historia', 'Portugues', 'Filosofia', 'Programacao'];
-
-const suggestedPromptsByCategory = [
-  {
-    category: 'Estudo',
-    icon: BookOpen,
-    prompts: ['Me ajude a estudar para uma prova de matematica', 'Crie um plano de estudos para concursos', 'Como estudar de forma mais eficiente?'],
-  },
-  {
-    category: 'Conceitos',
-    icon: Brain,
-    prompts: ['Explique fotossintese de forma simples', 'O que e derivada em calculo?', 'Qual a diferenca entre mitose e meiose?'],
-  },
-  {
-    category: 'Produtividade',
-    icon: Target,
-    prompts: ['Dicas para memorizar melhor', 'Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo'],
-  },
-];
-
 function SenseiChat() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [notebooks, setNotebooks] = useState<{ id: string; title: string; content: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fetchedRef = useRef(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Fetch chat history and notebooks on mount
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetch('/api/chat').then(r => r.json()).then(d => {
-      if (d.messages && d.messages.length > 0) {
-        setMessages(d.messages);
+    Promise.all([
+      fetch('/api/chat').then(r => r.json()),
+      fetch('/api/notebooks').then(r => r.json()),
+    ]).then(([chatData, nbData]) => {
+      if (nbData.notebooks) setNotebooks(nbData.notebooks);
+      if (chatData.messages && chatData.messages.length > 0) {
+        setMessages(chatData.messages);
       } else {
         setMessages([{
           id: 'welcome',
           role: 'assistant',
-          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.\n\nEstou aqui para ajudá-lo em sua jornada de aprendizado. Escolha um assunto acima ou digite sua pergunta.\n\n*O que gostaria de estudar hoje?*`,
+          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal inteligente.
+
+Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar com o conteudo que voce ja esta estudando. Quanto mais voce usa, mais eu entendo seu perfil de estudo.
+
+*Escolha uma sugestao abaixo ou digite sua pergunta!*`,
           createdAt: new Date().toISOString(),
         }]);
       }
@@ -1095,7 +1086,9 @@ function SenseiChat() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.\n\nEstou aqui para ajudá-lo em sua jornada de aprendizado.\n\n*O que gostaria de estudar hoje?*`,
+        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.
+
+*Como posso ajudar?*`,
         createdAt: new Date().toISOString(),
       }]);
     });
@@ -1105,6 +1098,14 @@ function SenseiChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isLoading]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [input]);
+
   const handleSend = async (msgText?: string) => {
     const userMsg = (msgText || input).trim();
     if (!userMsg || isLoading) return;
@@ -1113,17 +1114,10 @@ function SenseiChat() {
     setInput('');
     setIsLoading(true);
     try {
-      await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'user', message: userMsg }) });
-    } catch {}
-    try {
-      const contextPrefix = activeChip ? `[Contexto: ${activeChip}] ` : '';
-      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: contextPrefix + userMsg }) });
+      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
       const data = await res.json();
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
-      try {
-        await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'assistant', message: data.reply }) });
-      } catch {}
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -1143,12 +1137,39 @@ function SenseiChat() {
     setMessages([{
       id: 'welcome-clear',
       role: 'assistant',
-      content: `Conversa limpa! Estou pronto para ajudar.\n\n*Como posso ajudar?*`,
+      content: `Conversa limpa! Ainda tenho acesso aos seus cadernos.
+
+*Como posso ajudar?*`,
       createdAt: new Date().toISOString(),
     }]);
   };
 
+  const handleCopy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const isOnlyWelcome = messages.length <= 1;
+
+  // Build dynamic suggestions from notebooks
+  const notebookSuggestions = notebooks
+    .filter(nb => nb.content && nb.content.replace(/<[^>]*>/g, '').trim().length > 20)
+    .slice(0, 3);
+
+  const defaultSuggestions = [
+    { category: 'Estudo', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Dicas para memorizar melhor'] },
+    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo', 'Me ajude com tecnica Pomodoro'] },
+  ];
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
@@ -1157,14 +1178,21 @@ function SenseiChat() {
           <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
             <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
           </h1>
-          <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Seu tutor de IA pessoal para estudos</p>
+          <p className="mt-1 flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
+            Seu tutor inteligente
+            {notebooks.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ws-verdigris)]/30 bg-[color-mix(in_srgb,var(--ws-verdigris)_8%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--ws-verdigris)]">
+                <Sparkles size={10} /> Lendo {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </p>
         </div>
         {messages.length > 1 && (
           <button
             onClick={handleClear}
             className="flex items-center gap-1.5 rounded-ws-button border border-[var(--ws-glass-border)] px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:border-red-300/50 hover:text-red-400"
           >
-            <Trash size={12} /> Limpar conversa
+            <Trash size={12} /> Limpar
           </button>
         )}
       </div>
@@ -1173,31 +1201,19 @@ function SenseiChat() {
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
           <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
-            <p className="text-xs text-[var(--ws-text-tertiary)]">Seu tutor pessoal</p>
+            <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
+              {notebooks.length > 0
+                ? `Contexto: ${notebooks.map(n => n.title).join(', ')}`
+                : 'Conectado aos seus cadernos de estudo'
+              }
+            </p>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
             <span className="text-xs text-[var(--ws-text-tertiary)]">Online</span>
           </div>
-        </div>
-
-        {/* Subject chips */}
-        <div className="flex gap-2 overflow-x-auto border-b border-[var(--ws-glass-border)] px-6 py-3 no-scrollbar">
-          {subjectChips.map(chip => (
-            <button
-              key={chip}
-              onClick={() => setActiveChip(activeChip === chip ? null : chip)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeChip === chip
-                  ? 'bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)]'
-                  : 'border border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:border-[var(--ws-accent)]/30'
-              }`}
-            >
-              {chip}
-            </button>
-          ))}
         </div>
 
         {/* Messages */}
@@ -1208,13 +1224,23 @@ function SenseiChat() {
                 <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
                   <div className="flex flex-col">
-                    <div className={`max-w-[80%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-white/60 text-[var(--ws-text-primary)]'}`}>
+                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-white/60 text-[var(--ws-text-primary)]'}`}>
                       {msg.role === 'assistant' ? (
                         <div className="prose-ws text-sm leading-relaxed [&_p]:mb-2 [&_p]:last:mb-0 [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_code]:rounded [&_code]:bg-[var(--ws-bg)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:rounded-lg [&_pre]:bg-[var(--ws-bg)] [&_pre]:p-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--ws-accent)] [&_blockquote]:pl-3 [&_blockquote]:italic">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                      )}
+                      {/* Copy button on assistant messages */}
+                      {msg.role === 'assistant' && msg.id !== 'welcome' && msg.id !== 'welcome-clear' && (
+                        <button
+                          onClick={() => handleCopy(msg.content, msg.id)}
+                          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ws-text-tertiary)] opacity-0 transition-all hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] group-hover:opacity-100"
+                          title={copiedId === msg.id ? 'Copiado!' : 'Copiar resposta'}
+                        >
+                          {copiedId === msg.id ? <Check size={12} className="text-[var(--ws-verdigris)]" /> : <Copy size={12} />}
+                        </button>
                       )}
                     </div>
                     <span className={`mt-1 text-[10px] text-[var(--ws-text-tertiary)] ${msg.role === 'user' ? 'text-right' : ''}`}>
@@ -1241,10 +1267,32 @@ function SenseiChat() {
             )}
           </div>
 
-          {/* Suggested prompts by category */}
+          {/* Suggested prompts */}
           {isOnlyWelcome && !isLoading && (
             <div className="mt-6 space-y-4">
-              {suggestedPromptsByCategory.map((cat) => (
+              {/* Dynamic suggestions from user notebooks */}
+              {notebookSuggestions.length > 0 && (
+                <div>
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-[var(--ws-accent)]" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">Baseado nos seus cadernos</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {notebookSuggestions.map(nb => (
+                      <button key={nb.id} onClick={() => handleSend(`Me ajude a revisar o conteudo do caderno "${nb.title}". Me faca um resumo e me faca perguntas para testar meu conhecimento.`)} className="rounded-full border border-[var(--ws-accent)]/20 bg-[color-mix(in_srgb,var(--ws-accent)_6%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)]">
+                        Revisar: {nb.title}
+                      </button>
+                    ))}
+                    {notebookSuggestions.length > 0 && (
+                      <button onClick={() => handleSend('O que eu tenho estudado ultimamente? Me faca um resumo de todos os meus cadernos e sugira o que revisar primeiro.')} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+                        Resumo geral dos estudos
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* Default suggestions */}
+              {defaultSuggestions.map((cat) => (
                 <div key={cat.category}>
                   <div className="mb-2 flex items-center gap-1.5">
                     <cat.icon size={12} className="text-[var(--ws-accent)]" />
@@ -1263,26 +1311,30 @@ function SenseiChat() {
           )}
         </div>
 
-        {/* Input */}
+        {/* Input - textarea for multi-line */}
         <div className="border-t border-[var(--ws-glass-border)] p-4">
-          <div className="flex items-center gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-4 py-3">
-            <input
-              type="text"
-              placeholder={activeChip ? `Pergunte sobre ${activeChip}...` : 'Faca uma pergunta sobre seus estudos...'}
-              className="flex-1 bg-transparent text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-4 py-3">
+            <textarea
+              ref={textareaRef}
+              placeholder="Pergunte sobre seus estudos... (Shift+Enter para nova linha)"
+              className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              onKeyDown={handleKeyDown}
+              rows={1}
             />
             <button
               onClick={() => handleSend()}
               disabled={isLoading || !input.trim()}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
               aria-label="Enviar"
             >
               <Send size={14} />
             </button>
           </div>
+          <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
+            O Sensei IA le seus cadernos automaticamente para dar respostas mais precisas
+          </p>
         </div>
       </div>
     </motion.div>
