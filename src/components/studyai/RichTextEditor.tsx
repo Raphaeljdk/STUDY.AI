@@ -32,7 +32,7 @@ const highlightColors = [
 ];
 
 const textColors = [
-  { label: 'Padrao', color: '#1a1a1a' },
+  { label: 'Padrao', color: 'var(--ws-text-primary)' },
   { label: 'Vermelho', color: '#dc2626' },
   { label: 'Azul', color: '#2563eb' },
   { label: 'Verde', color: '#16a34a' },
@@ -83,7 +83,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[400px] text-[var(--ws-text-primary)] leading-relaxed',
+        class: 'focus:outline-none min-h-[400px] leading-relaxed',
       },
     },
   });
@@ -127,7 +127,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
           {showColorPicker && (<>
             <div className="fixed inset-0 z-10" onClick={() => setShowColorPicker(false)} />
             <div className="absolute left-0 top-full z-20 mt-1 flex gap-1 rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-2 shadow-lg">
-              {textColors.map(c => (<button key={c.color} onClick={() => setColor(c.color)} title={c.label} className="h-6 w-6 rounded-md border border-[var(--ws-glass-border)] transition-transform hover:scale-110" style={{ backgroundColor: c.color }} />))}
+              {textColors.map(c => (<button key={c.label} onClick={() => setColor(c.color)} title={c.label} className="h-6 w-6 rounded-md border border-[var(--ws-glass-border)] transition-transform hover:scale-110" style={{ backgroundColor: c.color }} />))}
             </div>
           </>)}
         </div>
@@ -166,30 +166,6 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
         </div>
       </div>
       <div className="prose-editor"><EditorContent editor={editor} /></div>
-      <style jsx global>{`
-        .prose-editor .tiptap { outline: none; min-height: 400px; padding: 1.25rem; }
-        .prose-editor .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; color: var(--ws-text-tertiary); pointer-events: none; height: 0; opacity: 0.6; }
-        .prose-editor .tiptap h1 { font-size: 1.875rem; font-weight: 700; line-height: 1.2; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--ws-text-primary); font-family: var(--font-serif-jp); }
-        .prose-editor .tiptap h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.3; margin-top: 1.25rem; margin-bottom: 0.5rem; color: var(--ws-text-primary); font-family: var(--font-serif-jp); }
-        .prose-editor .tiptap h3 { font-size: 1.25rem; font-weight: 600; line-height: 1.4; margin-top: 1rem; margin-bottom: 0.5rem; color: var(--ws-text-primary); }
-        .prose-editor .tiptap p { margin-bottom: 0.75rem; line-height: 1.75; color: var(--ws-text-primary); }
-        .prose-editor .tiptap ul, .prose-editor .tiptap ol { margin-bottom: 0.75rem; padding-left: 1.5rem; }
-        .prose-editor .tiptap ul { list-style-type: disc; }
-        .prose-editor .tiptap ol { list-style-type: decimal; }
-        .prose-editor .tiptap li { margin-bottom: 0.25rem; line-height: 1.6; color: var(--ws-text-primary); }
-        .prose-editor .tiptap blockquote { border-left: 3px solid var(--ws-accent); padding-left: 1rem; margin: 1rem 0; font-style: italic; color: var(--ws-text-secondary); }
-        .prose-editor .tiptap pre { background: color-mix(in srgb, var(--ws-ink) 6%, transparent); border-radius: var(--ws-radius-button); padding: 0.75rem 1rem; margin: 1rem 0; overflow-x: auto; }
-        .prose-editor .tiptap pre code { font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.5; color: var(--ws-text-primary); }
-        .prose-editor .tiptap code { background: color-mix(in srgb, var(--ws-accent) 10%, transparent); border-radius: 4px; padding: 0.125rem 0.375rem; font-family: 'Courier New', monospace; font-size: 0.875em; color: var(--ws-accent); }
-        .prose-editor .tiptap hr { border: none; border-top: 1px solid var(--ws-glass-border); margin: 1.5rem 0; }
-        .prose-editor .tiptap s { text-decoration: line-through; color: var(--ws-text-tertiary); }
-        .prose-editor .tiptap mark { border-radius: 2px; padding: 0.125rem 0; }
-        .prose-editor .tiptap ul[data-type="taskList"] { list-style: none; padding-left: 0; }
-        .prose-editor .tiptap ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.25rem; }
-        .prose-editor .tiptap ul[data-type="taskList"] li > label { margin-top: 0.2rem; flex-shrink: 0; }
-        .prose-editor .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] { accent-color: var(--ws-accent); width: 1rem; height: 1rem; }
-        .prose-editor .tiptap ul[data-type="taskList"] li > div { flex: 1; }
-      `}</style>
     </div>
   );
 }

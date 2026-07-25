@@ -45,3 +45,26 @@ Stage Summary:
 - UI dynamically adapts to show which notebooks are being used as context
 - All chat messages are persisted for future conversation continuity
 - Copy button, textarea input, and notebook-based suggestions improve UX
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix deployment client-side crash error + improve app quality
+
+Work Log:
+- Diagnosed root cause: `<style jsx global>` in RichTextEditor.tsx crashes in Next.js production builds (App Router + standalone output)
+- Moved all TipTap editor styles from `<style jsx global>` to globals.css as regular CSS
+- Removed `prose prose-sm sm:prose-base` classes from editorProps (requires missing @tailwindcss/typography plugin)
+- Fixed 3x `bg-white/60` hardcoded backgrounds → `bg-[var(--ws-glass)]` for dark theme support
+- Replaced `prose-ws` class (undefined) with proper `markdown-content` CSS class in globals.css
+- Added `transpilePackages` for all @tiptap/* packages in next.config.ts
+- Made DashboardView a dynamic import with `ssr: false` in page.tsx
+- Added Error Boundary class component in page.tsx for graceful error handling
+- Added loading states for all dynamic imports
+- Verified: landing page, dashboard, notebook editor, sensei chat, notebook creation all work
+- Verified: zero JavaScript errors in browser console
+- Verified: lint passes clean
+
+Stage Summary:
+- Root cause: styled-jsx global tag incompatible with Next.js App Router production builds
+- 6 files modified: globals.css, RichTextEditor.tsx, DashboardView.tsx, next.config.ts, page.tsx
+- All 5 key flows verified via agent-browser: Landing, Dashboard, Notebook Editor, Sensei Chat, Notebook Creation

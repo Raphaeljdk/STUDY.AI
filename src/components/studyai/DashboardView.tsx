@@ -1235,9 +1235,9 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
                 <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
                   <div className="flex flex-col">
-                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-white/60 text-[var(--ws-text-primary)]'}`}>
+                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)]'}`}>
                       {msg.role === 'assistant' ? (
-                        <div className="prose-ws text-sm leading-relaxed [&_p]:mb-2 [&_p]:last:mb-0 [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-1 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_code]:rounded [&_code]:bg-[var(--ws-bg)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:rounded-lg [&_pre]:bg-[var(--ws-bg)] [&_pre]:p-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--ws-accent)] [&_blockquote]:pl-3 [&_blockquote]:italic">
+                        <div className="markdown-content text-sm leading-relaxed">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       ) : (
@@ -1266,7 +1266,7 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
             {isLoading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
                 <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />
-                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-5 py-3">
+                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-5 py-3">
                   <div className="flex items-center gap-1.5">
                     <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
                     <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
@@ -1324,7 +1324,7 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
 
         {/* Input - textarea for multi-line */}
         <div className="border-t border-[var(--ws-glass-border)] p-4">
-          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-white/60 px-4 py-3">
+          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
             <textarea
               ref={textareaRef}
               placeholder="Pergunte sobre seus estudos... (Shift+Enter para nova linha)"
