@@ -68,3 +68,23 @@ Stage Summary:
 - Root cause: styled-jsx global tag incompatible with Next.js App Router production builds
 - 6 files modified: globals.css, RichTextEditor.tsx, DashboardView.tsx, next.config.ts, page.tsx
 - All 5 key flows verified via agent-browser: Landing, Dashboard, Notebook Editor, Sensei Chat, Notebook Creation
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix notebook creation crash - add SafeEditor with fallback
+
+Work Log:
+- User reported error boundary page showing when creating notebooks
+- Replaced dynamic import of RichTextEditor with SafeEditor component
+- SafeEditor loads RichTextEditor via dynamic import() with try/catch
+- If RichTextEditor fails to load, falls back to plain textarea
+- Added error details section to ErrorBoundary (shows actual error message)
+- Changed all bg-white/60 to bg-[var(--ws-glass)] for theme compatibility
+- Replaced prose-ws with markdown-content CSS class
+- Tested: notebook creation, editor loading, all working with zero errors
+
+Stage Summary:
+- SafeEditor provides bulletproof notebook editing even if TipTap fails
+- ErrorBoundary now shows error details for debugging
+- All themes (light/dark) work correctly

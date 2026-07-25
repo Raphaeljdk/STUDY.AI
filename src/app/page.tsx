@@ -24,7 +24,6 @@ const DashboardView = dynamic(() => import('@/components/studyai/DashboardView')
   ),
 });
 
-// Error Boundary class component
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -33,11 +32,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[StudyAI ErrorBoundary]', error, info.componentStack);
+  }
   render() {
     if (this.state.hasError) {
+      const msg = this.state.error?.message || 'Erro desconhecido';
       return (
         <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)] p-6">
-          <div className="max-w-md text-center">
+          <div className="max-w-md w-full text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ws-accent)]/10">
               <AlertCircle size={28} className="text-[var(--ws-accent)]" />
             </div>
@@ -45,6 +48,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
             <p className="mt-2 text-sm text-[var(--ws-text-tertiary)]">
               Ocorreu um erro inesperado. Tente recarregar a pagina.
             </p>
+            <details className="mt-4 text-left rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-bg-dark)] p-3">
+              <summary className="cursor-pointer text-xs font-medium text-[var(--ws-text-tertiary)]">Detalhes do erro</summary>
+              <pre className="mt-2 overflow-auto max-h-40 text-xs text-[var(--ws-accent)] whitespace-pre-wrap break-all">{msg}</pre>
+            </details>
             <button
               onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
               className="mt-6 inline-flex items-center gap-2 rounded-ws-button bg-[var(--ws-accent)] px-5 py-2.5 text-sm font-medium text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)]"
@@ -64,7 +71,6 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-  // Expose openAuth globally for HeaderZen to call
   useEffect(() => {
     (window as any).__studyai_openAuth = (mode?: 'login' | 'register') => {
       setAuthMode(mode || 'login');
@@ -72,7 +78,6 @@ export default function Home() {
     };
   }, []);
 
-  // Loading
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
@@ -84,7 +89,6 @@ export default function Home() {
     );
   }
 
-  // Logged in -> Dashboard (with error boundary + dynamic import)
   if (session) {
     return (
       <ErrorBoundary>
@@ -93,7 +97,6 @@ export default function Home() {
     );
   }
 
-  // Not logged in -> Landing Page
   return (
     <div className="min-h-screen bg-[var(--ws-bg)]">
       <HeaderZen />
@@ -104,12 +107,7 @@ export default function Home() {
         <AIChatPanel />
       </main>
       <FooterZen />
-
-      <AuthModal
-        isOpen={authOpen}
-        onClose={() => setAuthOpen(false)}
-        initialMode={authMode}
-      />
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
     </div>
   );
 }

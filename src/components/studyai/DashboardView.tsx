@@ -15,18 +15,51 @@ import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
-import dynamic from 'next/dynamic';
-const RichTextEditor = dynamic(() => import('./RichTextEditor').then(m => ({ default: m.RichTextEditor })), {
-  ssr: false,
-  loading: () => (
-    <div className="flex min-h-[400px] items-center justify-center">
-      <div className="text-center">
-        <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
-        <p className="text-xs text-[var(--ws-text-tertiary)]">Carregando editor...</p>
+
+// Safe rich text editor with fallback to plain textarea
+function SafeEditor({ content, onChange, placeholder }: { content: string; onChange: (html: string) => void; placeholder: string }) {
+  const [editorReady, setEditorReady] = useState(false);
+  const [editorFailed, setEditorFailed] = useState(false);
+  const [EditorComp, setEditorComp] = useState<React.ComponentType<{ content: string; onChange: (html: string) => void; placeholder: string }> | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    import('./RichTextEditor')
+      .then(m => { setEditorComp(() => m.RichTextEditor); setEditorReady(true); })
+      .catch(() => setEditorFailed(true));
+  }, []);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => onChange(val), 500);
+  }, [onChange]);
+
+  if (editorFailed) {
+    return (
+      <textarea
+        value={content}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className="min-h-[400px] w-full resize-none bg-transparent p-5 text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+      />
+    );
+  }
+
+  if (!editorReady) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+          <p className="text-xs text-[var(--ws-text-tertiary)]">Carregando editor...</p>
+        </div>
       </div>
-    </div>
-  ),
-});
+    );
+  }
+
+  if (EditorComp) return <EditorComp content={content} onChange={onChange} placeholder={placeholder} />;
+  return null;
+}
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
@@ -559,7 +592,7 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
             <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Edit3 size={14} className="mr-1.5 inline" /> Suas Anotacoes</h2>
             <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salva automaticamente</span>
           </div>
-          <RichTextEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." />
+          <SafeEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." />
         </WabiSabiCard>
 
         <div className="space-y-4">
