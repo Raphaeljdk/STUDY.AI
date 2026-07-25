@@ -88,3 +88,30 @@ Stage Summary:
 - SafeEditor provides bulletproof notebook editing even if TipTap fails
 - ErrorBoundary now shows error details for debugging
 - All themes (light/dark) work correctly
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix notebook creation - add Color/TextStyle extensions, error handling, toast notifications, section error boundary
+
+Work Log:
+- User reported "agr nn ta criando" - notebook creation not working
+- Verified notebook creation works locally (API returns 201, editor opens)
+- Found and fixed critical bug: `import TextStyle from '@tiptap/extension-text-style'` fails because the module has NO default export
+- Fixed: Changed to `import { Color, TextStyle } from '@tiptap/extension-text-style'` (named exports)
+- This was the REAL production crash cause - the import would fail at build time in standalone output
+- Added toast notifications (`toast()` from use-toast) to all notebook CRUD operations
+- Added proper error handling with user-visible feedback to handleCreate, handleDelete, handleCreateFc, handleDeleteFc, handleGenerateFc
+- Added console.error logging to all catch blocks (previously empty `catch {}`)
+- Added null-safety for notebook.content (`|| ''`)
+- Added content validation in handleGenerateFc (checks if content is empty before calling AI)
+- Created SectionErrorBoundary class component for per-section error isolation
+- Wrapped NotebookEditor in SectionErrorBoundary to prevent crashes from taking down the whole app
+- Verified via agent-browser: notebook creation works, editor opens with full toolbar, zero JS errors
+
+Stage Summary:
+- Root cause of production crash: `@tiptap/extension-text-style` has no default export, only named exports
+- Fix: `import { Color, TextStyle } from '@tiptap/extension-text-style'`
+- Added comprehensive error handling with toast notifications throughout the app
+- Added SectionErrorBoundary for graceful degradation if any section fails
+- Files modified: RichTextEditor.tsx, DashboardView.tsx

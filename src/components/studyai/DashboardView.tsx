@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -15,6 +15,42 @@ import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
+import { toast } from '@/hooks/use-toast';
+
+// Lightweight error boundary for individual sections
+class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode; name?: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(`[SectionErrorBoundary${this.props.name ? ` (${this.props.name})` : ''}]`, error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
+      return (
+        <div className="flex min-h-[300px] items-center justify-center rounded-lg border border-dashed border-[var(--ws-glass-border)] p-6">
+          <div className="text-center">
+            <AlertCircle size={24} className="mx-auto mb-3 text-[var(--ws-accent)]" />
+            <p className="text-sm font-medium text-[var(--ws-text-primary)]">Erro ao carregar esta secao</p>
+            <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">{this.state.error?.message || 'Erro desconhecido'}</p>
+            <button
+              onClick={() => { this.setState({ hasError: false, error: null }); }}
+              className="mt-3 text-xs font-medium text-[var(--ws-accent)] hover:underline"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Safe rich text editor with fallback to plain textarea
 function SafeEditor({ content, onChange, placeholder }: { content: string; onChange: (html: string) => void; placeholder: string }) {
@@ -26,7 +62,10 @@ function SafeEditor({ content, onChange, placeholder }: { content: string; onCha
   useEffect(() => {
     import('./RichTextEditor')
       .then(m => { setEditorComp(() => m.RichTextEditor); setEditorReady(true); })
-      .catch(() => setEditorFailed(true));
+      .catch((err) => {
+        console.warn('[SafeEditor] RichTextEditor failed to load, using fallback:', err);
+        setEditorFailed(true);
+      });
   }, []);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -136,7 +175,11 @@ export function DashboardView() {
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
           {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
-          {activeTab === 'notebook-edit' && editNotebookId && <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />}
+          {activeTab === 'notebook-edit' && editNotebookId && (
+            <SectionErrorBoundary key={`eb-${editNotebookId}`} name="NotebookEditor">
+              <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />
+            </SectionErrorBoundary>
+          )}
           {activeTab === 'flashcards' && <FlashcardsManager key="fc" onReview={() => setActiveTab('flashcard-review')} />}
           {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
           {activeTab === 'timer' && <PomodoroTimer key="pom" />}
@@ -397,20 +440,40 @@ function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
     try {
       const res = await fetch('/api/notebooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle, color: newColor }) });
       const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Erro ao criar caderno', description: data.error || 'Tente novamente.', variant: 'destructive' });
+        setCreating(false);
+        return;
+      }
       if (data.notebook) {
         setNotebooks(prev => [data.notebook, ...prev]);
         setNewTitle('');
         setCreating(false);
         onOpen(data.notebook.id);
+        toast({ title: 'Caderno criado!', description: `"${data.notebook.title}" esta pronto.` });
       }
-    } catch {} 
+    } catch (err) {
+      console.error('[NotebooksList] create error:', err);
+      toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o caderno. Verifique sua conexao.', variant: 'destructive' });
+    } 
     setCreating(false);
   };
 
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Deletar "${title}"?`)) return;
-    await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
-    setNotebooks(prev => prev.filter(n => n.id !== id));
+    try {
+      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setNotebooks(prev => prev.filter(n => n.id !== id));
+        toast({ title: 'Caderno deletado', description: `"${title}" foi removido.` });
+      } else {
+        const d = await res.json();
+        toast({ title: 'Erro ao deletar', description: d.error || 'Tente novamente.', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('[NotebooksList] delete error:', err);
+      toast({ title: 'Erro de conexao', description: 'Nao foi possivel deletar.', variant: 'destructive' });
+    }
   };
 
   const stripHtml = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -499,9 +562,17 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetch(`/api/notebooks/${notebookId}`).then(r => r.json()).then(d => {
-      if (d.notebook) { setNotebook(d.notebook); setTitle(d.notebook.title); setContent(d.notebook.content); }
-    }).catch(() => {}).finally(() => setLoading(false));
+    fetch(`/api/notebooks/${notebookId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.notebook) { setNotebook(d.notebook); setTitle(d.notebook.title); setContent(d.notebook.content || ''); }
+        else { toast({ title: 'Caderno nao encontrado', description: 'O caderno solicitado nao existe.', variant: 'destructive' }); }
+      })
+      .catch(err => {
+        console.error('[NotebookEditor] fetch error:', err);
+        toast({ title: 'Erro ao carregar', description: 'Nao foi possivel carregar o caderno.', variant: 'destructive' });
+      })
+      .finally(() => setLoading(false));
   }, [notebookId]);
 
   const saveContent = useCallback(async (newContent: string, newTitle?: string) => {
@@ -512,7 +583,9 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
       const res = await fetch(`/api/notebooks/${notebookId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       const d = await res.json();
       if (d.notebook) setNotebook(d.notebook);
-    } catch {}
+    } catch (err) {
+      console.error('[NotebookEditor] save error:', err);
+    }
     setSaving(false);
   }, [notebookId]);
 
@@ -533,29 +606,55 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
     try {
       const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fcFront, back: fcBack, notebookId }) });
       const data = await res.json();
-      if (data.flashcard) { setNotebook(prev => prev ? { ...prev, flashcards: [data.flashcard, ...(prev.flashcards || [])] } : prev); setFcFront(''); setFcBack(''); setShowFcForm(false); }
-    } catch {}
+      if (data.flashcard) {
+        setNotebook(prev => prev ? { ...prev, flashcards: [data.flashcard, ...(prev.flashcards || [])] } : prev);
+        setFcFront(''); setFcBack(''); setShowFcForm(false);
+      } else {
+        toast({ title: 'Erro ao criar flashcard', description: data.error || 'Tente novamente.', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('[NotebookEditor] create fc error:', err);
+      toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o flashcard.', variant: 'destructive' });
+    }
     setCreatingFc(false);
   };
 
   const handleDeleteFc = async (fcId: string) => {
-    await fetch(`/api/flashcards/${fcId}`, { method: 'DELETE' });
-    setNotebook(prev => prev ? { ...prev, flashcards: prev.flashcards?.filter(f => f.id !== fcId) || [] } : prev);
+    try {
+      await fetch(`/api/flashcards/${fcId}`, { method: 'DELETE' });
+      setNotebook(prev => prev ? { ...prev, flashcards: prev.flashcards?.filter(f => f.id !== fcId) || [] } : prev);
+    } catch (err) {
+      console.error('[NotebookEditor] delete fc error:', err);
+    }
   };
 
   const handleGenerateFc = async () => {
+    if (!content.trim()) {
+      toast({ title: 'Conteudo vazio', description: 'Escreva algo no caderno para gerar flashcards.', variant: 'destructive' });
+      return;
+    }
     setGenerating(true);
     try {
       const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, count: 5 }) });
       const data = await res.json();
-      if (data.flashcards) {
+      if (data.flashcards && data.flashcards.length > 0) {
+        let created = 0;
         for (const fc of data.flashcards) {
           const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back, notebookId }) });
           const d = await r.json();
-          if (d.flashcard) setNotebook(prev => prev ? { ...prev, flashcards: [d.flashcard, ...(prev.flashcards || [])] } : prev);
+          if (d.flashcard) {
+            setNotebook(prev => prev ? { ...prev, flashcards: [d.flashcard, ...(prev.flashcards || [])] } : prev);
+            created++;
+          }
         }
+        toast({ title: 'Flashcards gerados!', description: `${created} flashcards foram criados.` });
+      } else {
+        toast({ title: 'Nenhum flashcard gerado', description: data.error || 'Escreva mais conteudo para gerar flashcards.', variant: 'destructive' });
       }
-    } catch {}
+    } catch (err) {
+      console.error('[NotebookEditor] generate fc error:', err);
+      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+    }
     setGenerating(false);
   };
 

@@ -9,6 +9,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import { Color, TextStyle } from '@tiptap/extension-text-style';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Quote,
@@ -75,6 +76,8 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
       Placeholder.configure({ placeholder }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      TextStyle,
+      Color,
     ],
     content,
     onUpdate: ({ editor }) => {
