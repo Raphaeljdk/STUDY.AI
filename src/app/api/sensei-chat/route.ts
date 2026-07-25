@@ -33,7 +33,7 @@ const BASE_SYSTEM_PROMPT = `Voce e o Sensei AI, um tutor pessoal de estudos avan
 - Estruture respostas longas com cabecalhos e listas para facilitar a leitura
 
 ## Estilo de Resposta
-- Use \"**negrito**\" para termos importantes
+- Use "**negrito**" para termos importantes
 - Use listas para multiplas informacoes
 - Use blocos de codigo quando mostrar formulas ou exemplos tecnicos
 - Mantenha paragrafos curtos e diretos`;
@@ -41,7 +41,7 @@ const BASE_SYSTEM_PROMPT = `Voce e o Sensei AI, um tutor pessoal de estudos avan
 const fallbackResponses = [
   'O aprendizado e como um jardim zen: cada conceito que voce domina e como uma pedra colocada com cuidado. Continue assim!\n\n**Dica:** A chave esta na **repeticao espacada** e na **reflexao ativa** sobre o material. Tente explicar o conceito em suas proprias palavras.',
   'Na tradicao Wabi-Sabi, a beleza esta na imperfeicao. Nao se preocupe em entender tudo de uma vez!\n\nA retencao de longo prazo funciona melhor quando distribuida ao longo do tempo. **Estudar 30 minutos por dia** e mais eficaz do que 3 horas de uma vez.',
-  'Como disse um antigo mestre: *\"O conhecimento e como a agua que flui.\"*\n\nPara entender melhor esse conceito, tente:\n1. Ler com atencao\n2. Fazer anotacoes com suas palavras\n3. Criar exemplos praticos\n4. Explicar para outra pessoa',
+  'Como disse um antigo mestre: *"O conhecimento e como a agua que flui."*\n\nPara entender melhor esse conceito, tente:\n1. Ler com atencao\n2. Fazer anotacoes com suas palavras\n3. Criar exemplos praticos\n4. Explicar para outra pessoa',
   'O caminho do aprendizado e longo, mas cada passo importa. Parabens por estar aqui!\n\n**Tecnicas eficazes:**\n- **Pomodoro**: 25min foco + 5min pausa\n- **Flashcards**: Revisao espacada com SM-2\n- **Notas ativas**: Nao apenas copiar, mas processar\n- **Ensinar**: A melhor forma de aprender',
 ];
 
@@ -88,7 +88,15 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     }
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessao invalida. Tente fazer login novamente.' }, { status: 401 });
+    }
+    // Verify user exists in DB
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado. Crie uma nova conta.' }, { status: 401 });
+    }
     const { message } = await request.json();
 
     if (!message || typeof message !== 'string') {

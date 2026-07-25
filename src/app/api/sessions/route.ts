@@ -29,7 +29,15 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     }
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessao invalida. Tente fazer login novamente.' }, { status: 401 });
+    }
+    // Verify user exists in DB
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado. Crie uma nova conta.' }, { status: 401 });
+    }
     const { duration, type } = await request.json();
 
     if (!duration || duration < 0) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
   BookOpen, Brain, BarChart3, MessageCircle, Clock,
@@ -195,7 +195,7 @@ function TabBtn({ icon: Icon, label, active, onClick }: { icon: any; label: stri
   return (
     <button onClick={onClick} className={`relative flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${active ? 'text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]'}`}>
       <Icon size={16} /><span className="hidden sm:inline">{label}</span>
-      {active && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-2 right-2 h-0.5 bg-[var(--ws-accent)]" />}
+      {active && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[var(--ws-accent)]" />}
     </button>
   );
 }
@@ -777,7 +777,10 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
       const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front, back }) });
       const data = await res.json();
       if (data.flashcard) { setFlashcards(prev => [data.flashcard, ...prev]); setFront(''); setBack(''); setShowForm(false); }
-    } catch {}
+    } catch (err) {
+      console.error('[FlashcardsManager] create error:', err);
+      toast({ title: 'Erro ao criar flashcard', description: 'Tente novamente.', variant: 'destructive' });
+    }
     setCreating(false);
   };
 
@@ -802,7 +805,10 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
         setGenContent('');
         setShowGenForm(false);
       }
-    } catch {}
+    } catch (err) {
+      console.error('[FlashcardsManager] AI generate error:', err);
+      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+    }
     setGenerating(false);
   };
 
@@ -829,8 +835,8 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
             <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><BookPlus size={14} className="mr-1.5 inline" /> {showForm ? 'Fechar' : 'Criar Flashcard'}</h2>
             <motion.div animate={{ rotate: showForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
           </button>
-          <AnimatePresence>{showForm && (
-            <motion.form initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} onSubmit={handleCreate} className="mt-4 space-y-3 overflow-hidden">
+          {showForm && (
+            <form onSubmit={handleCreate} className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Frente (pergunta)</label>
                 <input type="text" value={front} onChange={e => setFront(e.target.value)} placeholder="O que e fotossintese?" className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
@@ -842,8 +848,8 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
               <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={creating || !front.trim() || !back.trim()}>
                 {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar Flashcard
               </ZenButton>
-            </motion.form>
-          )}</AnimatePresence>
+            </form>
+          )}
         </WabiSabiCard>
 
         <WabiSabiCard hover={false}>
@@ -851,8 +857,8 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
             <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Sparkles size={14} className="mr-1.5 inline text-[var(--ws-accent)]" /> Gerar com IA</h2>
             <motion.div animate={{ rotate: showGenForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
           </button>
-          <AnimatePresence>{showGenForm && (
-            <motion.form initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} onSubmit={handleAIGenerate} className="mt-4 space-y-3 overflow-hidden">
+          {showGenForm && (
+            <form onSubmit={handleAIGenerate} className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Conteudo de estudo</label>
                 <textarea value={genContent} onChange={e => setGenContent(e.target.value)} placeholder="Cole aqui o conteudo que deseja transformar em flashcards..." rows={4} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
@@ -860,8 +866,8 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
               <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={generating || !genContent.trim()}>
                 {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {generating ? 'Gerando...' : 'Gerar 5 Flashcards'}
               </ZenButton>
-            </motion.form>
-          )}</AnimatePresence>
+            </form>
+          )}
         </WabiSabiCard>
       </div>
 
@@ -1063,8 +1069,8 @@ function FlashcardReviewer({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Rating Buttons */}
-        <AnimatePresence>{flipped && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
+        {flipped && (
+          <div className="mt-8">
             <p className="mb-3 text-center text-xs text-[var(--ws-text-tertiary)]">Como voce se saiu? (teclas 1-4)</p>
             <div className="flex flex-wrap justify-center gap-3">
               {([
@@ -1084,8 +1090,8 @@ function FlashcardReviewer({ onBack }: { onBack: () => void }) {
                 </button>
               ))}
             </div>
-          </motion.div>
-        )}</AnimatePresence>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -1363,9 +1369,8 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
         {/* Messages */}
         <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
           <div className="space-y-6">
-            <AnimatePresence>
-              {messages.map((msg) => (
-                <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            {messages.map((msg) => (
+                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
                   <div className="flex flex-col">
                     <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)]'}`}>
@@ -1391,9 +1396,8 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
                       {formatTimestamp(msg.createdAt)}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))}
-            </AnimatePresence>
 
             {/* Loading animation */}
             {isLoading && (

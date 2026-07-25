@@ -115,3 +115,29 @@ Stage Summary:
 - Added comprehensive error handling with toast notifications throughout the app
 - Added SectionErrorBoundary for graceful degradation if any section fails
 - Files modified: RichTextEditor.tsx, DashboardView.tsx
+
+---
+Task ID: 2-a
+Agent: SubAgent
+Task: Fix ALL API routes to validate userId from session before Prisma operations
+
+Work Log:
+- Read all 6 API route files to understand current code structure
+- Added userId validation pattern to all handlers that perform Prisma operations:
+  1. /api/notebooks/route.ts - GET and POST handlers
+  2. /api/flashcards/route.ts - GET and POST handlers
+  3. /api/sessions/route.ts - POST handler
+  4. /api/chat/route.ts - POST and DELETE handlers
+  5. /api/stats/route.ts - GET handler
+  6. /api/sensei-chat/route.ts - POST handler
+- Validation pattern: Check (session.user as any)?.id for undefined, return 401 if missing
+- Added DB existence check: db.user.findUnique() to verify user exists in database
+- Returns 401 with 'Sessao invalida. Tente fazer login novamente.' if userId is undefined
+- Returns 401 with 'Usuario nao encontrado. Crie uma nova conta.' if user not in DB
+- Passed ESLint check with zero errors
+
+Stage Summary:
+- Fixed foreign key constraint violation caused by undefined userId in session
+- 6 files modified with consistent userId validation pattern
+- All Prisma operations now protected against invalid/missing userId
+- No changes to overall logic, only added safety checks before Prisma operations
