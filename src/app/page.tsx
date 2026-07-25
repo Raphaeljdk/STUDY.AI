@@ -6,7 +6,6 @@ import { HeaderZen } from '@/components/studyai/HeaderZen';
 import { HeroSection } from '@/components/studyai/HeroSection';
 import { FeaturesSection } from '@/components/studyai/FeaturesSection';
 import { HowItWorksSection } from '@/components/studyai/HowItWorksSection';
-import { PricingSection } from '@/components/studyai/PricingSection';
 import { AIChatPanel } from '@/components/studyai/AIChatPanel';
 import { FooterZen } from '@/components/studyai/FooterZen';
 import { AuthModal } from '@/components/studyai/AuthModal';
@@ -50,7 +49,6 @@ export default function Home() {
         <HeroSection />
         <FeaturesSection />
         <HowItWorksSection />
-        <PricingSection />
         <AIChatPanel />
       </main>
       <FooterZen />

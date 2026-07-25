@@ -10,7 +10,6 @@ import { EnsoCircle } from './EnsoCircle';
 const navLinks = [
   { label: 'Recursos', href: '#features' },
   { label: 'Como Funciona', href: '#how-it-works' },
-  { label: 'Preços', href: '#pricing' },
   { label: 'Sensei IA', href: '#ai-chat' },
 ];
 

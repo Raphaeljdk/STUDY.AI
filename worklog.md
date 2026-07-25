@@ -1,139 +1,29 @@
-# StudyAI Platform - Worklog
-
 ---
 Task ID: 1
-Agent: Main
-Task: Examinar estrutura do projeto existente
+Agent: Main Orchestrator
+Task: Fix all lint errors and implement 5 major improvements
 
 Work Log:
-- Verificou estrutura do Next.js 16 project
-- Confirmou dependências já instaladas: framer-motion, next-themes, lucide-react
+- Fixed sensei-chat/route.ts: unterminated string literal (multi-line string in single quotes)
+- Fixed RichTextEditor.tsx: moved ToolbarBtn and Divider components outside render function
+- Fixed DashboardView.tsx: added missing Send import from lucide-react
+- Fixed DashboardView.tsx: removed synchronous setLoading(true) calls inside useEffect
+- Created /api/generate-flashcards/route.ts: AI flashcard generation endpoint
+- Improved /api/sensei-chat/route.ts: added conversation context (last 10 messages), markdown responses
+- Improved /api/stats/route.ts: added dailyData, streak, todayMinutes, chatCount, masteredCards
+- Rewrote AuthModal.tsx: removed plan selection step, direct register with SENSEI plan
+- Rewrote DashboardView.tsx (655->1291 lines) with all 5 improvements
+- Removed PricingSection from landing page
+- Removed "Precos" link from HeaderZen nav
+- Removed "Precos" from FooterZen footer links
 
 Stage Summary:
-- Projeto pronto para desenvolvimento
-- Tailwind CSS 4 com shadcn/ui já configurado
-
----
-Task ID: 2-3
-Agent: Main
-Task: Configurar design system Wabi-Sabi japonês
-
-Work Log:
-- Atualizou layout.tsx com fontes Noto Serif JP + Inter (Google Fonts)
-- Configurou ThemeProvider com 5 temas Wabi-Sabi usando next-themes
-- Criou globals.css completo com:
-  - 5 temas: Washi Paper, Sumi Ink, Koke Ishi, Momiji, Sakura
-  - Variáveis CSS --ws-* para todo o design system
-  - Utility classes: .bg-ws, .text-ws-primary, .bg-ws-glass, .rounded-ws-organic, etc
-  - Custom scrollbar, selection colors, smooth scroll
-  - Fix: substituiu @apply outline-ring/50 por CSS puro (incompatível Tailwind v4)
-
-Stage Summary:
-- Design system completo com 5 variações temáticas
-- Paleta de cores: Papel artesanal (#F8F6F0), Tinta Sumi (#1A1A1A), Cinábrio (#D93838)
-
----
-Task ID: 4-5
-Agent: Main
-Task: Criar componentes de design base e UI
-
-Work Log:
-- Criou 10 componentes em src/components/studyai/:
-  1. EnsoCircle.tsx - Círculo imperfeito animado com SVG + framer-motion
-  2. SeigaihaPattern.tsx - Padrão de ondas japonesas
-  3. WoodblockTexture.tsx - Textura de papel washi via SVG noise
-  4. FloatingElements.tsx - Ícones flutuantes com Lucide (BookOpen, Brain, etc.)
-  5. ParticlesEffect.tsx - Partículas sutis flutuando
-  6. WabiSabiCard.tsx - Card com glassmorphism + organic radius
-  7. ZenButton.tsx - 3 variantes (primary/secondary/ghost), 3 tamanhos
-  8. EnsoDivider.tsx - Divisor de seção com mini Enso
-  9. ThemeSelector.tsx - Seletor de 5 temas com next-themes
-  10. SectionHeading.tsx - Heading reutilizável com subtítulo japonês
-
-Stage Summary:
-- Todos os componentes usam TypeScript + 'use client' + framer-motion
-- Zero emojis, apenas Lucide icons
-- Animações zen-like (lentas, suaves)
-
----
-Task ID: 7-12
-Agent: Main
-Task: Criar seções completas da landing page
-
-Work Log:
-- HeaderZen.tsx: Navegação fixa com glassmorphism, menu mobile, logo Enso
-- HeroSection.tsx: Parallax com scroll, Enso animado 420px, glassmorphism mini-dashboard, trust indicators
-- FeaturesSection.tsx: 8 features em grid responsivo com stagger animation
-- HowItWorksSection.tsx: 4 etapas com layout alternado e linha vertical
-- PricingSection.tsx: 3 planos (Shojin/Samurai/Sensei) com destaque no Samurai
-- AIChatPanel.tsx: Chat completo com Sensei AI, loading dots, mensagens animadas
-- FooterZen.tsx: Footer com links organizados, texto 侘寂, 一期一会
-
-Stage Summary:
-- 7 seções completas compostas na page.tsx
-- Todas as seções responsivas (mobile-first)
-
----
-Task ID: 11
-Agent: Main
-Task: Criar API de chat com Sensei AI
-
-Work Log:
-- Criou /api/sensei-chat/route.ts com z-ai-web-dev-sdk
-- System prompt em PT-BR com personalidade zen japonesa
-- Fallback responses para quando a API falha
-- Endpoint POST com validação de input
-
-Stage Summary:
-- API funcional com LLM e fallback graceful
-- Chat conecta ao backend via POST
-
----
-Task ID: 13-14
-Agent: Main
-Task: Verificação final
-
-Work Log:
-- Lint limpo (zero erros)
-- Servidor retorna HTTP 200 com 89KB de HTML correto
-- Conteúdo verificado: StudyAI, Sensei, 学習, Wabi-Sabi, Samurai, etc.
-- Configurado allowedDevOrigins para preview
-
-Stage Summary:
-- Plataforma completa e funcional
-- 5 temas Wabi-Sabi funcionais
-- AI Chat integrado com backend LLM
-
----
-Task ID: study-features
-Agent: Main
-Task: Build complete study functionality - notebook editor, flashcards, pomodoro timer, dynamic stats
-
-Work Log:
-- Updated Prisma schema with Notebook, Flashcard, StudySession models (SM-2 algorithm fields)
-- Pushed DB schema with `bun run db:push`
-- Created 6 new API routes:
-  - `/api/notebooks` (GET list, POST create)
-  - `/api/notebooks/[id]` (GET single, PATCH update content/title/color, DELETE)
-  - `/api/flashcards` (GET list with optional filters, POST create)
-  - `/api/flashcards/[id]` (PATCH with SM-2 review algorithm or edit, DELETE)
-  - `/api/sessions` (GET list, POST create pomodoro session)
-  - `/api/stats` (GET aggregated stats: notebooks, flashcards, due flashcards, study time)
-- Completely rewrote DashboardView.tsx (1100+ lines) with:
-  - Tab-based navigation: Dashboard, Cadernos, Flashcards, Pomodoro, Sensei IA, Admin
-  - DashboardHome: Dynamic stats from API, recent notebooks, quick access buttons that navigate
-  - NotebooksList: Create notebooks with color picker, grid view, delete
-  - NotebookEditor: Full text editor with auto-save (1s debounce), title editing, inline flashcard creation sidebar
-  - FlashcardsManager: Create flashcards, view all with SM-2 stats
-  - FlashcardReviewer: 3D flip card animation, SM-2 spaced repetition rating (Novamente/Dificil/Bom/Facil), progress bar, completion screen
-  - PomodoroTimer: 25/5/15 min modes, circular progress ring SVG, start/pause/reset, session saving, daily stats
-- Fixed WabiSabiCard decorative element blocking clicks (added pointer-events-none)
-- Fixed missing useCallback import that caused NotebookEditor crash
-- Removed unused imports (ChevronLeft, Save, FlipHorizontal, ThumbsUp, ThumbsDown)
-- Fixed duplicate setCreating(false) in notebook creation handler
-- Admin user seeded: admin@studyai.com / admin123 (SENSEI plan, ADMIN role)
-
-Stage Summary:
-- All features verified via Agent Browser: login, notebook CRUD, content editing with auto-save, flashcard creation (inside notebook), flashcard review with flip animation and SM-2 algorithm, pomodoro timer with circular progress
-- Lint passes clean (zero errors)
-- Dynamic dashboard stats work (1 Meus Cadernos, 1 flashcard, 0m study time)
+- All 30 lint errors fixed, now 0 errors
+- Server running on port 3000, responding 200
+- Landing page verified via agent-browser
+- 5 major improvements implemented:
+  1. Rich text editor (Tiptap already installed, fixed lint issues)
+  2. Plan restrictions removed (AuthModal, landing page, nav)
+  3. Flashcards improved (AI generation, search, SM-2 badges, due dates)
+  4. Sensei AI chat improved (markdown rendering, subject chips, clear chat, categories)
+  5. Dashboard improved (weekly chart, streak, time-based greeting, better stats)

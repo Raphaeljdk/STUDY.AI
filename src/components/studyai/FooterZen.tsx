@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { EnsoCircle } from './EnsoCircle';
 
 const footerLinks = {
-  Produto: ['Recursos', 'Preços', 'Roadmap', 'Integrações'],
+  Produto: ['Recursos', 'Roadmap', 'Integracoes'],
   Empresa: ['Sobre', 'Blog', 'Carreiras', 'Contato'],
   Recursos: ['Documentação', 'Comunidade', 'Tutoriais', 'FAQ'],
   Legal: ['Privacidade', 'Termos', 'Cookies'],
