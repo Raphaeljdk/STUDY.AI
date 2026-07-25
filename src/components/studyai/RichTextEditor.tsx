@@ -68,6 +68,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Comece a escr
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const editor = useEditor({
+    immediatelyRender: true,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
