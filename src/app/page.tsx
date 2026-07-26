@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Component, type ReactNode } from 'react';
+import { useState, useEffect, Component, type ReactNode, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { HeaderZen } from '@/components/studyai/HeaderZen';
 import { HeroSection } from '@/components/studyai/HeroSection';
@@ -17,7 +17,15 @@ const DashboardView = dynamic(() => import('@/components/studyai/DashboardView')
   loading: () => (
     <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
       <div className="text-center">
-        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+        <div className="mx-auto mb-6 grid max-w-sm grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton mb-2 h-10 w-10 rounded-full" />
+              <div className="skeleton mb-1.5 h-4 w-16" />
+              <div className="skeleton h-3 w-12" />
+            </div>
+          ))}
+        </div>
         <p className="text-sm text-[var(--ws-text-tertiary)]">Carregando seu espaco de estudo...</p>
       </div>
     </div>
@@ -66,11 +74,37 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// Scroll progress hook
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight > 0) {
+        setProgress((scrollTop / docHeight) * 100);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  return progress;
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const scrollProgress = useScrollProgress();
 
+  // Update progress bar
+  useEffect(() => {
+    const bar = document.getElementById('scroll-progress-bar');
+    if (bar) bar.style.width = `${scrollProgress}%`;
+  }, [scrollProgress]);
+
+  // Expose auth open globally
   useEffect(() => {
     (window as any).__studyai_openAuth = (mode?: 'login' | 'register') => {
       setAuthMode(mode || 'login');
@@ -78,11 +112,30 @@ export default function Home() {
     };
   }, []);
 
+  // Update header active users counter
+  useEffect(() => {
+    const updateCounter = () => {
+      const el = document.getElementById('header-active-users');
+      if (el) el.textContent = String(87 + Math.floor(Math.random() * 30));
+    };
+    updateCounter();
+    const id = setInterval(updateCounter, 5000);
+    return () => clearInterval(id);
+  }, []);
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+          <div className="mx-auto mb-6 grid max-w-sm grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton mb-2 h-10 w-10 rounded-full" />
+                <div className="skeleton mb-1.5 h-4 w-16" />
+                <div className="skeleton h-3 w-12" />
+              </div>
+            ))}
+          </div>
           <p className="text-sm text-[var(--ws-text-tertiary)]">Carregando...</p>
         </div>
       </div>

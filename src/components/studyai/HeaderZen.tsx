@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, Users } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { ZenButton } from './ZenButton';
-import { EnsoCircle } from './EnsoCircle';
+import Image from 'next/image';
 
 const navLinks = [
   { label: 'Recursos', href: '#features' },
@@ -37,13 +37,14 @@ export function HeaderZen() {
     >
       <div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-4 lg:px-24">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-3">
-          <EnsoCircle
-            size={36}
-            strokeWidth={2}
-            color="var(--ws-accent)"
-            imperfection={0.1}
-            animate={false}
+        <a href="#" className="flex items-center gap-3 transition-opacity hover:opacity-80">
+          <Image
+            src="/logo.png"
+            alt="StudyAI Logo"
+            width={36}
+            height={36}
+            className="rounded-full"
+            priority
           />
           <span className="font-serif-jp text-xl font-bold tracking-tight text-[var(--ws-text-primary)]">
             StudyAI
@@ -56,7 +57,7 @@ export function HeaderZen() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-[var(--ws-text-secondary)] transition-colors duration-300 hover:text-[var(--ws-accent)]"
+              className="relative text-sm font-medium text-[var(--ws-text-secondary)] transition-colors duration-300 hover:text-[var(--ws-accent)] after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-[var(--ws-accent)] after:transition-all after:duration-300 hover:after:w-full"
             >
               {link.label}
             </a>
@@ -65,26 +66,29 @@ export function HeaderZen() {
 
         {/* Right side */}
         <div className="hidden items-center gap-3 lg:flex">
+          <div className="mr-2 flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
+            <span className="live-dot inline-block h-2 w-2 rounded-full bg-[var(--ws-verdigris)]" />
+            <Users size={12} />
+            <span className="tabular-nums" id="header-active-users">--</span> online
+          </div>
           <ThemeSelector />
           <ZenButton variant="ghost" size="sm" onClick={() => openAuth('login')}>
             <LogIn size={15} /> Entrar
           </ZenButton>
-          <ZenButton variant="primary" size="sm" onClick={() => openAuth('register')}>
+          <ZenButton variant="primary" size="sm" gradient onClick={() => openAuth('register')}>
             <UserPlus size={15} /> Cadastrar
           </ZenButton>
         </div>
 
-        {/* Mobile Menu Toggle */}
+        {/* Mobile Menu Toggle - Animated Hamburger */}
         <button
-          className="lg:hidden"
+          className={`relative flex h-8 w-8 flex-col items-center justify-center gap-[5px] lg:hidden ${mobileOpen ? 'hamburger-active' : ''}`}
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Menu"
         >
-          {mobileOpen ? (
-            <X size={24} className="text-[var(--ws-text-primary)]" />
-          ) : (
-            <Menu size={24} className="text-[var(--ws-text-primary)]" />
-          )}
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
         </button>
       </div>
 
@@ -115,7 +119,7 @@ export function HeaderZen() {
                 <ZenButton variant="secondary" size="md" className="flex-1" onClick={() => { openAuth('login'); setMobileOpen(false); }}>
                   <LogIn size={15} /> Entrar
                 </ZenButton>
-                <ZenButton variant="primary" size="md" className="flex-1" onClick={() => { openAuth('register'); setMobileOpen(false); }}>
+                <ZenButton variant="primary" size="md" gradient className="flex-1" onClick={() => { openAuth('register'); setMobileOpen(false); }}>
                   <UserPlus size={15} /> Cadastrar
                 </ZenButton>
               </div>

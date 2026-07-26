@@ -8,6 +8,7 @@ interface ZenButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
+  gradient?: boolean;
 }
 
 const variantStyles = {
@@ -26,20 +27,28 @@ export function ZenButton({
   children,
   variant = 'primary',
   size = 'md',
+  gradient = false,
   className,
   ...props
 }: ZenButtonProps) {
+  const isPrimary = variant === 'primary';
+
   return (
     <motion.button
       className={cn(
-      'group relative inline-flex items-center justify-center gap-2 overflow-hidden font-medium tracking-wide transition-ws',
-      sizeStyles[size],
-      variantStyles[variant],
-      className,
-    )}
+        'group relative inline-flex items-center justify-center gap-2 overflow-hidden font-medium tracking-wide transition-ws',
+        sizeStyles[size],
+        variantStyles[variant],
+        isPrimary && gradient && 'btn-gradient-animate',
+        className,
+      )}
       style={{ borderRadius: 'var(--ws-radius-button)' }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ 
+        scale: 1.03, 
+        y: -1,
+        transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
+      }}
+      whileTap={{ scale: 0.97 }}
       {...props}
     >
       <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />

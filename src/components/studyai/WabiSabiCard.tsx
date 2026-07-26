@@ -7,18 +7,23 @@ interface WabiSabiCardProps {
   children: ReactNode;
   className?: string;
   hover?: boolean;
+  glass?: boolean;
 }
 
-export function WabiSabiCard({ children, className = '', hover = true }: WabiSabiCardProps) {
+export function WabiSabiCard({ children, className = '', hover = true, glass = false }: WabiSabiCardProps) {
   return (
     <motion.div
-      className={`relative overflow-hidden border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-6 backdrop-blur-xl ${className}`}
+      className={`relative overflow-hidden p-6 ${
+        glass
+          ? 'glass-enhanced'
+          : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl'
+      } ${className}`}
       style={{ borderRadius: 'var(--ws-radius-card)' }}
       whileHover={
         hover
           ? {
-              y: -2,
-              boxShadow: '0 12px 40px rgba(0,0,0,0.08)',
+              y: -3,
+              boxShadow: '0 16px 48px rgba(0,0,0,0.1)',
               transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] },
             }
           : undefined

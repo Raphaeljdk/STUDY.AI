@@ -1,0 +1,502 @@
+   500→   500→            {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar
+   501→   501→          </ZenButton>
+   502→   502→        </form>
+   503→   503→      </WabiSabiCard>
+   504→   504→      {loading ? (
+   505→   505→        <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>
+   506→   506→      ) : notebooks.length === 0 ? (
+   507→   507→        <div className="py-16 text-center">
+   508→   508→          <FolderOpen size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   509→   509→          <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum caderno criado ainda</p>
+   510→   510→        </div>
+   511→   511→      ) : (
+   512→   512→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+   513→   513→          {notebooks.map((nb, i) => (
+   514→   514→            <motion.div key={nb.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+   515→   515→              <WabiSabiCard>
+   516→   516→                <button onClick={() => onOpen(nb.id)} className="w-full text-left">
+   517→   517→                  <div className="flex items-start justify-between">
+   518→   518→                    <div className="flex items-center gap-3">
+   519→   519→                      <div className="flex h-10 w-10 items-center justify-center rounded-ws-button" style={{ backgroundColor: nb.color + '18' }}>
+   520→   520→                        <BookOpen size={18} style={{ color: nb.color }} strokeWidth={1.5} />
+   521→   521→                      </div>
+   522→   522→                      <div className="min-w-0">
+   523→   523→                        <p className="truncate text-sm font-semibold text-[var(--ws-text-primary)]">{nb.title}</p>
+   524→   524→                        <p className="text-xs text-[var(--ws-text-tertiary)]">{nb._count?.flashcards || 0} flashcards</p>
+   525→   525→                      </div>
+   526→   526→                    </div>
+   527→   527→                    <ChevronRight size={16} className="shrink-0 text-[var(--ws-text-tertiary)]" />
+   528→   528→                  </div>
+   529→   529→                  {nb.content && <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-[var(--ws-text-tertiary)]">{stripHtml(nb.content).substring(0, 120)}</p>}
+   530→   530→                  <p className="mt-2 text-[10px] text-[var(--ws-text-tertiary)]">{new Date(nb.updatedAt).toLocaleDateString('pt-BR')}</p>
+   531→   531→                </button>
+   532→   532→                <div className="mt-3 flex justify-end border-t border-[var(--ws-glass-border)] pt-3">
+   533→   533→                  <button onClick={(e) => { e.stopPropagation(); handleDelete(nb.id, nb.title); }} className="rounded-ws-button p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)]" title="Deletar">
+   534→   534→                    <Trash2 size={14} />
+   535→   535→                  </button>
+   536→   536→                </div>
+   537→   537→              </WabiSabiCard>
+   538→   538→            </motion.div>
+   539→   539→          ))}
+   540→   540→        </div>
+   541→   541→      )}
+   542→   542→    </motion.div>
+   543→   543→  );
+   544→   544→}
+   545→   545→
+   546→   546→// ========== NOTEBOOK EDITOR ==========
+   547→   547→function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: () => void }) {
+   548→   548→  const [notebook, setNotebook] = useState<NotebookItem | null>(null);
+   549→   549→  const [loading, setLoading] = useState(true);
+   550→   550→  const [saving, setSaving] = useState(false);
+   551→   551→  const [content, setContent] = useState('');
+   552→   552→  const [title, setTitle] = useState('');
+   553→   553→  const [editTitle, setEditTitle] = useState(false);
+   554→   554→  const [showFcForm, setShowFcForm] = useState(false);
+   555→   555→  const [fcFront, setFcFront] = useState('');
+   556→   556→  const [fcBack, setFcBack] = useState('');
+   557→   557→  const [creatingFc, setCreatingFc] = useState(false);
+   558→   558→  const [generating, setGenerating] = useState(false);
+   559→   559→  const [editorError, setEditorError] = useState<string | null>(null);
+   560→   560→  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   561→   561→  const fetchedRef = useRef(false);
+   562→   562→
+   563→   563→  useEffect(() => {
+   564→   564→    if (fetchedRef.current) return;
+   565→   565→    fetchedRef.current = true;
+   566→   566→    fetch(`/api/notebooks/${notebookId}`)
+   567→   567→      .then(r => r.json())
+   568→   568→      .then(d => {
+   569→   569→        if (d.notebook) { setNotebook(d.notebook); setTitle(d.notebook.title); setContent(d.notebook.content || ''); }
+   570→   570→        else { toast({ title: 'Caderno nao encontrado', description: 'O caderno solicitado nao existe.', variant: 'destructive' }); }
+   571→   571→      })
+   572→   572→      .catch(err => {
+   573→   573→        console.error('[NotebookEditor] fetch error:', err);
+   574→   574→        toast({ title: 'Erro ao carregar', description: 'Nao foi possivel carregar o caderno.', variant: 'destructive' });
+   575→   575→      })
+   576→   576→      .finally(() => setLoading(false));
+   577→   577→  }, [notebookId]);
+   578→   578→
+   579→   579→  const saveContent = useCallback(async (newContent: string, newTitle?: string) => {
+   580→   580→    setSaving(true);
+   581→   581→    try {
+   582→   582→      const data: any = { content: newContent };
+   583→   583→      if (newTitle !== undefined) data.title = newTitle;
+   584→   584→      const res = await fetch(`/api/notebooks/${notebookId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+   585→   585→      const d = await res.json();
+   586→   586→      if (d.notebook) setNotebook(d.notebook);
+   587→   587→    } catch (err) {
+   588→   588→      console.error('[NotebookEditor] save error:', err);
+   589→   589→    }
+   590→   590→    setSaving(false);
+   591→   591→  }, [notebookId]);
+   592→   592→
+   593→   593→  const handleEditorChange = (html: string) => {
+   594→   594→    setContent(html);
+   595→   595→    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+   596→   596→    saveTimerRef.current = setTimeout(() => saveContent(html), 1500);
+   597→   597→  };
+   598→   598→
+   599→   599→  const handleTitleSave = () => {
+   600→   600→    if (title.trim()) { saveContent(content, title.trim()); setEditTitle(false); }
+   601→   601→  };
+   602→   602→
+   603→   603→  const handleCreateFc = async (e: React.FormEvent) => {
+   604→   604→    e.preventDefault();
+   605→   605→    if (!fcFront.trim() || !fcBack.trim()) return;
+   606→   606→    setCreatingFc(true);
+   607→   607→    try {
+   608→   608→      const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fcFront, back: fcBack, notebookId }) });
+   609→   609→      const data = await res.json();
+   610→   610→      if (data.flashcard) {
+   611→   611→        setNotebook(prev => prev ? { ...prev, flashcards: [data.flashcard, ...(prev.flashcards || [])] } : prev);
+   612→   612→        setFcFront(''); setFcBack(''); setShowFcForm(false);
+   613→   613→      } else {
+   614→   614→        toast({ title: 'Erro ao criar flashcard', description: data.error || 'Tente novamente.', variant: 'destructive' });
+   615→   615→      }
+   616→   616→    } catch (err) {
+   617→   617→      console.error('[NotebookEditor] create fc error:', err);
+   618→   618→      toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o flashcard.', variant: 'destructive' });
+   619→   619→    }
+   620→   620→    setCreatingFc(false);
+   621→   621→  };
+   622→   622→
+   623→   623→  const handleDeleteFc = async (fcId: string) => {
+   624→   624→    try {
+   625→   625→      await fetch(`/api/flashcards/${fcId}`, { method: 'DELETE' });
+   626→   626→      setNotebook(prev => prev ? { ...prev, flashcards: prev.flashcards?.filter(f => f.id !== fcId) || [] } : prev);
+   627→   627→    } catch (err) {
+   628→   628→      console.error('[NotebookEditor] delete fc error:', err);
+   629→   629→    }
+   630→   630→  };
+   631→   631→
+   632→   632→  const handleGenerateFc = async () => {
+   633→   633→    if (!content.trim()) {
+   634→   634→      toast({ title: 'Conteudo vazio', description: 'Escreva algo no caderno para gerar flashcards.', variant: 'destructive' });
+   635→   635→      return;
+   636→   636→    }
+   637→   637→    setGenerating(true);
+   638→   638→    try {
+   639→   639→      const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, count: 5 }) });
+   640→   640→      const data = await res.json();
+   641→   641→      if (data.flashcards && data.flashcards.length > 0) {
+   642→   642→        let created = 0;
+   643→   643→        for (const fc of data.flashcards) {
+   644→   644→          const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back, notebookId }) });
+   645→   645→          const d = await r.json();
+   646→   646→          if (d.flashcard) {
+   647→   647→            setNotebook(prev => prev ? { ...prev, flashcards: [d.flashcard, ...(prev.flashcards || [])] } : prev);
+   648→   648→            created++;
+   649→   649→          }
+   650→   650→        }
+   651→   651→        toast({ title: 'Flashcards gerados!', description: `${created} flashcards foram criados.` });
+   652→   652→      } else {
+   653→   653→        toast({ title: 'Nenhum flashcard gerado', description: data.error || 'Escreva mais conteudo para gerar flashcards.', variant: 'destructive' });
+   654→   654→      }
+   655→   655→    } catch (err) {
+   656→   656→      console.error('[NotebookEditor] generate fc error:', err);
+   657→   657→      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+   658→   658→    }
+   659→   659→    setGenerating(false);
+   660→   660→  };
+   661→   661→
+   662→   662→  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>;
+   663→   663→  if (!notebook) return (
+   664→   664→    <div className="py-16 text-center">
+   665→   665→      <AlertCircle size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   666→   666→      <p className="text-sm text-[var(--ws-text-tertiary)]">Caderno nao encontrado</p>
+   667→   667→      <button onClick={onBack} className="mt-4 text-sm text-[var(--ws-accent)] hover:underline">Voltar</button>
+   668→   668→    </div>
+   669→   669→  );
+   670→   670→
+   671→   671→  return (
+   672→   672→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   673→   673→      <div className="mb-6 flex items-center gap-3">
+   674→   674→        <button onClick={onBack} className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-primary)]"><ArrowLeft size={18} /></button>
+   675→   675→        <div className="flex items-center gap-2">
+   676→   676→          {editTitle ? (
+   677→   677→            <input type="text" value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleSave} onKeyDown={e => e.key === 'Enter' && handleTitleSave()} autoFocus className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)] bg-transparent border-b border-[var(--ws-accent)]/30 outline-none" />
+   678→   678→          ) : (
+   679→   679→            <button onClick={() => setEditTitle(true)} className="flex items-center gap-2 group">
+   680→   680→              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: notebook.color }} />
+   681→   681→              <h1 className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)] lg:text-2xl group-hover:text-[var(--ws-accent)] transition-colors">{notebook.title}</h1>
+   682→   682→              <Edit3 size={14} className="text-[var(--ws-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+   683→   683→            </button>
+   684→   684→          )}
+   685→   685→        </div>
+   686→   686→        {saving && <Loader2 size={14} className="animate-spin text-[var(--ws-text-tertiary)]" />}
+   687→   687→      </div>
+   688→   688→
+   689→   689→      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+   690→   690→        <WabiSabiCard className="min-h-[500px]" hover={false}>
+   691→   691→          <div className="mb-2 flex items-center justify-between">
+   692→   692→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Edit3 size={14} className="mr-1.5 inline" /> Suas Anotacoes</h2>
+   693→   693→            <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salva automaticamente</span>
+   694→   694→          </div>
+   695→   695→          <SafeEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." onError={(msg) => setEditorError(msg)} />
+   696→   696→        </WabiSabiCard>
+   697→   697→
+   698→   698→        <div className="space-y-4">
+   699→   699→          <WabiSabiCard hover={false}>
+   700→   700→            <div className="flex items-center justify-between">
+   701→   701→              <h3 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Brain size={14} className="mr-1.5 inline" /> Flashcards ({notebook.flashcards?.length || 0})</h3>
+   702→   702→              <div className="flex gap-1">
+   703→   703→                <button onClick={handleGenerateFc} disabled={generating} className="flex items-center gap-1 rounded-ws-button border border-[var(--ws-glass-border)] px-2.5 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_8%,transparent)]" title="Gerar flashcards com IA">
+   704→   704→                  <Sparkles size={12} className={generating ? 'animate-spin' : ''} /> {generating ? 'Gerando...' : 'Gerar com IA'}
+   705→   705→                </button>
+   706→   706→                <button onClick={() => setShowFcForm(!showFcForm)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)]">{showFcForm ? <X size={14} /> : <Plus size={14} />}</button>
+   707→   707→              </div>
+   708→   708→            </div>
+   709→   709→            {showFcForm && (
+   710→   710→              <form onSubmit={handleCreateFc} className="mt-4 space-y-3 border-t border-[var(--ws-glass-border)] pt-4">
+   711→   711→                <input type="text" value={fcFront} onChange={e => setFcFront(e.target.value)} placeholder="Frente (pergunta)" className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   712→   712→                <textarea value={fcBack} onChange={e => setFcBack(e.target.value)} placeholder="Verso (resposta)" rows={3} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   713→   713→                <ZenButton type="submit" variant="primary" size="sm" className="w-full" disabled={creatingFc || !fcFront.trim() || !fcBack.trim()}>
+   714→   714→                  {creatingFc ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Criar
+   715→   715→                </ZenButton>
+   716→   716→              </form>
+   717→   717→            )}
+   718→   718→            <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+   719→   719→              {(!notebook.flashcards || notebook.flashcards.length === 0) && !showFcForm && (
+   720→   720→                <p className="py-4 text-center text-xs text-[var(--ws-text-tertiary)]">Crie flashcards manualmente ou gere com IA</p>
+   721→   721→              )}
+   722→   722→              {notebook.flashcards?.map(fc => (
+   723→   723→                <div key={fc.id} className="rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+   724→   724→                  <div className="flex items-start justify-between gap-2">
+   725→   725→                    <div className="min-w-0 flex-1">
+   726→   726→                      <p className="truncate text-xs font-medium text-[var(--ws-text-primary)]">{fc.front}</p>
+   727→   727→                      <p className="mt-1 line-clamp-2 text-[11px] text-[var(--ws-text-tertiary)]">{fc.back}</p>
+   728→   728→                    </div>
+   729→   729→                    <button onClick={() => handleDeleteFc(fc.id)} className="shrink-0 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)]"><Trash2 size={12} /></button>
+   730→   730→                  </div>
+   731→   731→                </div>
+   732→   732→              ))}
+   733→   733→            </div>
+   734→   734→          </WabiSabiCard>
+   735→   735→        </div>
+   736→   736→      </div>
+   737→   737→    </motion.div>
+   738→   738→  );
+   739→   739→}
+   740→   740→
+   741→   741→// ========== FLASHCARDS MANAGER ==========
+   742→   742→function FlashcardsManager({ onReview }: { onReview: () => void }) {
+   743→   743→  const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
+   744→   744→  const [loading, setLoading] = useState(true);
+   745→   745→  const [showForm, setShowForm] = useState(false);
+   746→   746→  const [front, setFront] = useState('');
+   747→   747→  const [back, setBack] = useState('');
+   748→   748→  const [creating, setCreating] = useState(false);
+   749→   749→  const [search, setSearch] = useState('');
+   750→   750→  const [dueCount, setDueCount] = useState(0);
+   751→   751→  const [generating, setGenerating] = useState(false);
+   752→   752→  const [genContent, setGenContent] = useState('');
+   753→   753→  const [showGenForm, setShowGenForm] = useState(false);
+   754→   754→  const fetchedRef = useRef(false);
+   755→   755→
+   756→   756→  useEffect(() => {
+   757→   757→    if (fetchedRef.current) return;
+   758→   758→    fetchedRef.current = true;
+   759→   759→    Promise.all([
+   760→   760→      fetch('/api/flashcards').then(r => r.json()),
+   761→   761→      fetch('/api/flashcards?due=true').then(r => r.json()),
+   762→   762→    ]).then(([allData, dueData]) => {
+   763→   763→      if (allData.flashcards) setFlashcards(allData.flashcards);
+   764→   764→      if (dueData.flashcards) setDueCount(dueData.flashcards.length);
+   765→   765→    }).catch(() => {}).finally(() => setLoading(false));
+   766→   766→  }, []);
+   767→   767→
+   768→   768→  const filteredCards = flashcards.filter(fc =>
+   769→   769→    !search.trim() || fc.front.toLowerCase().includes(search.toLowerCase()) || fc.back.toLowerCase().includes(search.toLowerCase())
+   770→   770→  );
+   771→   771→
+   772→   772→  const handleCreate = async (e: React.FormEvent) => {
+   773→   773→    e.preventDefault();
+   774→   774→    if (!front.trim() || !back.trim()) return;
+   775→   775→    setCreating(true);
+   776→   776→    try {
+   777→   777→      const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front, back }) });
+   778→   778→      const data = await res.json();
+   779→   779→      if (data.flashcard) { setFlashcards(prev => [data.flashcard, ...prev]); setFront(''); setBack(''); setShowForm(false); }
+   780→   780→    } catch (err) {
+   781→   781→      console.error('[FlashcardsManager] create error:', err);
+   782→   782→      toast({ title: 'Erro ao criar flashcard', description: 'Tente novamente.', variant: 'destructive' });
+   783→   783→    }
+   784→   784→    setCreating(false);
+   785→   785→  };
+   786→   786→
+   787→   787→  const handleDelete = async (id: string) => {
+   788→   788→    await fetch(`/api/flashcards/${id}`, { method: 'DELETE' });
+   789→   789→    setFlashcards(prev => prev.filter(f => f.id !== id));
+   790→   790→  };
+   791→   791→
+   792→   792→  const handleAIGenerate = async (e: React.FormEvent) => {
+   793→   793→    e.preventDefault();
+   794→   794→    if (!genContent.trim()) return;
+   795→   795→    setGenerating(true);
+   796→   796→    try {
+   797→   797→      const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: genContent, count: 5 }) });
+   798→   798→      const data = await res.json();
+   799→   799→      if (data.flashcards && data.flashcards.length > 0) {
+   800→   800→        for (const fc of data.flashcards) {
+   801→   801→          const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back }) });
+   802→   802→          const d = await r.json();
+   803→   803→          if (d.flashcard) setFlashcards(prev => [d.flashcard, ...prev]);
+   804→   804→        }
+   805→   805→        setGenContent('');
+   806→   806→        setShowGenForm(false);
+   807→   807→      }
+   808→   808→    } catch (err) {
+   809→   809→      console.error('[FlashcardsManager] AI generate error:', err);
+   810→   810→      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+   811→   811→    }
+   812→   812→    setGenerating(false);
+   813→   813→  };
+   814→   814→
+   815→   815→  return (
+   816→   816→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   817→   817→      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+   818→   818→        <div>
+   819→   819→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+   820→   820→            <Brain size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Flashcards
+   821→   821→          </h1>
+   822→   822→          <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Crie cartas e revise com spaced repetition</p>
+   823→   823→        </div>
+   824→   824→        {dueCount > 0 && (
+   825→   825→          <ZenButton variant="primary" size="md" onClick={onReview}>
+   826→   826→            <Target size={16} /> Revisar Agora ({dueCount})
+   827→   827→          </ZenButton>
+   828→   828→        )}
+   829→   829→      </div>
+   830→   830→
+   831→   831→      {/* Create & AI Generate */}
+   832→   832→      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+   833→   833→        <WabiSabiCard hover={false}>
+   834→   834→          <button onClick={() => setShowForm(!showForm)} className="flex w-full items-center justify-between text-left">
+   835→   835→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><BookPlus size={14} className="mr-1.5 inline" /> {showForm ? 'Fechar' : 'Criar Flashcard'}</h2>
+   836→   836→            <motion.div animate={{ rotate: showForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
+   837→   837→          </button>
+   838→   838→          {showForm && (
+   839→   839→            <form onSubmit={handleCreate} className="mt-4 space-y-3">
+   840→   840→              <div>
+   841→   841→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Frente (pergunta)</label>
+   842→   842→                <input type="text" value={front} onChange={e => setFront(e.target.value)} placeholder="O que e fotossintese?" className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   843→   843→              </div>
+   844→   844→              <div>
+   845→   845→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Verso (resposta)</label>
+   846→   846→                <textarea value={back} onChange={e => setBack(e.target.value)} placeholder="Processo pelo qual plantas convertem luz..." rows={3} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   847→   847→              </div>
+   848→   848→              <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={creating || !front.trim() || !back.trim()}>
+   849→   849→                {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar Flashcard
+   850→   850→              </ZenButton>
+   851→   851→            </form>
+   852→   852→          )}
+   853→   853→        </WabiSabiCard>
+   854→   854→
+   855→   855→        <WabiSabiCard hover={false}>
+   856→   856→          <button onClick={() => setShowGenForm(!showGenForm)} className="flex w-full items-center justify-between text-left">
+   857→   857→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Sparkles size={14} className="mr-1.5 inline text-[var(--ws-accent)]" /> Gerar com IA</h2>
+   858→   858→            <motion.div animate={{ rotate: showGenForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
+   859→   859→          </button>
+   860→   860→          {showGenForm && (
+   861→   861→            <form onSubmit={handleAIGenerate} className="mt-4 space-y-3">
+   862→   862→              <div>
+   863→   863→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Conteudo de estudo</label>
+   864→   864→                <textarea value={genContent} onChange={e => setGenContent(e.target.value)} placeholder="Cole aqui o conteudo que deseja transformar em flashcards..." rows={4} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   865→   865→              </div>
+   866→   866→              <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={generating || !genContent.trim()}>
+   867→   867→                {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {generating ? 'Gerando...' : 'Gerar 5 Flashcards'}
+   868→   868→              </ZenButton>
+   869→   869→            </form>
+   870→   870→          )}
+   871→   871→        </WabiSabiCard>
+   872→   872→      </div>
+   873→   873→
+   874→   874→      {/* Search */}
+   875→   875→      {flashcards.length > 0 && (
+   876→   876→        <div className="relative mb-6">
+   877→   877→          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ws-text-tertiary)]" />
+   878→   878→          <input
+   879→   879→            type="text"
+   880→   880→            value={search}
+   881→   881→            onChange={e => setSearch(e.target.value)}
+   882→   882→            placeholder="Buscar flashcards..."
+   883→   883→            className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] py-3 pl-11 pr-4 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none backdrop-blur-xl transition-colors focus:border-[var(--ws-accent)]/30"
+   884→   884→          />
+   885→   885→        </div>
+   886→   886→      )}
+   887→   887→
+   888→   888→      {/* Cards Grid */}
+   889→   889→      {loading ? (
+   890→   890→        <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>
+   891→   891→      ) : flashcards.length === 0 ? (
+   892→   892→        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-16 text-center">
+   893→   893→          <Brain size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   894→   894→          <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum flashcard criado ainda</p>
+   895→   895→          <div className="mt-6 mx-auto max-w-sm space-y-2 text-left">
+   896→   896→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+   897→   897→              <Hash size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+   898→   898→              <p className="text-xs text-[var(--ws-text-tertiary)]">Crie flashcards manualmente acima ou use a IA para gerar a partir de conteudo de estudo.</p>
+   899→   899→            </div>
+   900→   900→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+   901→   901→              <BookOpen size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+   902→   902→              <p className="text-xs text-[var(--ws-text-tertiary)]">Voce tambem pode criar flashcards diretamente dentro de um caderno.</p>
+   903→   903→            </div>
+   904→   904→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+   905→   905→              <Target size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+   906→   906→              <p className="text-xs text-[var(--ws-text-tertiary)]">Use o algoritmo SM-2 para revisar no momento ideal e fixar o conhecimento.</p>
+   907→   907→            </div>
+   908→   908→          </div>
+   909→   909→        </motion.div>
+   910→   910→      ) : (
+   911→   911→        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+   912→   912→          {filteredCards.map((fc, i) => {
+   913→   913→            const status = getStatusBadge(fc.repetitions);
+   914→   914→            return (
+   915→   915→              <motion.div key={fc.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+   916→   916→                <WabiSabiCard hover={false}>
+   917→   917→                  <div className="flex items-start justify-between">
+   918→   918→                    <div className="min-w-0 flex-1">
+   919→   919→                      <div className="mb-2 flex items-center gap-2">
+   920→   920→                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: status.color, backgroundColor: status.bg }}>{status.label}</span>
+   921→   921→                      </div>
+   922→   922→                      <p className="text-xs font-medium text-[var(--ws-text-secondary)]">Frente</p>
+   923→   923→                      <p className="mt-1 text-sm font-medium text-[var(--ws-text-primary)]">{fc.front}</p>
+   924→   924→                      <p className="mt-2 text-xs font-medium text-[var(--ws-text-secondary)]">Verso</p>
+   925→   925→                      <p className="mt-1 line-clamp-2 text-xs text-[var(--ws-text-tertiary)]">{fc.back}</p>
+   926→   926→                    </div>
+   927→   927→                    <button onClick={() => handleDelete(fc.id)} className="shrink-0 p-1 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)]"><Trash2 size={14} /></button>
+   928→   928→                  </div>
+   929→   929→                  <div className="mt-3 flex items-center justify-between border-t border-[var(--ws-glass-border)] pt-3">
+   930→   930→                    <span className="text-[10px] text-[var(--ws-text-tertiary)]">Repeticoes: {fc.repetitions}x</span>
+   931→   931→                    <span className="text-[10px] font-medium text-[var(--ws-accent)]">Proxima: {formatReviewDate(fc.nextReview)}</span>
+   932→   932→                  </div>
+   933→   933→                </WabiSabiCard>
+   934→   934→              </motion.div>
+   935→   935→            );
+   936→   936→          })}
+   937→   937→          {filteredCards.length === 0 && flashcards.length > 0 && (
+   938→   938→            <div className="col-span-full py-8 text-center">
+   939→   939→              <Search size={32} className="mx-auto mb-3 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   940→   940→              <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum flashcard encontrado para "{search}"</p>
+   941→   941→            </div>
+   942→   942→          )}
+   943→   943→        </div>
+   944→   944→      )}
+   945→   945→    </motion.div>
+   946→   946→  );
+   947→   947→}
+   948→   948→
+   949→   949→// ========== FLASHCARD REVIEWER ==========
+   950→   950→function FlashcardReviewer({ onBack }: { onBack: () => void }) {
+   951→   951→  const [cards, setCards] = useState<FlashcardItem[]>([]);
+   952→   952→  const [loading, setLoading] = useState(true);
+   953→   953→  const [currentIndex, setCurrentIndex] = useState(0);
+   954→   954→  const [flipped, setFlipped] = useState(false);
+   955→   955→  const [done, setDone] = useState(false);
+   956→   956→  const [reviewed, setReviewed] = useState(0);
+   957→   957→  const [ratings, setRatings] = useState<number[]>([]);
+   958→   958→  const fetchedRef = useRef(false);
+   959→   959→
+   960→   960→  useEffect(() => {
+   961→   961→    if (fetchedRef.current) return;
+   962→   962→    fetchedRef.current = true;
+   963→   963→    fetch('/api/flashcards?due=true').then(r => r.json()).then(d => {
+   964→   964→      if (d.flashcards) setCards(d.flashcards);
+   965→   965→    }).catch(() => {}).finally(() => setLoading(false));
+   966→   966→  }, []);
+   967→   967→
+   968→   968→  const handleReview = useCallback(async (quality: number) => {
+   969→   969→    const card = cards[currentIndex];
+   970→   970→    if (!card) return;
+   971→   971→    try {
+   972→   972→      await fetch(`/api/flashcards/${card.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: quality }) });
+   973→   973→    } catch {}
+   974→   974→    setReviewed(prev => prev + 1);
+   975→   975→    setRatings(prev => [...prev, quality]);
+   976→   976→    setFlipped(false);
+   977→   977→    if (currentIndex + 1 >= cards.length) setDone(true);
+   978→   978→    else setCurrentIndex(prev => prev + 1);
+   979→   979→  }, [cards, currentIndex]);
+   980→   980→
+   981→   981→  // Keyboard shortcuts
+   982→   982→  useEffect(() => {
+   983→   983→    if (done || !flipped || cards.length === 0) return;
+   984→   984→    const handleKey = (e: KeyboardEvent) => {
+   985→   985→      if (e.key === '1') handleReview(1);
+   986→   986→      else if (e.key === '2') handleReview(2);
+   987→   987→      else if (e.key === '3') handleReview(3);
+   988→   988→      else if (e.key === '4') handleReview(5);
+   989→   989→    };
+   990→   990→    window.addEventListener('keydown', handleKey);
+   991→   991→    return () => window.removeEventListener('keydown', handleKey);
+   992→   992→  }, [flipped, done, cards.length, handleReview]);
+   993→   993→
+   994→   994→  // Completion stats
+   995→   995→  const avgRating = ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : '0';
+   996→   996→  const hardCount = ratings.filter(r => r <= 2).length;
+   997→   997→  const easyCount = ratings.filter(r => r >= 4).length;
+   998→   998→
+   999→   999→  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>;
+
+[showing lines 500-999 of 1491; use offset=1000 with limit to continue reading]

@@ -21,9 +21,43 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "StudyAI — A beleza de aprender na imperfeição",
   description:
-    "Plataforma de estudos com estética Wabi-Sabi japonesa. Respeite seu ritmo natural de aprendizado com IA assistiva.",
-  keywords: ["StudyAI", "estudos", "IA", "aprendizado", "Wabi-Sabi", "tutor inteligente"],
-  icons: { icon: "/favicon.ico" },
+    "Plataforma de estudos com estetica Wabi-Sabi japonesa. Respeite seu ritmo natural de aprendizado com IA assistiva, flashcards espacados e tutor inteligente.",
+  keywords: [
+    "StudyAI",
+    "estudos com IA",
+    "aprendizado",
+    "Wabi-Sabi",
+    "tutor inteligente",
+    "flashcards",
+    "spaced repetition",
+    "pomodoro",
+    "estudar online",
+    "plataforma de estudos",
+  ],
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    title: "StudyAI — A beleza de aprender na imperfeição",
+    description:
+      "Plataforma de estudos com IA que respeita seu ritmo natural. Cadernos, flashcards, tutor IA e muito mais.",
+    type: "website",
+    locale: "pt_BR",
+    siteName: "StudyAI",
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: "StudyAI" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "StudyAI — A beleza de aprender na imperfeição",
+    description:
+      "Revolucione seus estudos com IA. Wabi-Sabi: a perfeicao esta na jornada.",
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -33,12 +67,38 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "EducationalOrganization",
+              "name": "StudyAI",
+              "description": "Plataforma de estudos inteligentes com IA adaptativa",
+              "url": "https://studyai.com.br",
+              "sameAs": [],
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://studyai.com.br/search?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            })
+          }}
+        />
+      </head>
       <body
         className={`${notoSerifJP.variable} ${inter.variable} antialiased`}
         style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif" }}
       >
+        <a href="#main-content" className="skip-link">
+          Pular para conteudo principal
+        </a>
         <Providers>
-          {children}
+          <div id="scroll-progress-bar" style={{ width: 0 }} />
+          <main id="main-content">
+            {children}
+          </main>
           <Toaster />
         </Providers>
       </body>
