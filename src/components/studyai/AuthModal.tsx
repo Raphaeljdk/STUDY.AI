@@ -77,12 +77,30 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setSuccessMsg('');
 
     try {
-      // Step 1: Create account
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, plan: 'SENSEI' }),
-      });
+      // Step 1: Create account (with timeout to avoid hanging)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      let res: Response;
+      try {
+        res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, plan: 'SENSEI' }),
+          signal: controller.signal,
+        });
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          setStatus('error');
+          setErrorMsg('Servidor demorou demais. O banco de dados pode nao estar configurado. Tente novamente.');
+        } else {
+          setStatus('error');
+          setErrorMsg('Erro de conexao. Verifique sua internet e tente novamente.');
+        }
+        return;
+      }
+      clearTimeout(timeoutId);
 
       let data: any;
       try {
@@ -107,13 +125,19 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         return;
       }
 
-      // Step 2: Auto-login after successful registration
+      // Step 2: Auto-login after successful registration (with timeout)
       try {
-        const loginRes = await signIn('credentials', {
-          email: form.email,
-          password: form.password,
-          redirect: false,
-        });
+        const loginController = new AbortController();
+        const loginTimeout = setTimeout(() => loginController.abort(), 10000);
+        const loginRes = await Promise.race([
+          signIn('credentials', {
+            email: form.email,
+            password: form.password,
+            redirect: false,
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+        ]);
+        clearTimeout(loginTimeout);
 
         if (loginRes?.ok) {
           setStatus('success');
