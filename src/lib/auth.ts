@@ -27,10 +27,11 @@ declare module 'next-auth/jwt' {
   }
 }
 
-// In production, NEXTAUTH_SECRET must be set explicitly. Failing fast here
-// prevents silently using an insecure fallback secret.
-const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-if (!nextAuthSecret && process.env.NODE_ENV === 'production') {
+// In production, NEXTAUTH_SECRET must be set explicitly.
+// In development, use a fallback to avoid the NO_SECRET warning.
+const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
+  (process.env.NODE_ENV !== 'production' ? 'studyai-dev-secret-do-not-use-in-prod' : undefined);
+if (!nextAuthSecret) {
   throw new Error(
     'NEXTAUTH_SECRET environment variable is not set. ' +
       'Please define it before running the application in production.'
