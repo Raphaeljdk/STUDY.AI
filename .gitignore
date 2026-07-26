@@ -51,5 +51,10 @@ test
 prompt
 
 server.log
-# vercel
-.vercel
+
+# database (SQLite local dev, if any)
+/db/
+*.db
+
+# Skills directory
+/skills/
