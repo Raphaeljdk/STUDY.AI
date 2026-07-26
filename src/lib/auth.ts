@@ -1,7 +1,41 @@
-import { NextAuthOptions } from 'next-auth';
+import { NextAuthOptions, DefaultSession } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
+
+import 'next-auth'
+
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string
+      role: string
+      plan: string
+    } & DefaultSession['user']
+  }
+  interface User {
+    role?: string
+    plan?: string
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id?: string
+    role?: string
+    plan?: string
+  }
+}
+
+// In production, NEXTAUTH_SECRET must be set explicitly. Failing fast here
+// prevents silently using an insecure fallback secret.
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+if (!nextAuthSecret && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'NEXTAUTH_SECRET environment variable is not set. ' +
+      'Please define it before running the application in production.'
+  );
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,12 +49,21 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: (credentials.email as string).toLowerCase() },
         });
 
         if (!user) return null;
 
-        const isValid = await bcrypt.compare(credentials.password as string, user.password);
+        let isValid = false;
+        try {
+          isValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+        } catch {
+          return null;
+        }
+
         if (!isValid) return null;
 
         return {
@@ -37,16 +80,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role;
-        token.plan = (user as any).plan;
+        token.role = user.role;
+        token.plan = user.plan;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).role = token.role;
-        (session.user as any).plan = token.plan;
+        if (token.id) session.user.id = token.id;
+        if (token.role) session.user.role = token.role;
+        if (token.plan) session.user.plan = token.plan;
       }
       return session;
     },
@@ -57,5 +100,5 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
-  secret: process.env.NEXTAUTH_SECRET || 'studyai-wabi-sabi-secret-2024',
+  secret: nextAuthSecret,
 };

@@ -155,13 +155,13 @@ export async function POST(request: Request) {
     const fullSystemPrompt = BASE_SYSTEM_PROMPT + knowledgeContext;
 
     // === 5. Build message array ===
-    const messages: { role: string; content: string }[] = [
-      { role: 'assistant', content: fullSystemPrompt },
+    const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
+      { role: 'system', content: fullSystemPrompt },
     ];
 
     for (const msg of history) {
       // Map 'user'/'assistant' roles properly
-      const role = msg.role === 'user' ? 'user' : 'assistant';
+      const role = msg.role === 'user' ? 'user' as const : 'assistant' as const;
       messages.push({ role, content: msg.content });
     }
 

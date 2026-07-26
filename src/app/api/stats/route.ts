@@ -11,19 +11,19 @@ export async function GET() {
     }
     const userId = (session.user as any)?.id;
     if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida. Tente fazer login novamente.' }, { status: 401 });
+      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
     const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado. Crie uma nova conta.' }, { status: 401 });
+      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [notebookCount, flashcardCount, dueFlashcards, totalCards, sessions, todaySessions, chatCount, masteredCards] = await Promise.all([
+    const [notebookCount, flashcardCount, dueFlashcards, totalCards, sessions, allSessions, todaySessions, chatCount, masteredCards] = await Promise.all([
       db.notebook.count({ where: { userId } }),
       db.flashcard.count({ where: { userId, repetitions: { gt: 0 } } }),
       db.flashcard.count({ where: { userId, nextReview: { lte: now } } }),
@@ -31,6 +31,11 @@ export async function GET() {
       db.studySession.findMany({
         where: { userId, createdAt: { gte: oneWeekAgo } },
         select: { duration: true, createdAt: true },
+      }),
+      // Fetch ALL sessions for streak calculation (no date filter)
+      db.studySession.findMany({
+        where: { userId },
+        select: { createdAt: true },
       }),
       db.studySession.findMany({
         where: { userId, createdAt: { gte: todayStart } },
@@ -65,12 +70,12 @@ export async function GET() {
       dailyData.push({ day: dayLabel, minutes: dayMinutes });
     }
 
-    // Streak calculation
+    // Streak calculation — uses ALL sessions (not just last 7 days)
     let streak = 0;
     for (let i = 0; i <= 365; i++) {
       const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      const hasSession = sessions.some(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
+      const hasSession = allSessions.some(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
       if (hasSession) streak++;
       else if (i > 0) break;
     }
@@ -88,7 +93,8 @@ export async function GET() {
       dailyData,
       weeklySessions: sessions.length,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Route error:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

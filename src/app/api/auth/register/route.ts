@@ -4,9 +4,29 @@ import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password, plan } = await request.json();
+    // JSON parse safety
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Dados invalidos' },
+        { status: 400 }
+      );
+    }
 
-    if (!name || !email || !password) {
+    const { name, email, password, plan } = body;
+
+    // Type validation
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Nome, email e senha são obrigatórios' },
+        { status: 400 }
+      );
+    }
+
+    // Name trim check
+    if (!name.trim() || !email.trim() || !password) {
       return NextResponse.json(
         { error: 'Nome, email e senha são obrigatórios' },
         { status: 400 }
@@ -20,7 +40,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const existing = await db.user.findUnique({ where: { email } });
+    // Email normalization BEFORE findUnique
+    const normalizedEmail = email.toLowerCase().trim();
+    const trimmedName = name.trim();
+
+    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json(
         { error: 'Este email já está cadastrado' },
@@ -28,15 +52,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const validPlans = ['FREE', 'SAMURAI', 'SENSEI'] as const;
-    const userPlan = validPlans.includes(plan) ? plan : 'FREE';
+    const validPlans: ('FREE' | 'SAMURAI' | 'SENSEI')[] = ['FREE', 'SAMURAI', 'SENSEI'];
+    const userPlan = typeof plan === 'string' && validPlans.includes(plan as 'FREE' | 'SAMURAI' | 'SENSEI')
+      ? (plan as 'FREE' | 'SAMURAI' | 'SENSEI')
+      : 'FREE' as const;
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await db.user.create({
       data: {
-        name,
-        email: email.toLowerCase(),
+        name: trimmedName,
+        email: normalizedEmail,
         password: hashedPassword,
         plan: userPlan,
       },
@@ -46,9 +72,10 @@ export async function POST(request: Request) {
       success: true,
       user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
     });
-  } catch (error: any) {
+  } catch (error) {
+    console.error('Route error:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro interno do servidor' },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

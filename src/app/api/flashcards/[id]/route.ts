@@ -9,18 +9,38 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!session?.user) {
       return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     }
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
+    }
+    // Verify user exists in DB
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+    }
     const { id } = await params;
-    const body = await request.json();
+
+    // JSON parse safety
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
+    }
 
     // Review mode: SM-2 algorithm
     if (body.review !== undefined) {
+      const quality = body.review;
+      // Quality validation: integer 0-5
+      if (typeof quality !== 'number' || !Number.isInteger(quality) || quality < 0 || quality > 5) {
+        return NextResponse.json({ error: 'Qualidade invalida' }, { status: 400 });
+      }
+
       const card = await db.flashcard.findFirst({ where: { id, userId } });
       if (!card) {
         return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
       }
 
-      const quality = body.review; // 0-5
       const { easeFactor, interval, repetitions } = card;
 
       let newEF = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
@@ -42,8 +62,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const nextReview = new Date();
       nextReview.setDate(nextReview.getDate() + newInterval);
 
-      const updated = await db.flashcard.update({
-        where: { id },
+      // TOCTOU-safe updateMany with userId filter
+      const result = await db.flashcard.updateMany({
+        where: { id, userId },
         data: {
           easeFactor: newEF,
           interval: newInterval,
@@ -52,25 +73,66 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
       });
 
+      if (result.count === 0) {
+        return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
+      }
+
+      const updated = await db.flashcard.findFirst({ where: { id, userId } });
       return NextResponse.json({ flashcard: updated });
     }
 
     // Edit mode
     const { front, back, notebookId } = body;
     const data: any = {};
-    if (typeof front === 'string') data.front = front.trim();
-    if (typeof back === 'string') data.back = back.trim();
-    if (notebookId === null || notebookId) data.notebookId = notebookId;
 
-    const existing = await db.flashcard.findFirst({ where: { id, userId } });
-    if (!existing) {
+    if (typeof front === 'string') {
+      if (!front.trim()) {
+        return NextResponse.json({ error: 'Frente nao pode ser vazia' }, { status: 400 });
+      }
+      data.front = front.trim();
+    }
+    if (typeof back === 'string') {
+      if (!back.trim()) {
+        return NextResponse.json({ error: 'Verso nao pode ser vazio' }, { status: 400 });
+      }
+      data.back = back.trim();
+    }
+    if (notebookId === null) {
+      data.notebookId = null;
+    } else if (notebookId !== undefined) {
+      if (typeof notebookId !== 'string' || !notebookId.trim()) {
+        return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
+      }
+      // Cross-user notebook injection fix
+      const ownedNotebook = await db.notebook.findFirst({
+        where: { id: notebookId, userId },
+        select: { id: true },
+      });
+      if (!ownedNotebook) {
+        return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
+      }
+      data.notebookId = notebookId;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'Nenhum campo valido para atualizar' }, { status: 400 });
+    }
+
+    // TOCTOU-safe updateMany with userId filter
+    const result = await db.flashcard.updateMany({
+      where: { id, userId },
+      data,
+    });
+
+    if (result.count === 0) {
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
     }
 
-    const flashcard = await db.flashcard.update({ where: { id }, data });
+    const flashcard = await db.flashcard.findFirst({ where: { id, userId } });
     return NextResponse.json({ flashcard });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Route error:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
 
@@ -80,17 +142,27 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (!session?.user) {
       return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     }
-    const userId = (session.user as any).id;
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
+    }
+    // Verify user exists in DB
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+    }
     const { id } = await params;
 
-    const existing = await db.flashcard.findFirst({ where: { id, userId } });
-    if (!existing) {
+    // TOCTOU-safe deleteMany with userId filter
+    const result = await db.flashcard.deleteMany({ where: { id, userId } });
+
+    if (result.count === 0) {
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
     }
 
-    await db.flashcard.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Route error:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

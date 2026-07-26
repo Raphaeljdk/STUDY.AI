@@ -1,10 +1,10 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { ButtonHTMLAttributes, ReactNode } from 'react';
+import { motion, type HTMLMotionProps } from 'framer-motion';
+import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-interface ZenButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ZenButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
@@ -29,6 +29,9 @@ export function ZenButton({
   size = 'md',
   gradient = false,
   className,
+  disabled,
+  type,
+  onClick,
   ...props
 }: ZenButtonProps) {
   const isPrimary = variant === 'primary';
@@ -49,6 +52,9 @@ export function ZenButton({
         transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
       }}
       whileTap={{ scale: 0.97 }}
+      disabled={disabled}
+      type={type}
+      onClick={onClick}
       {...props}
     >
       <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
