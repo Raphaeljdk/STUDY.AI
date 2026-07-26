@@ -1,12 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import { join } from 'path'
-import { existsSync, mkdirSync } from 'fs'
-
-// Ensure the db directory exists
-const dbDir = join(process.cwd(), 'db')
-if (!existsSync(dbDir)) {
-  mkdirSync(dbDir, { recursive: true })
-}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
