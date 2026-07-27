@@ -1307,7 +1307,7 @@ function SenseiChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [notebooks, setNotebooks] = useState<{ id: string; title: string; content: string }[]>([]);
-  const [memoryCount, setMemoryCount] = useState(0);
+  const [wisdom, setWisdom] = useState<{ level: number; title: string; emoji: string; memoriesCount: number; nextLevel: { title: string; emoji: string; min: number } | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fetchedRef = useRef(false);
@@ -1323,7 +1323,13 @@ function SenseiChat() {
       fetch('/api/memories').then(r => r.json()).catch(() => ({ count: 0 })),
     ]).then(([chatData, nbData, memData]) => {
       if (nbData.notebooks) setNotebooks(nbData.notebooks);
-      if (memData?.count) setMemoryCount(memData.count);
+      if (memData?.count) {
+        const levels = [{min:0,t:'Aprendiz',e:'🌱'},{min:3,t:'Discipulo',e:'🌿'},{min:8,t:'Guardiao',e:'🌳'},{min:15,t:'Sabio',e:'🏛️'},{min:25,t:'Mestre',e:'🧙'},{min:40,t:'Dragao',e:'🐉'},{min:60,t:'Vidente',e:'👁️'},{min:80,t:'Iluminado',e:'🌟'},{min:100,t:'Transcendente',e:'🌌'},{min:150,t:'Infinito',e:'♾️'}];
+        let lvl = levels[0]; let nxt = null;
+        for (const l of levels) { if (memData.count >= l.min) lvl = l; }
+        nxt = levels.find(l => l.min > memData.count) || null;
+        setWisdom({ level: lvl.min, title: lvl.t, emoji: lvl.e, memoriesCount: memData.count, nextLevel: nxt ? { title: nxt.t, emoji: nxt.e, min: nxt.min } : null });
+      }
       if (chatData.messages && chatData.messages.length > 0) {
         setMessages(chatData.messages);
       } else {
@@ -1374,9 +1380,7 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
       const data = await res.json();
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
-      if (typeof data.memoryCount === 'number' && data.memoryCount > memoryCount) {
-        setMemoryCount(data.memoryCount);
-      }
+      if (data.wisdom) setWisdom(data.wisdom);
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -1440,11 +1444,11 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
           <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
             <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
           </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
-            Assistente inteligente universal
-            {memoryCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/8 px-2 py-0.5 text-[10px] font-medium text-amber-500">
-                <Brain size={10} /> {memoryCount} memorias sobre voce
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {wisdom && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-500">
+                <span className="text-sm">{wisdom.emoji}</span> {wisdom.title}
+                <span className="text-[10px] font-normal text-amber-400/70">({wisdom.memoriesCount} memorias)</span>
               </span>
             )}
             {notebooks.length > 0 && (
@@ -1452,7 +1456,7 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
                 <Sparkles size={10} /> {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
               </span>
             )}
-          </p>
+          </div>
         </div>
         {messages.length > 1 && (
           <button
@@ -1467,20 +1471,24 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
       <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
-          <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-lg">
+            {wisdom?.emoji || '🌱'}
+            {isLoading && <div className="absolute -top-0.5 -right-0.5 h-3 w-3"><div className="h-full w-full animate-ping rounded-full bg-green-400" /></div>}
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
-              {memoryCount > 0 && (
-                <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">Nv.{Math.min(Math.floor(memoryCount / 5) + 1, 10)}</span>
-              )}
+              <h3 className="font-serif-jp text-sm font-bold text-[var(--ws-text-primary)]">Sensei AI {wisdom ? wisdom.title : ''}</h3>
             </div>
-            <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
-              {notebooks.length > 0
-                ? `${notebooks.map(n => n.title).join(', ')}${memoryCount > 0 ? ' + memoria ativa' : ''}`
-                : memoryCount > 0 ? 'Memoria ativa — quanto mais conversa, mais inteligente' : 'Pergunte qualquer coisa'
-              }
-            </p>
+            {wisdom && (
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--ws-glass-border)]">
+                  <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-1000 ease-out" style={{ width: `${Math.min((wisdom.memoriesCount / 150) * 100, 100)}%` }} />
+                </div>
+                <span className="text-[9px] text-[var(--ws-text-tertiary)]">
+                  {wisdom.nextLevel ? `${wisdom.memoriesCount}/${wisdom.nextLevel.min} ${wisdom.nextLevel.emoji} ${wisdom.nextLevel.title}` : 'Nivel maximo!'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
@@ -1603,9 +1611,10 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
             </button>
           </div>
           <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-            {memoryCount > 0
-              ? `Sensei IA com ${memoryCount} memorias — quanto mais voce conversa, mais ele te conhece`
-              : 'O Sensei IA aprende sobre voce a cada conversa e fica mais inteligente'}
+            {wisdom && wisdom.nextLevel
+              ? `${wisdom.emoji} ${wisdom.title} — converse mais ${wisdom.nextLevel.min - wisdom.memoriesCount} vezes para virar ${wisdom.nextLevel.emoji} ${wisdom.nextLevel.title}`
+              : wisdom ? `${wisdom.emoji} ${wisdom.title} — Voce alcancou a sabedoria maxima!`
+              : 'O Sensei IA evolui com cada conversa — comece a perguntar!'}
           </p>
         </div>
       </div>

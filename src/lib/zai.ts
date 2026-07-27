@@ -10,59 +10,35 @@ const ZAI_CONFIG = {
 
 let zaiInstance: InstanceType<typeof ZAI> | null = null;
 
-/**
- * ZAI AI Client - supports two modes:
- * 1. Direct mode: Uses ZAI SDK directly (works on z.ai platform)
- * 2. Proxy mode: Uses AI proxy via AI_PROXY_URL env var (works from Vercel/external)
- */
-export async function getZAI(): Promise<InstanceType<typeof ZAI>> {
-  if (!zaiInstance) {
-    zaiInstance = new ZAI(ZAI_CONFIG);
-  }
+function getDirectZAI(): InstanceType<typeof ZAI> {
+  if (!zaiInstance) zaiInstance = new ZAI(ZAI_CONFIG);
   return zaiInstance;
 }
 
 /**
- * AI proxy mode for Vercel - calls the z.ai proxy service
- */
-export async function chatViaProxy(messages: { role: string; content: string }[]): Promise<string> {
-  const proxyUrl = process.env.AI_PROXY_URL;
-  if (!proxyUrl) {
-    throw new Error('AI_PROXY_URL nao configurada no Vercel');
-  }
-
-  const url = proxyUrl.endsWith('/') ? `${proxyUrl}chat` : `${proxyUrl}/chat`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, thinking: { type: 'disabled' } }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`AI proxy error: ${res.status} ${err}`);
-  }
-
-  const data = await res.json();
-  if (!data.success || !data.reply) {
-    throw new Error(data.error || 'AI proxy retornou resposta vazia');
-  }
-
-  return data.reply;
-}
-
-/**
- * Smart AI call - tries direct first, falls back to proxy
+ * Smart AI call — tries proxy first if AI_PROXY_URL is set, otherwise direct SDK
  */
 export async function aiChat(messages: { role: string; content: string }[]): Promise<string> {
-  // If AI_PROXY_URL is set (Vercel), use proxy
-  if (process.env.AI_PROXY_URL) {
-    return chatViaProxy(messages);
+  const proxyUrl = process.env.AI_PROXY_URL;
+
+  if (proxyUrl) {
+    const url = proxyUrl.replace(/\/$/, '') + '/chat';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, thinking: { type: 'disabled' } }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Proxy error ${res.status}: ${errText}`);
+    }
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Proxy returned failure');
+    return data.reply || '';
   }
 
-  // Otherwise use direct ZAI SDK (z.ai platform)
-  const zai = await getZAI();
+  // Direct ZAI SDK (z.ai platform)
+  const zai = getDirectZAI();
   const completion = await zai.chat.completions.create({
     messages,
     thinking: { type: 'disabled' },
