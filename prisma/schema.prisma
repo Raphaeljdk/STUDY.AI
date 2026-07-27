@@ -57,8 +57,8 @@ model Flashcard {
   easeFactor Float    @default(2.5)
   interval   Int      @default(0)
   repetitions Int     @default(0)
- nextReview DateTime @default(now())
- createdAt  DateTime @default(now())
+  nextReview DateTime @default(now())
+  createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
 
@@ -87,7 +87,7 @@ model UserMemory {
   category  String   @default("general")
   content   String
   source    String   @default("conversation")
- createdAt DateTime @default(now())
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
