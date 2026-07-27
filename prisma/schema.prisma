@@ -31,6 +31,7 @@ model User {
   notebooks      Notebook[]
   studySessions  StudySession[]
   chatMessages   ChatMessage[]
+  memories       UserMemory[]
 }
 
 model Notebook {
@@ -77,4 +78,17 @@ model ChatMessage {
   role      String
   content   String
   createdAt DateTime @default(now())
+}
+
+model UserMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String   @default("general")
+  content   String
+  source    String   @default("conversation")
+ createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

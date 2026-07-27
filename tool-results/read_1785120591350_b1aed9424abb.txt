@@ -1,0 +1,1594 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
+     4→import { useSession, signOut } from 'next-auth/react';
+     5→import { motion } from 'framer-motion';
+     6→import ReactMarkdown from 'react-markdown';
+     7→import {
+     8→  BookOpen, Brain, BarChart3, MessageCircle, Clock,
+     9→  LogOut, Shield, ChevronRight, Star, Send,
+    10→  Plus, Trash2, Edit3, X, Timer, RotateCcw,
+    11→  Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
+    12→  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users
+    13→} from 'lucide-react';
+    14→import { WabiSabiCard } from './WabiSabiCard';
+    15→import { ZenButton } from './ZenButton';
+    16→import { EnsoCircle } from './EnsoCircle';
+    17→import { AdminPanel } from './AdminPanel';
+    18→import { toast } from '@/hooks/use-toast';
+    19→import Image from 'next/image';
+    20→
+    21→// Lightweight error boundary for individual sections
+    22→class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
+    23→  constructor(props: { children: ReactNode; fallback?: ReactNode; name?: string }) {
+    24→    super(props);
+    25→    this.state = { hasError: false, error: null };
+    26→  }
+    27→  static getDerivedStateFromError(error: Error) {
+    28→    return { hasError: true, error };
+    29→  }
+    30→  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    31→    console.error(`[SectionErrorBoundary${this.props.name ? ` (${this.props.name})` : ''}]`, error, info.componentStack);
+    32→  }
+    33→  render() {
+    34→    if (this.state.hasError) {
+    35→      if (this.props.fallback) return this.props.fallback;
+    36→      return (
+    37→        <div className="flex min-h-[300px] items-center justify-center rounded-lg border border-dashed border-[var(--ws-glass-border)] p-6">
+    38→          <div className="text-center">
+    39→            <AlertCircle size={24} className="mx-auto mb-3 text-[var(--ws-accent)]" />
+    40→            <p className="text-sm font-medium text-[var(--ws-text-primary)]">Erro ao carregar esta secao</p>
+    41→            <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">{this.state.error?.message || 'Erro desconhecido'}</p>
+    42→            <button
+    43→              onClick={() => { this.setState({ hasError: false, error: null }); }}
+    44→              className="mt-3 text-xs font-medium text-[var(--ws-accent)] hover:underline"
+    45→            >
+    46→              Tentar novamente
+    47→            </button>
+    48→          </div>
+    49→        </div>
+    50→      );
+    51→    }
+    52→    return this.props.children;
+    53→  }
+    54→}
+    55→
+    56→// Safe rich text editor with fallback to plain textarea
+    57→function SafeEditor({ content, onChange, placeholder, onError }: { content: string; onChange: (html: string) => void; placeholder: string; onError?: (msg: string) => void }) {
+    58→  const [editorReady, setEditorReady] = useState(false);
+    59→  const [editorFailed, setEditorFailed] = useState(false);
+    60→  const [EditorComp, setEditorComp] = useState<React.ComponentType<{ content: string; onChange: (html: string) => void; placeholder: string }> | null>(null);
+    61→  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    62→
+    63→  useEffect(() => {
+    64→    import('./RichTextEditor')
+    65→      .then(m => { setEditorComp(() => m.RichTextEditor); setEditorReady(true); })
+    66→      .catch((err) => {
+    67→        console.warn('[SafeEditor] RichTextEditor failed to load, using fallback:', err);
+    68→        setEditorFailed(true);
+    69→        onError?.(err?.message || 'Editor falhou ao carregar');
+    70→      });
+    71→  }, []);
+    72→
+    73→  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    74→    const val = e.target.value;
+    75→    if (saveTimer.current) clearTimeout(saveTimer.current);
+    76→    saveTimer.current = setTimeout(() => onChange(val), 500);
+    77→  }, [onChange]);
+    78→
+    79→  if (editorFailed) {
+    80→    return (
+    81→      <div>
+    82→        <div className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--ws-accent)]/10 px-3 py-2 text-xs text-[var(--ws-accent)]">
+    83→          <AlertCircle size={14} /> Editor avancado indisponivel. Usando editor simples.
+    84→        </div>
+    85→        <textarea
+    86→          value={content}
+    87→          onChange={handleChange}
+    88→          placeholder={placeholder}
+    89→          className="min-h-[400px] w-full resize-none bg-transparent p-5 text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+    90→        />
+    91→      </div>
+    92→    );
+    93→  }
+    94→
+    95→  if (!editorReady) {
+    96→    return (
+    97→      <div className="flex min-h-[400px] items-center justify-center">
+    98→        <div className="text-center">
+    99→          <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+   100→          <p className="text-xs text-[var(--ws-text-tertiary)]">Carregando editor...</p>
+   101→        </div>
+   102→      </div>
+   103→    );
+   104→  }
+   105→
+   106→  if (EditorComp) return <EditorComp content={content} onChange={onChange} placeholder={placeholder} />;
+   107→  return null;
+   108→}
+   109→
+   110→const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
+   111→
+   112→type Tab = 'dashboard' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'admin';
+   113→
+   114→interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
+   115→interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
+   116→interface StatsData {
+   117→  notebooks: number;
+   118→  flashcards: number;
+   119→  studiedFlashcards: number;
+   120→  dueFlashcards: number;
+   121→  masteredCards: number;
+   122→  studyTime: string;
+   123→  todayMinutes: number;
+   124→  chatCount: number;
+   125→  streak: number;
+   126→  dailyData: { day: string; minutes: number }[];
+   127→  weeklySessions: number;
+   128→}
+   129→interface ChatMsg { id: string; role: string; content: string; createdAt: string; }
+   130→
+   131→// ========== ACTIVE USERS HOOK ==========
+   132→function useActiveUsers() {
+   133→  const [count, setCount] = useState(0);
+   134→  useEffect(() => {
+   135→    const base = 87;
+   136→    const tick = () => setCount(base + Math.floor(Math.random() * 30));
+   137→    tick();
+   138→    const id = setInterval(tick, 5000);
+   139→    return () => clearInterval(id);
+   140→  }, []);
+   141→  return count;
+   142→}
+   143→
+   144→// ========== SWIPE HOOK ==========
+   145→function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
+   146→  const touchStartX = useRef(0);
+   147→  const touchEndX = useRef(0);
+   148→
+   149→  const onTouchStart = useCallback((e: React.TouchEvent) => {
+   150→    touchStartX.current = e.changedTouches[0].screenX;
+   151→  }, []);
+   152→
+   153→  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+   154→    touchEndX.current = e.changedTouches[0].screenX;
+   155→    const diff = touchEndX.current - touchStartX.current;
+   156→    if (Math.abs(diff) > 80) {
+   157→      if (diff < 0) onSwipeLeft();
+   158→      else onSwipeRight();
+   159→    }
+   160→  }, [onSwipeLeft, onSwipeRight]);
+   161→
+   162→  return { onTouchStart, onTouchEnd };
+   163→}
+   164→
+   165→// ========== MAIN ==========
+   166→const tabOrder: Tab[] = ['dashboard', 'notebooks', 'flashcards', 'timer', 'chat', 'admin'];
+   167→
+   168→export function DashboardView() {
+   169→  const { data: session } = useSession();
+   170→  const user = session?.user as any;
+   171→  const isAdmin = user?.role === 'ADMIN';
+   172→  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+   173→  const [editNotebookId, setEditNotebookId] = useState<string | null>(null);
+   174→  const activeUsers = useActiveUsers();
+   175→
+   176→  const openNotebook = (id: string) => {
+   177→    if (!id) { setActiveTab('notebooks'); return; }
+   178→    setEditNotebookId(id);
+   179→    setActiveTab('notebook-edit');
+   180→  };
+   181→
+   182→  const navigateTo = (tab: Tab) => setActiveTab(tab);
+   183→
+   184→  // Swipe navigation for mobile
+   185→  const validTabs = tabOrder.filter(t => t !== 'admin' || isAdmin);
+   186→  const validIndex = validTabs.indexOf(activeTab);
+   187→  const swipeHandlers = useSwipeGestures(
+   188→    () => { if (validIndex < validTabs.length - 1) setActiveTab(validTabs[validIndex + 1]); },
+   189→    () => { if (validIndex > 0) setActiveTab(validTabs[validIndex - 1]); },
+   190→  );
+   191→
+   192→  return (
+   193→    <div className="min-h-screen bg-[var(--ws-bg)]" {...swipeHandlers}>
+   194→      <header className="sticky top-0 z-50 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl">
+   195→        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-24">
+   196→          <button onClick={() => activeTab !== 'dashboard' && setActiveTab('dashboard')} className="flex items-center gap-2 sm:gap-3">
+   197→            <Image src="/logo.png" alt="StudyAI" width={32} height={32} className="rounded-full" />
+   198→            <span className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)] sm:text-lg">StudyAI</span>
+   199→          </button>
+   200→          <nav className="hidden items-center gap-1 md:flex">
+   201→            <TabBtn icon={BarChart3} label="Dashboard" tooltip="Visao geral" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+   202→            <TabBtn icon={BookOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
+   203→            <TabBtn icon={Brain} label="Flashcards" tooltip="Revisao espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
+   204→            <TabBtn icon={Timer} label="Pomodoro" tooltip="Timer de foco" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
+   205→            <TabBtn icon={MessageCircle} label="Sensei IA" tooltip="Tutor inteligente" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+   206→            {isAdmin && <TabBtn icon={Shield} label="Admin" tooltip="Painel admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
+   207→          </nav>
+   208→          <div className="flex items-center gap-2 sm:gap-3">
+   209→            <div className="mr-1 hidden items-center gap-1.5 text-xs text-[var(--ws-text-tertiary)] lg:flex">
+   210→              <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[var(--ws-verdigris)]" />
+   211→              <Users size={10} />
+   212→              <span>{activeUsers}</span>
+   213→            </div>
+   214→            <div className="hidden text-right sm:block">
+   215→              <p className="text-sm font-medium text-[var(--ws-text-primary)]">{user?.name}</p>
+   216→              <p className="text-xs text-[var(--ws-accent)]">Ilimitado{isAdmin && ' · Admin'}</p>
+   217→            </div>
+   218→            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] font-serif-jp text-xs font-bold text-[var(--ws-accent)] sm:h-9 sm:w-9 sm:text-sm">{user?.name?.charAt(0)?.toUpperCase()}</div>
+   219→            <button onClick={() => signOut({ callbackUrl: '/' })} data-ws-tooltip="Sair" className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-accent)]"><LogOut size={18} /></button>
+   220→          </div>
+   221→        </div>
+   222→        <div className="flex overflow-x-auto md:hidden no-scrollbar px-1">
+   223→          <TabBtn icon={BarChart3} label="Home" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+   224→          <TabBtn icon={BookOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
+   225→          <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
+   226→          <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
+   227→          <TabBtn icon={MessageCircle} label="Sensei" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+   228→          {isAdmin && <TabBtn icon={Shield} label="Admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
+   229→        </div>
+   230→      </header>
+   231→      <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-4 sm:py-6 lg:px-24 lg:py-8">
+   232→        {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
+   233→        {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
+   234→        {activeTab === 'notebook-edit' && editNotebookId && <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />}
+   235→        {activeTab === 'flashcards' && <FlashcardsManager key="fc" onReview={() => setActiveTab('flashcard-review')} />}
+   236→        {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
+   237→        {activeTab === 'timer' && <PomodoroTimer key="pom" />}
+   238→        {activeTab === 'chat' && <SenseiChat key="chat" />}
+   239→        {activeTab === 'admin' && isAdmin && <AdminPanel key="adm" />}
+   240→      </main>
+   241→    </div>
+   242→  );
+   243→}
+   244→
+   245→function TabBtn({ icon: Icon, label, active, onClick, tooltip }: { icon: any; label: string; active: boolean; onClick: () => void; tooltip?: string }) {
+   246→  return (
+   247→    <button 
+   248→      onClick={onClick} 
+   249→      {...(tooltip ? { 'data-ws-tooltip': tooltip } : {})}
+   250→      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm ${active ? 'text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]'}`}
+   251→    >
+   252→      <Icon size={16} /><span className="hidden sm:inline">{label}</span>
+   253→      {active && <div className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--ws-accent)]" />}
+   254→    </button>
+   255→  );
+   256→}
+   257→
+   258→// ========== HELPER: Time-based greeting ==========
+   259→function getGreeting(): string {
+   260→  const h = new Date().getHours();
+   261→  if (h < 12) return 'Bom dia';
+   262→  if (h < 18) return 'Boa tarde';
+   263→  return 'Boa noite';
+   264→}
+   265→
+   266→function getGreetingSubtext(): string {
+   267→  const h = new Date().getHours();
+   268→  if (h < 12) return 'Comece o dia com foco e determinacao. Cada estudo e um passo adiante.';
+   269→  if (h < 18) return 'A tarde e perfeita para revisar e consolidar o conhecimento.';
+   270→  return 'Boas sessoes noturnas fixam melhor o que voce aprendeu.';
+   271→}
+   272→
+   273→function formatReviewDate(dateStr: string): string {
+   274→  const d = new Date(dateStr);
+   275→  const now = new Date();
+   276→  const diffMs = d.getTime() - now.getTime();
+   277→  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+   278→
+   279→  if (diffDays < 0) return 'Atrasado';
+   280→  if (diffDays === 0) return 'Hoje';
+   281→  if (diffDays === 1) return 'Amanha';
+   282→  if (diffDays <= 7) return `em ${diffDays} dias`;
+   283→  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+   284→}
+   285→
+   286→function getStatusBadge(repetitions: number): { label: string; color: string; bg: string } {
+   287→  if (repetitions === 0) return { label: 'Novo', color: 'var(--ws-accent)', bg: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' };
+   288→  if (repetitions < 5) return { label: 'Revisando', color: 'var(--ws-gold)', bg: 'color-mix(in srgb, var(--ws-gold) 12%, transparent)' };
+   289→  return { label: 'Dominado', color: 'var(--ws-verdigris)', bg: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)' };
+   290→}
+   291→
+   292→function formatTimestamp(iso: string): string {
+   293→  const d = new Date(iso);
+   294→  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+   295→}
+   296→
+   297→// ========== DASHBOARD HOME ==========
+   298→function DashboardHome({ user, openNotebook, onNavigate }: { user: any; openNotebook: (id: string) => void; onNavigate: (tab: Tab) => void }) {
+   299→  const [stats, setStats] = useState<StatsData>({
+   300→    notebooks: 0, flashcards: 0, studiedFlashcards: 0, dueFlashcards: 0,
+   301→    masteredCards: 0, studyTime: '0m', todayMinutes: 0, chatCount: 0,
+   302→    streak: 0, dailyData: [], weeklySessions: 0,
+   303→  });
+   304→  const [recentNBs, setRecentNBs] = useState<NotebookItem[]>([]);
+   305→  const [loading, setLoading] = useState(true);
+   306→
+   307→  useEffect(() => {
+   308→    Promise.all([
+   309→      fetch('/api/stats').then(r => r.json()),
+   310→      fetch('/api/notebooks').then(r => r.json()),
+   311→    ]).then(([statsData, nbData]) => {
+   312→      if (statsData.notebooks !== undefined) setStats(statsData);
+   313→      if (nbData.notebooks) setRecentNBs(nbData.notebooks.slice(0, 3));
+   314→    }).catch(() => {}).finally(() => setLoading(false));
+   315→  }, []);
+   316→
+   317→  if (loading) {
+   318→    return (
+   319→      <div>
+   320→        <div className="mb-8">
+   321→          <div className="skeleton mb-2 h-8 w-48" />
+   322→          <div className="skeleton h-4 w-72" />
+   323→        </div>
+   324→        <div className="mb-8 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+   325→          {[...Array(5)].map((_, i) => (
+   326→            <div key={i} className="skeleton-card">
+   327→              <div className="skeleton skeleton-circle mb-3 h-10 w-10" />
+   328→              <div className="skeleton mb-1 h-7 w-12" />
+   329→              <div className="skeleton h-3 w-20" />
+   330→              <div className="skeleton mt-1 h-3 w-14" />
+   331→            </div>
+   332→          ))}
+   333→        </div>
+   334→        <div className="mb-8 grid gap-6 sm:grid-cols-2">
+   335→          <div className="skeleton-card h-52" />
+   336→          <div className="space-y-3">
+   337→            <div className="skeleton h-5 w-36" />
+   338→            {[...Array(4)].map((_, i) => (
+   339→              <div key={i} className="skeleton-card flex items-center gap-3">
+   340→                <div className="skeleton skeleton-circle h-10 w-10 shrink-0" />
+   341→                <div className="flex-1">
+   342→                  <div className="skeleton mb-1.5 h-4 w-28" />
+   343→                  <div className="skeleton h-3 w-40" />
+   344→                </div>
+   345→              </div>
+   346→            ))}
+   347→          </div>
+   348→        </div>
+   349→      </div>
+   350→    );
+   351→  }
+   352→
+   353→  const stripHtml = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+   354→  const maxMinutes = Math.max(...stats.dailyData.map(d => d.minutes), 1);
+   355→
+   356→  return (
+   357→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   358→      {/* Greeting */}
+   359→      <div className="mb-8">
+   360→        <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+   361→          {getGreeting()}, {user?.name?.split(' ')[0]}!
+   362→        </h1>
+   363→        <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">{getGreetingSubtext()}</p>
+   364→      </div>
+   365→
+   366→      {/* Stats Cards */}
+   367→      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+   368→        {[
+   369→          { Icon: BookOpen, title: 'Cadernos', value: String(stats.notebooks), desc: 'Ativos', accent: false },
+   370→          { Icon: Brain, title: 'Flashcards', value: String(stats.flashcards), desc: `${stats.masteredCards} dominados`, accent: false },
+   371→          { Icon: Target, title: 'Revisoes Pendentes', value: String(stats.dueFlashcards), desc: 'Para hoje', accent: stats.dueFlashcards > 0 },
+   372→          { Icon: Clock, title: 'Minutos Hoje', value: String(stats.todayMinutes), desc: 'de estudo', accent: false },
+   373→          { Icon: Flame, title: 'Streak', value: String(stats.streak), desc: 'dias seguidos', accent: stats.streak > 0 },
+   374→        ].map((c, i) => (
+   375→          <motion.button
+   376→            key={c.title}
+   377→            className="w-full text-left"
+   378→            initial={{ opacity: 0, y: 15 }}
+   379→            animate={{ opacity: 1, y: 0 }}
+   380→            transition={{ delay: i * 0.06 }}
+   381→          >
+   382→            <WabiSabiCard>
+   383→              <div className="flex items-start justify-between">
+   384→                <div
+   385→                  className="flex h-10 w-10 items-center justify-center rounded-ws-button"
+   386→                  style={{ backgroundColor: c.accent ? 'color-mix(in srgb, var(--ws-accent) 15%, transparent)' : 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' }}
+   387→                >
+   388→                  <c.Icon size={18} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
+   389→                </div>
+   390→              </div>
+   391→              <p className="mt-4 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)]">{c.value}</p>
+   392→              <p className="mt-1 text-sm font-medium text-[var(--ws-text-secondary)]">{c.title}</p>
+   393→              <p className="text-xs text-[var(--ws-text-tertiary)]">{c.desc}</p>
+   394→            </WabiSabiCard>
+   395→          </motion.button>
+   396→        ))}
+   397→      </div>
+   398→
+   399→      {/* Weekly Study Chart + Quick Access */}
+   400→      <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
+   401→        {/* Mini Weekly Chart */}
+   402→        <WabiSabiCard hover={false}>
+   403→          <div className="mb-4 flex items-center justify-between">
+   404→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]">
+   405→              <TrendingUp size={14} className="mr-1.5 inline" />Estudo Semanal
+   406→            </h2>
+   407→            <span className="text-xs text-[var(--ws-text-tertiary)]">{stats.studyTime} esta semana</span>
+   408→          </div>
+   409→          <div className="flex h-36 items-end justify-between gap-2">
+   410→            {stats.dailyData.map((d, i) => {
+   411→              const height = Math.max((d.minutes / maxMinutes) * 100, d.minutes > 0 ? 8 : 4);
+   412→              return (
+   413→                <div key={i} className="flex flex-1 flex-col items-center gap-2">
+   414→                  <span className="text-[10px] font-medium text-[var(--ws-text-tertiary)]">
+   415→                    {d.minutes > 0 ? `${d.minutes}m` : ''}
+   416→                  </span>
+   417→                  <motion.div
+   418→                    className="w-full rounded-t-md"
+   419→                    style={{ backgroundColor: d.minutes > 0 ? 'color-mix(in srgb, var(--ws-accent) 40%, transparent)' : 'color-mix(in srgb, var(--ws-glass-border) 40%, transparent)', minHeight: 4 }}
+   420→                    initial={{ height: 4 }}
+   421→                    animate={{ height: `${height}%` }}
+   422→                    transition={{ duration: 0.5, delay: i * 0.06 }}
+   423→                  />
+   424→                  <span className="text-[10px] text-[var(--ws-text-tertiary)]">{d.day}</span>
+   425→                </div>
+   426→              );
+   427→            })}
+   428→          </div>
+   429→        </WabiSabiCard>
+   430→
+   431→        {/* Quick Access */}
+   432→        <div>
+   433→          <h2 className="mb-4 font-serif-jp text-lg font-bold text-[var(--ws-text-primary)]">Acesso Rapido</h2>
+   434→          <div className="space-y-3">
+   435→            {[
+   436→              { icon: BookOpen, title: 'Abrir Caderno', desc: 'Continue de onde parou', action: () => openNotebook('') },
+   437→              { icon: Brain, title: 'Revisar Flashcards', desc: stats.dueFlashcards > 0 ? `${stats.dueFlashcards} cartas pendentes` : 'Nenhuma carta pendente', action: () => onNavigate('flashcards') },
+   438→              { icon: Timer, title: 'Pomodoro Timer', desc: 'Estude com foco', action: () => onNavigate('timer') },
+   439→              { icon: MessageCircle, title: 'Perguntar ao Sensei', desc: `${stats.chatCount} conversas ate agora`, action: () => onNavigate('chat') },
+   440→            ].map((a) => (
+   441→              <button key={a.title} onClick={a.action} className="w-full text-left">
+   442→                <WabiSabiCard hover={false}>
+   443→                  <div className="flex items-center gap-3">
+   444→                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ws-button" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' }}>
+   445→                      <a.icon size={18} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
+   446→                    </div>
+   447→                    <div className="min-w-0 flex-1">
+   448→                      <p className="text-sm font-semibold text-[var(--ws-text-primary)]">{a.title}</p>
+   449→                      <p className="text-xs text-[var(--ws-text-tertiary)]">{a.desc}</p>
+   450→                    </div>
+   451→                    <ChevronRight size={16} className="shrink-0 text-[var(--ws-text-tertiary)]" />
+   452→                  </div>
+   453→                </WabiSabiCard>
+   454→              </button>
+   455→            ))}
+   456→          </div>
+   457→        </div>
+   458→      </div>
+   459→
+   460→      {/* Recent Notebooks */}
+   461→      <div>
+   462→        <div className="mb-4 flex items-center justify-between">
+   463→          <h2 className="font-serif-jp text-lg font-bold text-[var(--ws-text-primary)]">Cadernos Recentes</h2>
+   464→          <button onClick={() => openNotebook('')} className="text-xs font-medium text-[var(--ws-accent)] hover:underline">Ver todos</button>
+   465→        </div>
+   466→        {!loading && recentNBs.length === 0 ? (
+   467→          <WabiSabiCard hover={false}>
+   468→            <div className="py-6 text-center">
+   469→              <FolderOpen size={36} className="mx-auto mb-3 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   470→              <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum caderno criado</p>
+   471→              <button onClick={() => openNotebook('')} className="mt-2 text-sm font-medium text-[var(--ws-accent)] hover:underline">Criar primeiro caderno</button>
+   472→            </div>
+   473→          </WabiSabiCard>
+   474→        ) : (
+   475→          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+   476→            {recentNBs.map((nb, i) => (
+   477→              <motion.button
+   478→                key={nb.id}
+   479→                onClick={() => openNotebook(nb.id)}
+   480→                className="w-full text-left"
+   481→                initial={{ opacity: 0, y: 10 }}
+   482→                animate={{ opacity: 1, y: 0 }}
+   483→                transition={{ delay: i * 0.05 }}
+   484→              >
+   485→                <WabiSabiCard hover={false}>
+   486→                  <div className="flex items-center gap-3">
+   487→                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ws-button" style={{ backgroundColor: nb.color + '18' }}>
+   488→                      <BookOpen size={18} style={{ color: nb.color }} strokeWidth={1.5} />
+   489→                    </div>
+   490→                    <div className="min-w-0 flex-1">
+   491→                      <p className="truncate text-sm font-semibold text-[var(--ws-text-primary)]">{nb.title}</p>
+   492→                      <p className="line-clamp-1 text-xs text-[var(--ws-text-tertiary)]">{stripHtml(nb.content).substring(0, 80) || 'Sem conteudo'}</p>
+   493→                    </div>
+   494→                    <div className="shrink-0 text-right">
+   495→                      <p className="text-xs text-[var(--ws-text-tertiary)]">{nb._count?.flashcards || 0} cards</p>
+   496→                      <p className="text-[10px] text-[var(--ws-text-tertiary)]">{new Date(nb.updatedAt).toLocaleDateString('pt-BR')}</p>
+   497→                    </div>
+   498→                  </div>
+   499→                </WabiSabiCard>
+   500→              </motion.button>
+   501→            ))}
+   502→          </div>
+   503→        )}
+   504→      </div>
+   505→    </motion.div>
+   506→  );
+   507→}
+   508→
+   509→// ========== NOTEBOOKS LIST ==========
+   510→function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
+   511→  const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
+   512→  const [loading, setLoading] = useState(true);
+   513→  const [creating, setCreating] = useState(false);
+   514→  const [newTitle, setNewTitle] = useState('');
+   515→  const [newColor, setNewColor] = useState(notebookColors[0]);
+   516→  const fetchedRef = useRef(false);
+   517→
+   518→  useEffect(() => {
+   519→    if (fetchedRef.current) return;
+   520→    fetchedRef.current = true;
+   521→    fetch('/api/notebooks').then(r => r.json()).then(d => {
+   522→      if (d.notebooks) setNotebooks(d.notebooks);
+   523→    }).catch(() => {}).finally(() => setLoading(false));
+   524→  }, []);
+   525→
+   526→  const handleCreate = async (e: React.FormEvent) => {
+   527→    e.preventDefault();
+   528→    if (!newTitle.trim()) return;
+   529→    setCreating(true);
+   530→    try {
+   531→      const res = await fetch('/api/notebooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle, color: newColor }) });
+   532→      const data = await res.json();
+   533→      if (!res.ok) {
+   534→        toast({ title: 'Erro ao criar caderno', description: data.error || 'Tente novamente.', variant: 'destructive' });
+   535→        setCreating(false);
+   536→        return;
+   537→      }
+   538→      if (data.notebook) {
+   539→        setNotebooks(prev => [data.notebook, ...prev]);
+   540→        setNewTitle('');
+   541→        setCreating(false);
+   542→        onOpen(data.notebook.id);
+   543→        toast({ title: 'Caderno criado!', description: `"${data.notebook.title}" esta pronto.` });
+   544→      }
+   545→    } catch (err) {
+   546→      console.error('[NotebooksList] create error:', err);
+   547→      toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o caderno. Verifique sua conexao.', variant: 'destructive' });
+   548→    } 
+   549→    setCreating(false);
+   550→  };
+   551→
+   552→  const handleDelete = async (id: string, title: string) => {
+   553→    if (!confirm(`Deletar "${title}"?`)) return;
+   554→    try {
+   555→      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
+   556→      if (res.ok) {
+   557→        setNotebooks(prev => prev.filter(n => n.id !== id));
+   558→        toast({ title: 'Caderno deletado', description: `"${title}" foi removido.` });
+   559→      } else {
+   560→        const d = await res.json();
+   561→        toast({ title: 'Erro ao deletar', description: d.error || 'Tente novamente.', variant: 'destructive' });
+   562→      }
+   563→    } catch (err) {
+   564→      console.error('[NotebooksList] delete error:', err);
+   565→      toast({ title: 'Erro de conexao', description: 'Nao foi possivel deletar.', variant: 'destructive' });
+   566→    }
+   567→  };
+   568→
+   569→  const stripHtml = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+   570→
+   571→  return (
+   572→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   573→      <div className="mb-8">
+   574→        <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">Meus Cadernos</h1>
+   575→        <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Organize seus estudos por assunto</p>
+   576→      </div>
+   577→      <WabiSabiCard className="mb-8" hover={false}>
+   578→        <form onSubmit={handleCreate} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+   579→          <div className="flex-1">
+   580→            <label className="mb-1.5 block text-sm font-medium text-[var(--ws-text-secondary)]">Novo Caderno</label>
+   581→            <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Ex: Matematica, Historia, Biologia..." className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none transition-colors focus:border-[var(--ws-accent)]/30" />
+   582→          </div>
+   583→          <div>
+   584→            <label className="mb-1.5 block text-sm font-medium text-[var(--ws-text-secondary)]">Cor</label>
+   585→            <div className="flex gap-2">{notebookColors.map(c => (
+   586→              <button key={c} type="button" onClick={() => setNewColor(c)} className={`h-8 w-8 rounded-full border-2 transition-transform ${newColor === c ? 'scale-110 border-[var(--ws-text-primary)]' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+   587→            ))}</div>
+   588→          </div>
+   589→          <ZenButton type="submit" variant="primary" size="md" disabled={creating || !newTitle.trim()}>
+   590→            {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar
+   591→          </ZenButton>
+   592→        </form>
+   593→      </WabiSabiCard>
+   594→      {loading ? (
+   595→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+   596→          {[...Array(4)].map((_, i) => (
+   597→            <div key={i} className="skeleton-card">
+   598→              <div className="flex items-center gap-3">
+   599→                <div className="skeleton skeleton-circle h-10 w-10 shrink-0" />
+   600→                <div className="flex-1">
+   601→                  <div className="skeleton mb-1.5 h-4 w-32" />
+   602→                  <div className="skeleton h-3 w-48" />
+   603→                  <div className="skeleton mt-1 h-3 w-24" />
+   604→                </div>
+   605→              </div>
+   606→            </div>
+   607→          ))}
+   608→        </div>
+   609→      ) : notebooks.length === 0 ? (
+   610→        <div className="py-16 text-center">
+   611→          <FolderOpen size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   612→          <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum caderno criado ainda</p>
+   613→        </div>
+   614→      ) : (
+   615→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+   616→          {notebooks.map((nb, i) => (
+   617→            <motion.div key={nb.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+   618→              <WabiSabiCard>
+   619→                <button onClick={() => onOpen(nb.id)} className="w-full text-left">
+   620→                  <div className="flex items-start justify-between">
+   621→                    <div className="flex items-center gap-3">
+   622→                      <div className="flex h-10 w-10 items-center justify-center rounded-ws-button" style={{ backgroundColor: nb.color + '18' }}>
+   623→                        <BookOpen size={18} style={{ color: nb.color }} strokeWidth={1.5} />
+   624→                      </div>
+   625→                      <div className="min-w-0">
+   626→                        <p className="truncate text-sm font-semibold text-[var(--ws-text-primary)]">{nb.title}</p>
+   627→                        <p className="text-xs text-[var(--ws-text-tertiary)]">{nb._count?.flashcards || 0} flashcards</p>
+   628→                      </div>
+   629→                    </div>
+   630→                    <ChevronRight size={16} className="shrink-0 text-[var(--ws-text-tertiary)]" />
+   631→                  </div>
+   632→                  {nb.content && <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-[var(--ws-text-tertiary)]">{stripHtml(nb.content).substring(0, 120)}</p>}
+   633→                  <p className="mt-2 text-[10px] text-[var(--ws-text-tertiary)]">{new Date(nb.updatedAt).toLocaleDateString('pt-BR')}</p>
+   634→                </button>
+   635→                <div className="mt-3 flex justify-end border-t border-[var(--ws-glass-border)] pt-3">
+   636→                  <button onClick={(e) => { e.stopPropagation(); handleDelete(nb.id, nb.title); }} className="rounded-ws-button p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)]" title="Deletar">
+   637→                    <Trash2 size={14} />
+   638→                  </button>
+   639→                </div>
+   640→              </WabiSabiCard>
+   641→            </motion.div>
+   642→          ))}
+   643→        </div>
+   644→      )}
+   645→    </motion.div>
+   646→  );
+   647→}
+   648→
+   649→// ========== NOTEBOOK EDITOR ==========
+   650→function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: () => void }) {
+   651→  const [notebook, setNotebook] = useState<NotebookItem | null>(null);
+   652→  const [loading, setLoading] = useState(true);
+   653→  const [saving, setSaving] = useState(false);
+   654→  const [content, setContent] = useState('');
+   655→  const [title, setTitle] = useState('');
+   656→  const [editTitle, setEditTitle] = useState(false);
+   657→  const [showFcForm, setShowFcForm] = useState(false);
+   658→  const [fcFront, setFcFront] = useState('');
+   659→  const [fcBack, setFcBack] = useState('');
+   660→  const [creatingFc, setCreatingFc] = useState(false);
+   661→  const [generating, setGenerating] = useState(false);
+   662→  const [editorError, setEditorError] = useState<string | null>(null);
+   663→  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   664→  const fetchedRef = useRef(false);
+   665→
+   666→  useEffect(() => {
+   667→    if (fetchedRef.current) return;
+   668→    fetchedRef.current = true;
+   669→    fetch(`/api/notebooks/${notebookId}`)
+   670→      .then(r => r.json())
+   671→      .then(d => {
+   672→        if (d.notebook) { setNotebook(d.notebook); setTitle(d.notebook.title); setContent(d.notebook.content || ''); }
+   673→        else { toast({ title: 'Caderno nao encontrado', description: 'O caderno solicitado nao existe.', variant: 'destructive' }); }
+   674→      })
+   675→      .catch(err => {
+   676→        console.error('[NotebookEditor] fetch error:', err);
+   677→        toast({ title: 'Erro ao carregar', description: 'Nao foi possivel carregar o caderno.', variant: 'destructive' });
+   678→      })
+   679→      .finally(() => setLoading(false));
+   680→  }, [notebookId]);
+   681→
+   682→  const saveContent = useCallback(async (newContent: string, newTitle?: string) => {
+   683→    setSaving(true);
+   684→    try {
+   685→      const data: any = { content: newContent };
+   686→      if (newTitle !== undefined) data.title = newTitle;
+   687→      const res = await fetch(`/api/notebooks/${notebookId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+   688→      const d = await res.json();
+   689→      if (d.notebook) setNotebook(d.notebook);
+   690→    } catch (err) {
+   691→      console.error('[NotebookEditor] save error:', err);
+   692→    }
+   693→    setSaving(false);
+   694→  }, [notebookId]);
+   695→
+   696→  const handleEditorChange = (html: string) => {
+   697→    setContent(html);
+   698→    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+   699→    saveTimerRef.current = setTimeout(() => saveContent(html), 1500);
+   700→  };
+   701→
+   702→  const handleTitleSave = () => {
+   703→    if (title.trim()) { saveContent(content, title.trim()); setEditTitle(false); }
+   704→  };
+   705→
+   706→  const handleCreateFc = async (e: React.FormEvent) => {
+   707→    e.preventDefault();
+   708→    if (!fcFront.trim() || !fcBack.trim()) return;
+   709→    setCreatingFc(true);
+   710→    try {
+   711→      const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fcFront, back: fcBack, notebookId }) });
+   712→      const data = await res.json();
+   713→      if (data.flashcard) {
+   714→        setNotebook(prev => prev ? { ...prev, flashcards: [data.flashcard, ...(prev.flashcards || [])] } : prev);
+   715→        setFcFront(''); setFcBack(''); setShowFcForm(false);
+   716→      } else {
+   717→        toast({ title: 'Erro ao criar flashcard', description: data.error || 'Tente novamente.', variant: 'destructive' });
+   718→      }
+   719→    } catch (err) {
+   720→      console.error('[NotebookEditor] create fc error:', err);
+   721→      toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o flashcard.', variant: 'destructive' });
+   722→    }
+   723→    setCreatingFc(false);
+   724→  };
+   725→
+   726→  const handleDeleteFc = async (fcId: string) => {
+   727→    try {
+   728→      await fetch(`/api/flashcards/${fcId}`, { method: 'DELETE' });
+   729→      setNotebook(prev => prev ? { ...prev, flashcards: prev.flashcards?.filter(f => f.id !== fcId) || [] } : prev);
+   730→    } catch (err) {
+   731→      console.error('[NotebookEditor] delete fc error:', err);
+   732→    }
+   733→  };
+   734→
+   735→  const handleGenerateFc = async () => {
+   736→    if (!content.trim()) {
+   737→      toast({ title: 'Conteudo vazio', description: 'Escreva algo no caderno para gerar flashcards.', variant: 'destructive' });
+   738→      return;
+   739→    }
+   740→    setGenerating(true);
+   741→    try {
+   742→      const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, count: 5 }) });
+   743→      const data = await res.json();
+   744→      if (data.flashcards && data.flashcards.length > 0) {
+   745→        let created = 0;
+   746→        for (const fc of data.flashcards) {
+   747→          const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back, notebookId }) });
+   748→          const d = await r.json();
+   749→          if (d.flashcard) {
+   750→            setNotebook(prev => prev ? { ...prev, flashcards: [d.flashcard, ...(prev.flashcards || [])] } : prev);
+   751→            created++;
+   752→          }
+   753→        }
+   754→        toast({ title: 'Flashcards gerados!', description: `${created} flashcards foram criados.` });
+   755→      } else {
+   756→        toast({ title: 'Nenhum flashcard gerado', description: data.error || 'Escreva mais conteudo para gerar flashcards.', variant: 'destructive' });
+   757→      }
+   758→    } catch (err) {
+   759→      console.error('[NotebookEditor] generate fc error:', err);
+   760→      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+   761→    }
+   762→    setGenerating(false);
+   763→  };
+   764→
+   765→  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>;
+   766→  if (!notebook) return (
+   767→    <div className="py-16 text-center">
+   768→      <AlertCircle size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   769→      <p className="text-sm text-[var(--ws-text-tertiary)]">Caderno nao encontrado</p>
+   770→      <button onClick={onBack} className="mt-4 text-sm text-[var(--ws-accent)] hover:underline">Voltar</button>
+   771→    </div>
+   772→  );
+   773→
+   774→  return (
+   775→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   776→      <div className="mb-6 flex items-center gap-3">
+   777→        <button onClick={onBack} className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-primary)]"><ArrowLeft size={18} /></button>
+   778→        <div className="flex items-center gap-2">
+   779→          {editTitle ? (
+   780→            <input type="text" value={title} onChange={e => setTitle(e.target.value)} onBlur={handleTitleSave} onKeyDown={e => e.key === 'Enter' && handleTitleSave()} autoFocus className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)] bg-transparent border-b border-[var(--ws-accent)]/30 outline-none" />
+   781→          ) : (
+   782→            <button onClick={() => setEditTitle(true)} className="flex items-center gap-2 group">
+   783→              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: notebook.color }} />
+   784→              <h1 className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)] lg:text-2xl group-hover:text-[var(--ws-accent)] transition-colors">{notebook.title}</h1>
+   785→              <Edit3 size={14} className="text-[var(--ws-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+   786→            </button>
+   787→          )}
+   788→        </div>
+   789→        {saving && <Loader2 size={14} className="animate-spin text-[var(--ws-text-tertiary)]" />}
+   790→      </div>
+   791→
+   792→      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+   793→        <WabiSabiCard className="min-h-[500px]" hover={false}>
+   794→          <div className="mb-2 flex items-center justify-between">
+   795→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Edit3 size={14} className="mr-1.5 inline" /> Suas Anotacoes</h2>
+   796→            <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salva automaticamente</span>
+   797→          </div>
+   798→          <SafeEditor content={content} onChange={handleEditorChange} placeholder="Comece a escrever suas anotacoes aqui... Use a barra de ferramentas para formatar o texto." onError={(msg) => setEditorError(msg)} />
+   799→        </WabiSabiCard>
+   800→
+   801→        <div className="space-y-4">
+   802→          <WabiSabiCard hover={false}>
+   803→            <div className="flex items-center justify-between">
+   804→              <h3 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Brain size={14} className="mr-1.5 inline" /> Flashcards ({notebook.flashcards?.length || 0})</h3>
+   805→              <div className="flex gap-1">
+   806→                <button onClick={handleGenerateFc} disabled={generating} className="flex items-center gap-1 rounded-ws-button border border-[var(--ws-glass-border)] px-2.5 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_8%,transparent)]" title="Gerar flashcards com IA">
+   807→                  <Sparkles size={12} className={generating ? 'animate-spin' : ''} /> {generating ? 'Gerando...' : 'Gerar com IA'}
+   808→                </button>
+   809→                <button onClick={() => setShowFcForm(!showFcForm)} className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)]">{showFcForm ? <X size={14} /> : <Plus size={14} />}</button>
+   810→              </div>
+   811→            </div>
+   812→            {showFcForm && (
+   813→              <form onSubmit={handleCreateFc} className="mt-4 space-y-3 border-t border-[var(--ws-glass-border)] pt-4">
+   814→                <input type="text" value={fcFront} onChange={e => setFcFront(e.target.value)} placeholder="Frente (pergunta)" className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   815→                <textarea value={fcBack} onChange={e => setFcBack(e.target.value)} placeholder="Verso (resposta)" rows={3} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   816→                <ZenButton type="submit" variant="primary" size="sm" className="w-full" disabled={creatingFc || !fcFront.trim() || !fcBack.trim()}>
+   817→                  {creatingFc ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Criar
+   818→                </ZenButton>
+   819→              </form>
+   820→            )}
+   821→            <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+   822→              {(!notebook.flashcards || notebook.flashcards.length === 0) && !showFcForm && (
+   823→                <p className="py-4 text-center text-xs text-[var(--ws-text-tertiary)]">Crie flashcards manualmente ou gere com IA</p>
+   824→              )}
+   825→              {notebook.flashcards?.map(fc => (
+   826→                <div key={fc.id} className="rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+   827→                  <div className="flex items-start justify-between gap-2">
+   828→                    <div className="min-w-0 flex-1">
+   829→                      <p className="truncate text-xs font-medium text-[var(--ws-text-primary)]">{fc.front}</p>
+   830→                      <p className="mt-1 line-clamp-2 text-[11px] text-[var(--ws-text-tertiary)]">{fc.back}</p>
+   831→                    </div>
+   832→                    <button onClick={() => handleDeleteFc(fc.id)} className="shrink-0 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)]"><Trash2 size={12} /></button>
+   833→                  </div>
+   834→                </div>
+   835→              ))}
+   836→            </div>
+   837→          </WabiSabiCard>
+   838→        </div>
+   839→      </div>
+   840→    </motion.div>
+   841→  );
+   842→}
+   843→
+   844→// ========== FLASHCARDS MANAGER ==========
+   845→function FlashcardsManager({ onReview }: { onReview: () => void }) {
+   846→  const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
+   847→  const [loading, setLoading] = useState(true);
+   848→  const [showForm, setShowForm] = useState(false);
+   849→  const [front, setFront] = useState('');
+   850→  const [back, setBack] = useState('');
+   851→  const [creating, setCreating] = useState(false);
+   852→  const [search, setSearch] = useState('');
+   853→  const [dueCount, setDueCount] = useState(0);
+   854→  const [generating, setGenerating] = useState(false);
+   855→  const [genContent, setGenContent] = useState('');
+   856→  const [showGenForm, setShowGenForm] = useState(false);
+   857→  const fetchedRef = useRef(false);
+   858→
+   859→  useEffect(() => {
+   860→    if (fetchedRef.current) return;
+   861→    fetchedRef.current = true;
+   862→    Promise.all([
+   863→      fetch('/api/flashcards').then(r => r.json()),
+   864→      fetch('/api/flashcards?due=true').then(r => r.json()),
+   865→    ]).then(([allData, dueData]) => {
+   866→      if (allData.flashcards) setFlashcards(allData.flashcards);
+   867→      if (dueData.flashcards) setDueCount(dueData.flashcards.length);
+   868→    }).catch(() => {}).finally(() => setLoading(false));
+   869→  }, []);
+   870→
+   871→  const filteredCards = flashcards.filter(fc =>
+   872→    !search.trim() || fc.front.toLowerCase().includes(search.toLowerCase()) || fc.back.toLowerCase().includes(search.toLowerCase())
+   873→  );
+   874→
+   875→  const handleCreate = async (e: React.FormEvent) => {
+   876→    e.preventDefault();
+   877→    if (!front.trim() || !back.trim()) return;
+   878→    setCreating(true);
+   879→    try {
+   880→      const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front, back }) });
+   881→      const data = await res.json();
+   882→      if (data.flashcard) { setFlashcards(prev => [data.flashcard, ...prev]); setFront(''); setBack(''); setShowForm(false); }
+   883→    } catch (err) {
+   884→      console.error('[FlashcardsManager] create error:', err);
+   885→      toast({ title: 'Erro ao criar flashcard', description: 'Tente novamente.', variant: 'destructive' });
+   886→    }
+   887→    setCreating(false);
+   888→  };
+   889→
+   890→  const handleDelete = async (id: string) => {
+   891→    await fetch(`/api/flashcards/${id}`, { method: 'DELETE' });
+   892→    setFlashcards(prev => prev.filter(f => f.id !== id));
+   893→  };
+   894→
+   895→  const handleAIGenerate = async (e: React.FormEvent) => {
+   896→    e.preventDefault();
+   897→    if (!genContent.trim()) return;
+   898→    setGenerating(true);
+   899→    try {
+   900→      const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: genContent, count: 5 }) });
+   901→      const data = await res.json();
+   902→      if (data.flashcards && data.flashcards.length > 0) {
+   903→        for (const fc of data.flashcards) {
+   904→          const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back }) });
+   905→          const d = await r.json();
+   906→          if (d.flashcard) setFlashcards(prev => [d.flashcard, ...prev]);
+   907→        }
+   908→        setGenContent('');
+   909→        setShowGenForm(false);
+   910→      }
+   911→    } catch (err) {
+   912→      console.error('[FlashcardsManager] AI generate error:', err);
+   913→      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+   914→    }
+   915→    setGenerating(false);
+   916→  };
+   917→
+   918→  return (
+   919→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+   920→      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+   921→        <div>
+   922→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+   923→            <Brain size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Flashcards
+   924→          </h1>
+   925→          <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Crie cartas e revise com spaced repetition</p>
+   926→        </div>
+   927→        {dueCount > 0 && (
+   928→          <ZenButton variant="primary" size="md" onClick={onReview}>
+   929→            <Target size={16} /> Revisar Agora ({dueCount})
+   930→          </ZenButton>
+   931→        )}
+   932→      </div>
+   933→
+   934→      {/* Create & AI Generate */}
+   935→      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+   936→        <WabiSabiCard hover={false}>
+   937→          <button onClick={() => setShowForm(!showForm)} className="flex w-full items-center justify-between text-left">
+   938→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><BookPlus size={14} className="mr-1.5 inline" /> {showForm ? 'Fechar' : 'Criar Flashcard'}</h2>
+   939→            <motion.div animate={{ rotate: showForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
+   940→          </button>
+   941→          {showForm && (
+   942→            <form onSubmit={handleCreate} className="mt-4 space-y-3">
+   943→              <div>
+   944→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Frente (pergunta)</label>
+   945→                <input type="text" value={front} onChange={e => setFront(e.target.value)} placeholder="O que e fotossintese?" className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   946→              </div>
+   947→              <div>
+   948→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Verso (resposta)</label>
+   949→                <textarea value={back} onChange={e => setBack(e.target.value)} placeholder="Processo pelo qual plantas convertem luz..." rows={3} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   950→              </div>
+   951→              <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={creating || !front.trim() || !back.trim()}>
+   952→                {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar Flashcard
+   953→              </ZenButton>
+   954→            </form>
+   955→          )}
+   956→        </WabiSabiCard>
+   957→
+   958→        <WabiSabiCard hover={false}>
+   959→          <button onClick={() => setShowGenForm(!showGenForm)} className="flex w-full items-center justify-between text-left">
+   960→            <h2 className="text-sm font-semibold text-[var(--ws-text-secondary)]"><Sparkles size={14} className="mr-1.5 inline text-[var(--ws-accent)]" /> Gerar com IA</h2>
+   961→            <motion.div animate={{ rotate: showGenForm ? 45 : 0 }}><Plus size={16} className="text-[var(--ws-text-tertiary)]" /></motion.div>
+   962→          </button>
+   963→          {showGenForm && (
+   964→            <form onSubmit={handleAIGenerate} className="mt-4 space-y-3">
+   965→              <div>
+   966→                <label className="mb-1 block text-xs font-medium text-[var(--ws-text-secondary)]">Conteudo de estudo</label>
+   967→                <textarea value={genContent} onChange={e => setGenContent(e.target.value)} placeholder="Cole aqui o conteudo que deseja transformar em flashcards..." rows={4} className="w-full resize-none rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-4 py-3 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none focus:border-[var(--ws-accent)]/30" />
+   968→              </div>
+   969→              <ZenButton type="submit" variant="primary" size="md" className="w-full" disabled={generating || !genContent.trim()}>
+   970→                {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {generating ? 'Gerando...' : 'Gerar 5 Flashcards'}
+   971→              </ZenButton>
+   972→            </form>
+   973→          )}
+   974→        </WabiSabiCard>
+   975→      </div>
+   976→
+   977→      {/* Search */}
+   978→      {flashcards.length > 0 && (
+   979→        <div className="relative mb-6">
+   980→          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ws-text-tertiary)]" />
+   981→          <input
+   982→            type="text"
+   983→            value={search}
+   984→            onChange={e => setSearch(e.target.value)}
+   985→            placeholder="Buscar flashcards..."
+   986→            className="w-full rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] py-3 pl-11 pr-4 text-sm text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none backdrop-blur-xl transition-colors focus:border-[var(--ws-accent)]/30"
+   987→          />
+   988→        </div>
+   989→      )}
+   990→
+   991→      {/* Cards Grid */}
+   992→      {loading ? (
+   993→        <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>
+   994→      ) : flashcards.length === 0 ? (
+   995→        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-16 text-center">
+   996→          <Brain size={48} className="mx-auto mb-4 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   997→          <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum flashcard criado ainda</p>
+   998→          <div className="mt-6 mx-auto max-w-sm space-y-2 text-left">
+   999→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+  1000→              <Hash size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+  1001→              <p className="text-xs text-[var(--ws-text-tertiary)]">Crie flashcards manualmente acima ou use a IA para gerar a partir de conteudo de estudo.</p>
+  1002→            </div>
+  1003→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+  1004→              <BookOpen size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+  1005→              <p className="text-xs text-[var(--ws-text-tertiary)]">Voce tambem pode criar flashcards diretamente dentro de um caderno.</p>
+  1006→            </div>
+  1007→            <div className="flex items-start gap-2 rounded-ws-button border border-[var(--ws-glass-border)] p-3">
+  1008→              <Target size={14} className="mt-0.5 shrink-0 text-[var(--ws-accent)]" />
+  1009→              <p className="text-xs text-[var(--ws-text-tertiary)]">Use o algoritmo SM-2 para revisar no momento ideal e fixar o conhecimento.</p>
+  1010→            </div>
+  1011→          </div>
+  1012→        </motion.div>
+  1013→      ) : (
+  1014→        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+  1015→          {filteredCards.map((fc, i) => {
+  1016→            const status = getStatusBadge(fc.repetitions);
+  1017→            return (
+  1018→              <motion.div key={fc.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+  1019→                <WabiSabiCard hover={false}>
+  1020→                  <div className="flex items-start justify-between">
+  1021→                    <div className="min-w-0 flex-1">
+  1022→                      <div className="mb-2 flex items-center gap-2">
+  1023→                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: status.color, backgroundColor: status.bg }}>{status.label}</span>
+  1024→                      </div>
+  1025→                      <p className="text-xs font-medium text-[var(--ws-text-secondary)]">Frente</p>
+  1026→                      <p className="mt-1 text-sm font-medium text-[var(--ws-text-primary)]">{fc.front}</p>
+  1027→                      <p className="mt-2 text-xs font-medium text-[var(--ws-text-secondary)]">Verso</p>
+  1028→                      <p className="mt-1 line-clamp-2 text-xs text-[var(--ws-text-tertiary)]">{fc.back}</p>
+  1029→                    </div>
+  1030→                    <button onClick={() => handleDelete(fc.id)} className="shrink-0 p-1 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)]"><Trash2 size={14} /></button>
+  1031→                  </div>
+  1032→                  <div className="mt-3 flex items-center justify-between border-t border-[var(--ws-glass-border)] pt-3">
+  1033→                    <span className="text-[10px] text-[var(--ws-text-tertiary)]">Repeticoes: {fc.repetitions}x</span>
+  1034→                    <span className="text-[10px] font-medium text-[var(--ws-accent)]">Proxima: {formatReviewDate(fc.nextReview)}</span>
+  1035→                  </div>
+  1036→                </WabiSabiCard>
+  1037→              </motion.div>
+  1038→            );
+  1039→          })}
+  1040→          {filteredCards.length === 0 && flashcards.length > 0 && (
+  1041→            <div className="col-span-full py-8 text-center">
+  1042→              <Search size={32} className="mx-auto mb-3 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+  1043→              <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhum flashcard encontrado para "{search}"</p>
+  1044→            </div>
+  1045→          )}
+  1046→        </div>
+  1047→      )}
+  1048→    </motion.div>
+  1049→  );
+  1050→}
+  1051→
+  1052→// ========== FLASHCARD REVIEWER ==========
+  1053→function FlashcardReviewer({ onBack }: { onBack: () => void }) {
+  1054→  const [cards, setCards] = useState<FlashcardItem[]>([]);
+  1055→  const [loading, setLoading] = useState(true);
+  1056→  const [currentIndex, setCurrentIndex] = useState(0);
+  1057→  const [flipped, setFlipped] = useState(false);
+  1058→  const [done, setDone] = useState(false);
+  1059→  const [reviewed, setReviewed] = useState(0);
+  1060→  const [ratings, setRatings] = useState<number[]>([]);
+  1061→  const fetchedRef = useRef(false);
+  1062→
+  1063→  useEffect(() => {
+  1064→    if (fetchedRef.current) return;
+  1065→    fetchedRef.current = true;
+  1066→    fetch('/api/flashcards?due=true').then(r => r.json()).then(d => {
+  1067→      if (d.flashcards) setCards(d.flashcards);
+  1068→    }).catch(() => {}).finally(() => setLoading(false));
+  1069→  }, []);
+  1070→
+  1071→  const handleReview = useCallback(async (quality: number) => {
+  1072→    const card = cards[currentIndex];
+  1073→    if (!card) return;
+  1074→    try {
+  1075→      await fetch(`/api/flashcards/${card.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: quality }) });
+  1076→    } catch {}
+  1077→    setReviewed(prev => prev + 1);
+  1078→    setRatings(prev => [...prev, quality]);
+  1079→    setFlipped(false);
+  1080→    if (currentIndex + 1 >= cards.length) setDone(true);
+  1081→    else setCurrentIndex(prev => prev + 1);
+  1082→  }, [cards, currentIndex]);
+  1083→
+  1084→  // Keyboard shortcuts
+  1085→  useEffect(() => {
+  1086→    if (done || !flipped || cards.length === 0) return;
+  1087→    const handleKey = (e: KeyboardEvent) => {
+  1088→      if (e.key === '1') handleReview(1);
+  1089→      else if (e.key === '2') handleReview(2);
+  1090→      else if (e.key === '3') handleReview(3);
+  1091→      else if (e.key === '4') handleReview(5);
+  1092→    };
+  1093→    window.addEventListener('keydown', handleKey);
+  1094→    return () => window.removeEventListener('keydown', handleKey);
+  1095→  }, [flipped, done, cards.length, handleReview]);
+  1096→
+  1097→  // Completion stats
+  1098→  const avgRating = ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : '0';
+  1099→  const hardCount = ratings.filter(r => r <= 2).length;
+  1100→  const easyCount = ratings.filter(r => r >= 4).length;
+  1101→
+  1102→  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[var(--ws-text-tertiary)]" /></div>;
+  1103→  if (cards.length === 0) return (
+  1104→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="py-16 text-center">
+  1105→      <Check size={48} className="mx-auto mb-4 text-[var(--ws-verdigris)]" strokeWidth={1} />
+  1106→      <p className="text-sm text-[var(--ws-text-tertiary)]">Nenhuma carta para revisar agora</p>
+  1107→      <button onClick={onBack} className="mt-4 text-sm text-[var(--ws-accent)] hover:underline">Voltar</button>
+  1108→    </motion.div>
+  1109→  );
+  1110→  if (done) return (
+  1111→    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto max-w-md py-16 text-center">
+  1112→      <EnsoCircle size={80} strokeWidth={2} color="var(--ws-verdigris)" imperfection={0.1} animate={false} />
+  1113→      <h2 className="mt-6 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)]">Sessao Completa!</h2>
+  1114→      <p className="mt-2 text-sm text-[var(--ws-text-tertiary)]">Voce revisou {reviewed} cartas</p>
+  1115→
+  1116→      <div className="mt-8 grid grid-cols-3 gap-4">
+  1117→        <WabiSabiCard hover={false}>
+  1118→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-accent)]">{avgRating}</p>
+  1119→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Media</p>
+  1120→        </WabiSabiCard>
+  1121→        <WabiSabiCard hover={false}>
+  1122→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-gold)]">{hardCount}</p>
+  1123→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Dificeis</p>
+  1124→        </WabiSabiCard>
+  1125→        <WabiSabiCard hover={false}>
+  1126→          <p className="font-serif-jp text-xl font-bold text-[var(--ws-verdigris)]">{easyCount}</p>
+  1127→          <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">Faceis</p>
+  1128→        </WabiSabiCard>
+  1129→      </div>
+  1130→
+  1131→      <ZenButton variant="primary" size="md" className="mt-8" onClick={onBack}>Voltar aos Flashcards</ZenButton>
+  1132→    </motion.div>
+  1133→  );
+  1134→
+  1135→  const card = cards[currentIndex];
+  1136→  return (
+  1137→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+  1138→      {/* Progress header */}
+  1139→      <div className="mb-6">
+  1140→        <div className="mb-4 flex items-center justify-between">
+  1141→          <button onClick={onBack} className="flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]">
+  1142→            <ArrowLeft size={16} /> Voltar
+  1143→          </button>
+  1144→          <div className="flex items-center gap-3">
+  1145→            <span className="font-serif-jp text-sm font-bold text-[var(--ws-text-primary)]">{currentIndex + 1} <span className="font-normal text-[var(--ws-text-tertiary)]">de {cards.length}</span></span>
+  1146→            <span className="rounded-ws-button bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] px-2.5 py-1 text-xs font-medium text-[var(--ws-accent)]">{reviewed} revisadas</span>
+  1147→          </div>
+  1148→        </div>
+  1149→        <div className="h-1.5 w-full rounded-full bg-[var(--ws-glass-border)]">
+  1150→          <motion.div className="h-1.5 rounded-full bg-[var(--ws-accent)]" initial={{ width: 0 }} animate={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }} transition={{ duration: 0.3 }} />
+  1151→        </div>
+  1152→      </div>
+  1153→
+  1154→      <div className="mx-auto max-w-xl">
+  1155→        {/* Flashcard */}
+  1156→        <div
+  1157→          className="perspective-1000 cursor-pointer"
+  1158→          onClick={() => !flipped && setFlipped(true)}
+  1159→          style={{ perspective: 1000 }}
+  1160→        >
+  1161→          <motion.div className="min-h-[280px] relative" animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.6, type: 'spring', stiffness: 100 }} style={{ transformStyle: 'preserve-3d' }}>
+  1162→            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-8 backdrop-blur-xl" style={{ backfaceVisibility: 'hidden' }}>
+  1163→              <p className="mb-4 text-xs font-medium text-[var(--ws-accent)]">PERGUNTA</p>
+  1164→              <p className="text-center text-lg font-medium leading-relaxed text-[var(--ws-text-primary)]">{card.front}</p>
+  1165→              <p className="mt-6 text-xs text-[var(--ws-text-tertiary)]">Clique para ver a resposta</p>
+  1166→            </div>
+  1167→            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-ws-organic border border-[var(--ws-accent)]/20 bg-[var(--ws-bg)] p-8" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+  1168→              <p className="mb-4 text-xs font-medium text-[var(--ws-verdigris)]">RESPOSTA</p>
+  1169→              <p className="text-center text-base leading-relaxed text-[var(--ws-text-primary)]">{card.back}</p>
+  1170→            </div>
+  1171→          </motion.div>
+  1172→        </div>
+  1173→
+  1174→        {/* Rating Buttons */}
+  1175→        {flipped && (
+  1176→          <div className="mt-8">
+  1177→            <p className="mb-3 text-center text-xs text-[var(--ws-text-tertiary)]">Como voce se saiu? (teclas 1-4)</p>
+  1178→            <div className="flex flex-wrap justify-center gap-3">
+  1179→              {([
+  1180→                ['Novamente', '1 min', 1, '1'],
+  1181→                ['Dificil', '6 min', 2, '2'],
+  1182→                ['Bom', '10 min', 3, '3'],
+  1183→                ['Facil', '4 dias', 5, '4'],
+  1184→              ] as const).map(([label, sub, q, key]) => (
+  1185→                <button
+  1186→                  key={label}
+  1187→                  onClick={() => handleReview(q)}
+  1188→                  className="group flex flex-col items-center gap-1 rounded-ws-button border border-[var(--ws-glass-border)] px-5 py-3 transition-all hover:border-[var(--ws-accent)]/30 hover:shadow-md"
+  1189→                >
+  1190→                  <span className="text-sm font-medium text-[var(--ws-text-primary)]">{label}</span>
+  1191→                  <span className="text-[10px] text-[var(--ws-text-tertiary)]">{sub}</span>
+  1192→                  <span className="mt-1 rounded bg-[var(--ws-bg)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--ws-text-tertiary)] opacity-0 transition-opacity group-hover:opacity-100">{key}</span>
+  1193→                </button>
+  1194→              ))}
+  1195→            </div>
+  1196→          </div>
+  1197→        )}
+  1198→      </div>
+  1199→    </motion.div>
+  1200→  );
+  1201→}
+  1202→
+  1203→// ========== POMODORO TIMER ==========
+  1204→function PomodoroTimer() {
+  1205→  const [mode, setMode] = useState<'focus' | 'short' | 'long'>('focus');
+  1206→  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  1207→  const [isRunning, setIsRunning] = useState(false);
+  1208→  const [totalToday, setTotalToday] = useState(0);
+  1209→  const [sessions, setSessions] = useState<{ duration: number; createdAt: string }[]>([]);
+  1210→  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  1211→  const durations = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
+  1212→  const modeLabels = { focus: 'Foco', short: 'Pausa Curta', long: 'Pausa Longa' };
+  1213→  const fetchedRef = useRef(false);
+  1214→
+  1215→  useEffect(() => {
+  1216→    if (fetchedRef.current) return;
+  1217→    fetchedRef.current = true;
+  1218→    fetch('/api/sessions').then(r => r.json()).then(d => {
+  1219→      if (d.sessions) {
+  1220→        const today = new Date().toDateString();
+  1221→        setTotalToday(d.sessions.filter((s: any) => new Date(s.createdAt).toDateString() === today).reduce((sum: number, s: any) => sum + s.duration, 0));
+  1222→        setSessions(d.sessions.slice(0, 10));
+  1223→      }
+  1224→    });
+  1225→  }, []);
+  1226→
+  1227→  useEffect(() => {
+  1228→    if (isRunning) {
+  1229→      intervalRef.current = setInterval(() => {
+  1230→        setTimeLeft(prev => {
+  1231→          if (prev <= 1) {
+  1232→            setIsRunning(false);
+  1233→            if (mode === 'focus') {
+  1234→              const dur = durations.focus - prev;
+  1235→              fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: dur, type: 'pomodoro' }) });
+  1236→              setTotalToday(t => t + dur);
+  1237→            }
+  1238→            return 0;
+  1239→          }
+  1240→          return prev - 1;
+  1241→        });
+  1242→      }, 1000);
+  1243→    } else if (intervalRef.current) clearInterval(intervalRef.current);
+  1244→    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  1245→  }, [isRunning, mode, durations.focus]);
+  1246→
+  1247→  const switchMode = (m: 'focus' | 'short' | 'long') => { setMode(m); setTimeLeft(durations[m]); setIsRunning(false); };
+  1248→  const minutes = Math.floor(timeLeft / 60);
+  1249→  const seconds = timeLeft % 60;
+  1250→  const progress = 1 - timeLeft / durations[mode];
+  1251→
+  1252→  return (
+  1253→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+  1254→      <div className="mb-8">
+  1255→        <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl"><Timer size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Pomodoro Timer</h1>
+  1256→        <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">Estude com foco usando a tecnica Pomodoro</p>
+  1257→      </div>
+  1258→      <div className="mx-auto max-w-md">
+  1259→        <div className="mb-8 flex justify-center gap-2">
+  1260→          {(['focus', 'short', 'long'] as const).map(m => (
+  1261→            <button key={m} onClick={() => switchMode(m)} className={`rounded-ws-button px-4 py-2 text-sm font-medium transition-colors ${mode === m ? 'bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]'}`}>
+  1262→              {modeLabels[m]}
+  1263→            </button>
+  1264→          ))}
+  1265→        </div>
+  1266→        <WabiSabiCard className="mb-8" hover={false}>
+  1267→          <div className="flex flex-col items-center py-8">
+  1268→            <div className="relative flex h-56 w-56 items-center justify-center">
+  1269→              <svg className="absolute inset-0 -rotate-90" viewBox="0 0 200 200">
+  1270→                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--ws-glass-border)" strokeWidth="4" />
+  1271→                <motion.circle cx="100" cy="100" r="90" fill="none" stroke="var(--ws-accent)" strokeWidth="4" strokeLinecap="round" strokeDasharray={2 * Math.PI * 90} initial={{ strokeDashoffset: 2 * Math.PI * 90 }} animate={{ strokeDashoffset: 2 * Math.PI * 90 * (1 - progress) }} transition={{ duration: 0.5 }} />
+  1272→              </svg>
+  1273→              <div className="text-center">
+  1274→                <p className="font-serif-jp text-5xl font-bold text-[var(--ws-text-primary)]">{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</p>
+  1275→                <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">{modeLabels[mode]}</p>
+  1276→              </div>
+  1277→            </div>
+  1278→            <div className="mt-8 flex gap-4">
+  1279→              <button onClick={() => switchMode(mode)} className="rounded-ws-button p-3 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-primary)]" title="Reiniciar"><RotateCcw size={18} /></button>
+  1280→              <ZenButton variant="primary" size="lg" onClick={() => setIsRunning(!isRunning)} className="px-12">{isRunning ? 'Pausar' : 'Iniciar'}</ZenButton>
+  1281→            </div>
+  1282→          </div>
+  1283→        </WabiSabiCard>
+  1284→        <WabiSabiCard hover={false}>
+  1285→          <h3 className="mb-3 text-sm font-semibold text-[var(--ws-text-secondary)]"><Clock size={14} className="mr-1.5 inline" /> Hoje</h3>
+  1286→          <p className="font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">{Math.round(totalToday / 60)} min</p>
+  1287→          <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">de tempo de foco</p>
+  1288→          {sessions.length > 0 && (
+  1289→            <div className="mt-4 max-h-48 space-y-2 overflow-y-auto border-t border-[var(--ws-glass-border)] pt-4">
+  1290→              {sessions.map((s, i) => (
+  1291→                <div key={i} className="flex items-center justify-between text-xs">
+  1292→                  <span className="text-[var(--ws-text-tertiary)]">{new Date(s.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+  1293→                  <span className="font-medium text-[var(--ws-text-primary)]">{Math.round(s.duration / 60)} min</span>
+  1294→                </div>
+  1295→              ))}
+  1296→            </div>
+  1297→          )}
+  1298→        </WabiSabiCard>
+  1299→      </div>
+  1300→    </motion.div>
+  1301→  );
+  1302→}
+  1303→
+  1304→// ========== SENSEI AI CHAT ==========
+  1305→function SenseiChat() {
+  1306→  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  1307→  const [input, setInput] = useState('');
+  1308→  const [isLoading, setIsLoading] = useState(false);
+  1309→  const [notebooks, setNotebooks] = useState<{ id: string; title: string; content: string }[]>([]);
+  1310→  const scrollRef = useRef<HTMLDivElement>(null);
+  1311→  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  1312→  const fetchedRef = useRef(false);
+  1313→  const [copiedId, setCopiedId] = useState<string | null>(null);
+  1314→
+  1315→  // Fetch chat history and notebooks on mount
+  1316→  useEffect(() => {
+  1317→    if (fetchedRef.current) return;
+  1318→    fetchedRef.current = true;
+  1319→    Promise.all([
+  1320→      fetch('/api/chat').then(r => r.json()),
+  1321→      fetch('/api/notebooks').then(r => r.json()),
+  1322→    ]).then(([chatData, nbData]) => {
+  1323→      if (nbData.notebooks) setNotebooks(nbData.notebooks);
+  1324→      if (chatData.messages && chatData.messages.length > 0) {
+  1325→        setMessages(chatData.messages);
+  1326→      } else {
+  1327→        setMessages([{
+  1328→          id: 'welcome',
+  1329→          role: 'assistant',
+  1330→          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal inteligente.
+  1331→
+  1332→Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar com o conteudo que voce ja esta estudando. Quanto mais voce usa, mais eu entendo seu perfil de estudo.
+  1333→
+  1334→*Escolha uma sugestao abaixo ou digite sua pergunta!*`,
+  1335→          createdAt: new Date().toISOString(),
+  1336→        }]);
+  1337→      }
+  1338→    }).catch(() => {
+  1339→      setMessages([{
+  1340→        id: 'welcome',
+  1341→        role: 'assistant',
+  1342→        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.
+  1343→
+  1344→*Como posso ajudar?*`,
+  1345→        createdAt: new Date().toISOString(),
+  1346→      }]);
+  1347→    });
+  1348→  }, []);
+  1349→
+  1350→  useEffect(() => {
+  1351→    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  1352→  }, [messages, isLoading]);
+  1353→
+  1354→  // Auto-resize textarea
+  1355→  useEffect(() => {
+  1356→    if (textareaRef.current) {
+  1357→      textareaRef.current.style.height = 'auto';
+  1358→      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+  1359→    }
+  1360→  }, [input]);
+  1361→
+  1362→  const handleSend = async (msgText?: string) => {
+  1363→    const userMsg = (msgText || input).trim();
+  1364→    if (!userMsg || isLoading) return;
+  1365→    const userMessage = { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: new Date().toISOString() };
+  1366→    setMessages(prev => [...prev, userMessage]);
+  1367→    setInput('');
+  1368→    setIsLoading(true);
+  1369→    try {
+  1370→      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
+  1371→      const data = await res.json();
+  1372→      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
+  1373→      setMessages(prev => [...prev, assistantMsg]);
+  1374→    } catch {
+  1375→      setMessages(prev => [...prev, {
+  1376→        id: (Date.now() + 1).toString(),
+  1377→        role: 'assistant',
+  1378→        content: 'Desculpe, ocorreu um erro. Tente novamente.',
+  1379→        createdAt: new Date().toISOString(),
+  1380→      }]);
+  1381→    }
+  1382→    setIsLoading(false);
+  1383→  };
+  1384→
+  1385→  const handleClear = async () => {
+  1386→    if (!confirm('Limpar toda a conversa?')) return;
+  1387→    try {
+  1388→      await fetch('/api/chat', { method: 'DELETE' });
+  1389→    } catch {}
+  1390→    setMessages([{
+  1391→      id: 'welcome-clear',
+  1392→      role: 'assistant',
+  1393→      content: `Conversa limpa! Ainda tenho acesso aos seus cadernos.
+  1394→
+  1395→*Como posso ajudar?*`,
+  1396→      createdAt: new Date().toISOString(),
+  1397→    }]);
+  1398→  };
+  1399→
+  1400→  const handleCopy = async (text: string, id: string) => {
+  1401→    try {
+  1402→      await navigator.clipboard.writeText(text);
+  1403→      setCopiedId(id);
+  1404→      setTimeout(() => setCopiedId(null), 2000);
+  1405→    } catch {}
+  1406→  };
+  1407→
+  1408→  const handleKeyDown = (e: React.KeyboardEvent) => {
+  1409→    if (e.key === 'Enter' && !e.shiftKey) {
+  1410→      e.preventDefault();
+  1411→      handleSend();
+  1412→    }
+  1413→  };
+  1414→
+  1415→  const isOnlyWelcome = messages.length <= 1;
+  1416→
+  1417→  // Build dynamic suggestions from notebooks
+  1418→  const notebookSuggestions = notebooks
+  1419→    .filter(nb => nb.content && nb.content.replace(/<[^>]*>/g, '').trim().length > 20)
+  1420→    .slice(0, 3);
+  1421→
+  1422→  const defaultSuggestions = [
+  1423→    { category: 'Estudo', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Dicas para memorizar melhor'] },
+  1424→    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo', 'Me ajude com tecnica Pomodoro'] },
+  1425→  ];
+  1426→
+  1427→  return (
+  1428→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+  1429→      <div className="mb-6 flex items-start justify-between">
+  1430→        <div>
+  1431→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+  1432→            <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
+  1433→          </h1>
+  1434→          <p className="mt-1 flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
+  1435→            Seu tutor inteligente
+  1436→            {notebooks.length > 0 && (
+  1437→              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ws-verdigris)]/30 bg-[color-mix(in_srgb,var(--ws-verdigris)_8%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--ws-verdigris)]">
+  1438→                <Sparkles size={10} /> Lendo {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
+  1439→              </span>
+  1440→            )}
+  1441→          </p>
+  1442→        </div>
+  1443→        {messages.length > 1 && (
+  1444→          <button
+  1445→            onClick={handleClear}
+  1446→            className="flex items-center gap-1.5 rounded-ws-button border border-[var(--ws-glass-border)] px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:border-red-300/50 hover:text-red-400"
+  1447→          >
+  1448→            <Trash size={12} /> Limpar
+  1449→          </button>
+  1450→        )}
+  1451→      </div>
+  1452→
+  1453→      <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
+  1454→        {/* Header */}
+  1455→        <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
+  1456→          <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
+  1457→          <div className="min-w-0 flex-1">
+  1458→            <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
+  1459→            <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
+  1460→              {notebooks.length > 0
+  1461→                ? `Contexto: ${notebooks.map(n => n.title).join(', ')}`
+  1462→                : 'Conectado aos seus cadernos de estudo'
+  1463→              }
+  1464→            </p>
+  1465→          </div>
+  1466→          <div className="flex items-center gap-2">
+  1467→            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
+  1468→            <span className="text-xs text-[var(--ws-text-tertiary)]">Online</span>
+  1469→          </div>
+  1470→        </div>
+  1471→
+  1472→        {/* Messages */}
+  1473→        <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
+  1474→          <div className="space-y-6">
+  1475→            {messages.map((msg) => (
+  1476→                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+  1477→                  {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
+  1478→                  <div className="flex flex-col">
+  1479→                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)]'}`}>
+  1480→                      {msg.role === 'assistant' ? (
+  1481→                        <div className="markdown-content text-sm leading-relaxed">
+  1482→                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+  1483→                        </div>
+  1484→                      ) : (
+  1485→                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+  1486→                      )}
+  1487→                      {/* Copy button on assistant messages */}
+  1488→                      {msg.role === 'assistant' && msg.id !== 'welcome' && msg.id !== 'welcome-clear' && (
+  1489→                        <button
+  1490→                          onClick={() => handleCopy(msg.content, msg.id)}
+  1491→                          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ws-text-tertiary)] opacity-0 transition-all hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] group-hover:opacity-100"
+  1492→                          title={copiedId === msg.id ? 'Copiado!' : 'Copiar resposta'}
+  1493→                        >
+  1494→                          {copiedId === msg.id ? <Check size={12} className="text-[var(--ws-verdigris)]" /> : <Copy size={12} />}
+  1495→                        </button>
+  1496→                      )}
+  1497→                    </div>
+  1498→                    <span className={`mt-1 text-[10px] text-[var(--ws-text-tertiary)] ${msg.role === 'user' ? 'text-right' : ''}`}>
+  1499→                      {formatTimestamp(msg.createdAt)}
+  1500→                    </span>
+  1501→                  </div>
+  1502→                </div>
+  1503→              ))}
+  1504→
+  1505→            {/* Loading animation */}
+  1506→            {isLoading && (
+  1507→              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+  1508→                <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />
+  1509→                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-5 py-3">
+  1510→                  <div className="flex items-center gap-1.5">
+  1511→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
+  1512→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
+  1513→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} />
+  1514→                  </div>
+  1515→                  <span className="ml-2 text-[10px] text-[var(--ws-text-tertiary)]">Sensei esta pensando...</span>
+  1516→                </div>
+  1517→              </motion.div>
+  1518→            )}
+  1519→          </div>
+  1520→
+  1521→          {/* Suggested prompts */}
+  1522→          {isOnlyWelcome && !isLoading && (
+  1523→            <div className="mt-6 space-y-4">
+  1524→              {/* Dynamic suggestions from user notebooks */}
+  1525→              {notebookSuggestions.length > 0 && (
+  1526→                <div>
+  1527→                  <div className="mb-2 flex items-center gap-1.5">
+  1528→                    <Sparkles size={12} className="text-[var(--ws-accent)]" />
+  1529→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">Baseado nos seus cadernos</span>
+  1530→                  </div>
+  1531→                  <div className="flex flex-wrap gap-2">
+  1532→                    {notebookSuggestions.map(nb => (
+  1533→                      <button key={nb.id} onClick={() => handleSend(`Me ajude a revisar o conteudo do caderno "${nb.title}". Me faca um resumo e me faca perguntas para testar meu conhecimento.`)} className="rounded-full border border-[var(--ws-accent)]/20 bg-[color-mix(in_srgb,var(--ws-accent)_6%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)]">
+  1534→                        Revisar: {nb.title}
+  1535→                      </button>
+  1536→                    ))}
+  1537→                    {notebookSuggestions.length > 0 && (
+  1538→                      <button onClick={() => handleSend('O que eu tenho estudado ultimamente? Me faca um resumo de todos os meus cadernos e sugira o que revisar primeiro.')} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+  1539→                        Resumo geral dos estudos
+  1540→                      </button>
+  1541→                    )}
+  1542→                  </div>
+  1543→                </div>
+  1544→              )}
+  1545→              {/* Default suggestions */}
+  1546→              {defaultSuggestions.map((cat) => (
+  1547→                <div key={cat.category}>
+  1548→                  <div className="mb-2 flex items-center gap-1.5">
+  1549→                    <cat.icon size={12} className="text-[var(--ws-accent)]" />
+  1550→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">{cat.category}</span>
+  1551→                  </div>
+  1552→                  <div className="flex flex-wrap gap-2">
+  1553→                    {cat.prompts.map(p => (
+  1554→                      <button key={p} onClick={() => handleSend(p)} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+  1555→                        {p}
+  1556→                      </button>
+  1557→                    ))}
+  1558→                  </div>
+  1559→                </div>
+  1560→              ))}
+  1561→            </div>
+  1562→          )}
+  1563→        </div>
+  1564→
+  1565→        {/* Input - textarea for multi-line */}
+  1566→        <div className="border-t border-[var(--ws-glass-border)] p-4">
+  1567→          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
+  1568→            <textarea
+  1569→              ref={textareaRef}
+  1570→              placeholder="Pergunte sobre seus estudos... (Shift+Enter para nova linha)"
+  1571→              className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+  1572→              value={input}
+  1573→              onChange={e => setInput(e.target.value)}
+  1574→              onKeyDown={handleKeyDown}
+  1575→              rows={1}
+  1576→            />
+  1577→            <button
+  1578→              onClick={() => handleSend()}
+  1579→              disabled={isLoading || !input.trim()}
+  1580→              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
+  1581→              aria-label="Enviar"
+  1582→            >
+  1583→              <Send size={14} />
+  1584→            </button>
+  1585→          </div>
+  1586→          <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
+  1587→            O Sensei IA le seus cadernos automaticamente para dar respostas mais precisas
+  1588→          </p>
+  1589→        </div>
+  1590→      </div>
+  1591→    </motion.div>
+  1592→  );
+  1593→}
+  1594→

@@ -4,46 +4,65 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
 
-const BASE_SYSTEM_PROMPT = `Voce e o Sensei AI, um tutor pessoal de estudos avancado da plataforma StudyAI. Sua personalidade combina a sabedoria zen japonesa com um estilo de ensino moderno e acessivel.
+const BASE_SYSTEM_PROMPT = `Voce e o Sensei AI, um assistente de inteligencia artificial avancado da plataforma StudyAI. Voce e capaz de responder QUALQUER tipo de pergunta — nao apenas sobre estudos — como um assistente universal (similiar ao ChatGPT).
 
-## Regras Fundamentais
+## Personalidade e Estilo
 - Fale em portugues brasileiro
-- Seja encorajador e paciente
-- Explique conceitos de forma clara com exemplos praticos
-- Use metaforas relacionadas a natureza e filosofia japonesa quando apropriado
-- Responda de forma concisa mas completa
-- Use formatacao Markdown para organizar suas respostas (listas, negrito, cabecalhos, blocos de codigo)
-- Se nao souber algo, seja honesto
-- Incentive o aprendizado continuo
-- Mantenha um tom respeitoso mas amigavel
+- Seja inteligente, direto e completo nas respostas
+- Adapte o tom ao contexto: pode ser tecnico, casual, criativo, profissional ou didatico conforme o assunto
+- Use formatacao Markdown (listas, negrito, cabecalhos, blocos de codigo, tabelas) para organizar respostas
+- Responda de forma concisa quando o assunto for simples, e detalhada quando necessario
+- Seja honesto quando nao souber algo com certeza
+- Use analogias e exemplos praticos quando ajudar a explicar
+- Mantenha paragrafos curtos e diretos
 
-## Capacidades
-- Voce tem acesso ao historico de conversa com o usuario
+## O Que Voce Pode Fazer
+- **Qualquer assunto**: programacao, matematica, historia, ciencias, filosofia, arte, negocios, saude, esportes, cultura, tecnologia, idiomas, receitas, viagens, musica, cinema, jogos, conselhos, criatividade, escrita, analise de dados — TUDO
+- **Ajudar com estudos**: explicar conceitos, criar resumos, gerar exercicios, planejar cronogramas
+- **Programacao**: escrever codigo, debuggar, explicar algoritmos, sugerir solucoes
+- **Criatividade**: escrever textos, brainstorming, ideias para projetos
+- **Analise**: comparar opcoes, fazer resumos de textos longos, estruturar informacoes
+- **Conversa**: conversar sobre qualquer topico de forma interessante e informativa
+- **Resolucao de problemas**: ajudar a pensar em solucoes para problemas reais
+
+## Como Usar as Memorias do Usuario
+- Voce tem acesso a memorias acumuladas sobre o usuario (preferencias, interesses, contexto pessoal)
+- USE essas memorias para personalizar suas respostas
+- Se o usuario ja mencionou que estuda algo, referencie isso naturalmente
+- Se o usuario tem interesses conhecidos, conecte novos assuntos aos conhecidos quando relevante
+- Quanto mais o usuario conversa, mais voce sabe sobre ele — use isso a favor dele
+
+## Cadernos do Usuario
 - Voce tem acesso aos cadernos de anotacoes do usuario
-- Use o conteudo dos cadernos do usuario para dar respostas mais personalizadas e contextualizadas
-- Quando o usuario perguntar sobre algo que esta nos cadernos dele, referencie esse conteudo diretamente
-- Se o usuario pedir para explicar ou resumir algo do caderno, use o conteudo disponivel
+- Quando a pergunta for sobre conteudo que esta nos cadernos, use e referencie esse material
 - Adapte suas explicacoes ao nivel que o usuario demonstra nas conversas anteriores
 
-## Tecnicas de Ensino
-- Quando o usuario pedir ajuda para estudar, sugira tecnicas como Pomodoro, flashcards, e revisao espacada
-- Use analogias e exemplos praticos
-- Quando apropriado, faca perguntas para verificar o entendimento
-- Ofereca exercicios e praticas quando relevante
-- Estruture respostas longas com cabecalhos e listas para facilitar a leitura
-
-## Estilo de Resposta
+## Formatacao
 - Use "**negrito**" para termos importantes
 - Use listas para multiplas informacoes
-- Use blocos de codigo quando mostrar formulas ou exemplos tecnicos
-- Mantenha paragrafos curtos e diretos`;
+- Use blocos de codigo com linguagem especificada para codigo
+- Use tabelas quando comparar informacoes
+- Mantenha respostas bem estruturadas e faceis de ler`;
 
-const fallbackResponses = [
-  'O aprendizado e como um jardim zen: cada conceito que voce domina e como uma pedra colocada com cuidado. Continue assim!\n\n**Dica:** A chave esta na **repeticao espacada** e na **reflexao ativa** sobre o material. Tente explicar o conceito em suas proprias palavras.',
-  'Na tradicao Wabi-Sabi, a beleza esta na imperfeicao. Nao se preocupe em entender tudo de uma vez!\n\nA retencao de longo prazo funciona melhor quando distribuida ao longo do tempo. **Estudar 30 minutos por dia** e mais eficaz do que 3 horas de uma vez.',
-  'Como disse um antigo mestre: *"O conhecimento e como a agua que flui."*\n\nPara entender melhor esse conceito, tente:\n1. Ler com atencao\n2. Fazer anotacoes com suas palavras\n3. Criar exemplos praticos\n4. Explicar para outra pessoa',
-  'O caminho do aprendizado e longo, mas cada passo importa. Parabens por estar aqui!\n\n**Tecnicas eficazes:**\n- **Pomodoro**: 25min foco + 5min pausa\n- **Flashcards**: Revisao espacada com SM-2\n- **Notas ativas**: Nao apenas copiar, mas processar\n- **Ensinar**: A melhor forma de aprender',
-];
+const MEMORY_EXTRACTION_PROMPT = `Analise a conversa abaixo e extraia FATOS IMPORTANTES sobre o usuario que poderiam ser uteis em futuras conversas para personalizar as respostas.
+
+Categorias de memorias uteis:
+- **interesses**: assuntos que o usuario gosta ou estuda (ex: "Gosta de programacao em Python")
+- **profissao**: o que o usuario faz (ex: "Estudante de engenharia", "Desenvolvedor frontend")
+- **objetivos**: metas do usuario (ex: "Quer aprender japones", "Esta se preparando para concurso")
+- **preferencias**: como o usuario prefere aprender ou receber informacoes (ex: "Prefere explicacoes visuais")
+- **contexto**: informacoes pessoais relevantes (ex: "Mora em Sao Paulo", "Tem 25 anos")
+- **nivel**: nivel de conhecimento em areas (ex: "Iniciante em JavaScript", "Avancado em matematica")
+
+IMPORTANTE:
+- Extraia apenas fatos CLAROS e ESPECIFICOS — nao suponha nada
+- Nao repita memorias que ja devem existir
+- Retorne APENAS um array JSON, sem texto adicional
+- Cada item deve ter "category" (interesses/profissao/objetivos/preferencias/contexto/nivel) e "content" (descricao curta)
+- Se nao houver nada novo para aprender, retorne []
+- Maximo 5 memorias por conversa
+
+Exemplo de resposta: [{"category":"interesses","content":"Estuda programacao em Python e React"},{"category":"objetivos","content":"Quer aprender japones para viagem"}]`;
 
 let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
 
@@ -54,7 +73,7 @@ async function getZAI() {
 
 function stripHtml(html: string): string {
   return html
-    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<br\s*\/>/gi, '\n')
     .replace(/<li[^>]*>/gi, '- ')
     .replace(/<h[1-6][^>]*>/gi, '\n## ')
     .replace(/<\/?p[^>]*>/gi, '\n')
@@ -69,7 +88,6 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** Simple relevance scoring: count how many query words appear in the text */
 function scoreRelevance(text: string, query: string): number {
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   const textLower = text.toLowerCase();
@@ -82,6 +100,55 @@ function scoreRelevance(text: string, query: string): number {
   return score;
 }
 
+async function extractMemories(userId: string, userMessage: string, assistantReply: string): Promise<void> {
+  try {
+    const zai = await getZAI();
+    const result = await zai.chat.completions.create({
+      messages: [
+        { role: 'system', content: MEMORY_EXTRACTION_PROMPT },
+        { role: 'user', content: `Conversa recente:\n\nUsuario: ${userMessage}\n\nAssistente: ${assistantReply}` },
+      ],
+      thinking: { type: 'disabled' },
+    });
+
+    const raw = result.choices[0]?.message?.content?.trim();
+    if (!raw) return;
+
+    // Extract JSON array from response (handle markdown code blocks)
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return;
+
+    const memories: { category: string; content: string }[] = JSON.parse(jsonMatch[0]);
+
+    const validCategories = ['interesses', 'profissao', 'objetivos', 'preferencias', 'contexto', 'nivel', 'general'];
+
+    for (const mem of memories.slice(0, 5)) {
+      if (!mem.content || mem.content.length < 5 || mem.content.length > 200) continue;
+      const category = validCategories.includes(mem.category?.toLowerCase()) ? mem.category.toLowerCase() : 'general';
+
+      // Check for duplicate/similar memories
+      const existing = await db.userMemory.findMany({
+        where: { userId, category },
+        select: { content: true },
+      });
+
+      const isDuplicate = existing.some(e => {
+        const words1 = e.content.toLowerCase().split(/\s+/);
+        const words2 = mem.content.toLowerCase().split(/\s+/);
+        const common = words1.filter(w => w.length > 3 && words2.includes(w));
+        return common.length / Math.max(words1.length, words2.length) > 0.6;
+      });
+
+      if (!isDuplicate) {
+        await db.userMemory.create({ data: { userId, category, content: mem.content.trim(), source: 'conversation' } });
+      }
+    }
+  } catch (err) {
+    // Memory extraction is async and non-critical — never fail the main response
+    console.error('Memory extraction failed (non-critical):', err);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -92,8 +159,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida. Tente fazer login novamente.' }, { status: 401 });
     }
-    // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true } });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado. Crie uma nova conta.' }, { status: 401 });
     }
@@ -102,8 +168,19 @@ export async function POST(request: Request) {
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Mensagem e obrigatoria' }, { status: 400 });
     }
+    if (message.length > 10000) {
+      return NextResponse.json({ error: 'Mensagem muito longa' }, { status: 400 });
+    }
 
-    // === 1. Get conversation history (last 20 messages) ===
+    // === 1. Load memories about the user ===
+    const memories = await db.userMemory.findMany({
+      where: { userId },
+      select: { category: true, content: true },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    // === 2. Get conversation history (last 20 messages) ===
     const recentMessages = await db.chatMessage.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -112,33 +189,40 @@ export async function POST(request: Request) {
     });
     const history = recentMessages.reverse();
 
-    // === 2. Get ALL user notebooks as knowledge base ===
+    // === 3. Get user notebooks as knowledge base ===
     const notebooks = await db.notebook.findMany({
       where: { userId },
       select: { title: true, content: true },
     });
 
-    // === 3. Build knowledge context from notebooks ===
+    // === 4. Build memory context ===
+    let memoryContext = '';
+    if (memories.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      for (const m of memories) {
+        const cat = m.category || 'general';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(m.content);
+      }
+      const memLines = Object.entries(grouped)
+        .map(([cat, items]) => `- ${cat}: ${items.join('; ')}`)
+        .join('\n');
+      memoryContext = `\n\n## Memorias sobre o Usuario (use para personalizar respostas)\nO usuario conversou com voce antes e voce aprendeu o seguinte sobre ele. Use essas informacoes NATURALMENTE nas respostas — nao mencione explicitamente que tem memorias.\n\n${memLines}`;
+    }
+
+    // === 5. Build knowledge context from notebooks ===
     let knowledgeContext = '';
     if (notebooks.length > 0) {
-      // Strip HTML and prepare notebook content
       const notebookTexts = notebooks
         .filter(nb => nb.content && nb.content.replace(/<[^>]*>/g, '').trim().length > 10)
-        .map(nb => ({
-          title: nb.title,
-          text: stripHtml(nb.content),
-        }));
+        .map(nb => ({ title: nb.title, text: stripHtml(nb.content) }));
 
       if (notebookTexts.length > 0) {
-        // Score each notebook by relevance to the current question
         const scored = notebookTexts
           .map(nb => ({ ...nb, score: scoreRelevance(nb.text, message) }))
           .sort((a, b) => b.score - a.score);
 
-        // Take top 3 most relevant notebooks (or all if fewer)
         const topNotebooks = scored.slice(0, 3);
-
-        // Build context string - limit each notebook to ~1500 chars to stay within context window
         const MAX_CHARS_PER_NOTEBOOK = 1500;
         const contextParts = topNotebooks.map(nb => {
           const truncated = nb.text.length > MAX_CHARS_PER_NOTEBOOK
@@ -147,20 +231,20 @@ export async function POST(request: Request) {
           return `### Caderno: ${nb.title}\n${truncated}`;
         });
 
-        knowledgeContext = `\n\n## Base de Conhecimento do Aluno\nAbaixo estao as anotacoes dos cadernos do aluno. Use esse conteudo para personalizar suas respostas e referenciar o material de estudo dele quando relevante.\n\n${contextParts.join('\n\n')}`;
+        knowledgeContext = `\n\n## Cadernos de Anotacoes do Usuario\nAbaixo estao as anotacoes dos cadernos do usuario. Use para personalizar respostas quando relevante.\n\n${contextParts.join('\n\n')}`;
       }
     }
 
-    // === 4. Assemble full system prompt ===
-    const fullSystemPrompt = BASE_SYSTEM_PROMPT + knowledgeContext;
+    // === 6. Assemble full system prompt ===
+    const userName = userExists.name.split(' ')[0];
+    const fullSystemPrompt = `${BASE_SYSTEM_PROMPT}\n\nO nome do usuario e **${userName}**. Use o nome dele naturalmente quando apropriado.${memoryContext}${knowledgeContext}`;
 
-    // === 5. Build message array ===
+    // === 7. Build message array ===
     const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
       { role: 'system', content: fullSystemPrompt },
     ];
 
     for (const msg of history) {
-      // Map 'user'/'assistant' roles properly
       const role = msg.role === 'user' ? 'user' as const : 'assistant' as const;
       messages.push({ role, content: msg.content });
     }
@@ -173,16 +257,16 @@ export async function POST(request: Request) {
       ? [messages[0], ...messages.slice(-(MAX_TOTAL - 1))]
       : messages;
 
-    // === 6. Call LLM ===
+    // === 8. Call LLM ===
     const zai = await getZAI();
     const completion = await zai.chat.completions.create({
       messages: trimmed,
       thinking: { type: 'disabled' },
     });
 
-    const reply = completion.choices[0]?.message?.content || fallbackResponses[0];
+    const reply = completion.choices[0]?.message?.content || 'Desculpe, nao consegui gerar uma resposta. Pode tentar novamente?';
 
-    // === 7. Persist both messages to DB for future context ===
+    // === 9. Persist both messages ===
     await db.chatMessage.createMany({
       data: [
         { userId, role: 'user', content: message },
@@ -190,10 +274,15 @@ export async function POST(request: Request) {
       ],
     });
 
-    return NextResponse.json({ reply });
+    // === 10. Extract memories asynchronously (non-blocking) ===
+    extractMemories(userId, message, reply).catch(() => {});
+
+    const memoryCount = memories.length;
+    return NextResponse.json({ reply, memoryCount });
   } catch (error) {
     console.error('Sensei chat error:', error);
-    const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-    return NextResponse.json({ reply: fallback });
+    return NextResponse.json({
+      reply: 'Desculpe, algo deu errado. Pode tentar enviar sua mensagem novamente?',
+    });
   }
 }
