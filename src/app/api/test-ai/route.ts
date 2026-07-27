@@ -23,7 +23,7 @@ export async function GET() {
     const res = NextResponse.json({ success: true, name: user.name });
     // Set NextAuth session cookie
     const domain = process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).hostname : undefined;
-    res.cookies.set('next-auth.session-token', token, {
+    res.cookies.set('__Secure-next-auth.session-token', token, {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
