@@ -1307,288 +1307,309 @@
   1307→  const [input, setInput] = useState('');
   1308→  const [isLoading, setIsLoading] = useState(false);
   1309→  const [notebooks, setNotebooks] = useState<{ id: string; title: string; content: string }[]>([]);
-  1310→  const scrollRef = useRef<HTMLDivElement>(null);
-  1311→  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  1312→  const fetchedRef = useRef(false);
-  1313→  const [copiedId, setCopiedId] = useState<string | null>(null);
-  1314→
-  1315→  // Fetch chat history and notebooks on mount
-  1316→  useEffect(() => {
-  1317→    if (fetchedRef.current) return;
-  1318→    fetchedRef.current = true;
-  1319→    Promise.all([
-  1320→      fetch('/api/chat').then(r => r.json()),
-  1321→      fetch('/api/notebooks').then(r => r.json()),
-  1322→    ]).then(([chatData, nbData]) => {
-  1323→      if (nbData.notebooks) setNotebooks(nbData.notebooks);
-  1324→      if (chatData.messages && chatData.messages.length > 0) {
-  1325→        setMessages(chatData.messages);
-  1326→      } else {
-  1327→        setMessages([{
-  1328→          id: 'welcome',
-  1329→          role: 'assistant',
-  1330→          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal inteligente.
-  1331→
-  1332→Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar com o conteudo que voce ja esta estudando. Quanto mais voce usa, mais eu entendo seu perfil de estudo.
-  1333→
-  1334→*Escolha uma sugestao abaixo ou digite sua pergunta!*`,
-  1335→          createdAt: new Date().toISOString(),
-  1336→        }]);
-  1337→      }
-  1338→    }).catch(() => {
-  1339→      setMessages([{
-  1340→        id: 'welcome',
-  1341→        role: 'assistant',
-  1342→        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.
-  1343→
-  1344→*Como posso ajudar?*`,
-  1345→        createdAt: new Date().toISOString(),
-  1346→      }]);
-  1347→    });
-  1348→  }, []);
-  1349→
-  1350→  useEffect(() => {
-  1351→    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  1352→  }, [messages, isLoading]);
-  1353→
-  1354→  // Auto-resize textarea
-  1355→  useEffect(() => {
-  1356→    if (textareaRef.current) {
-  1357→      textareaRef.current.style.height = 'auto';
-  1358→      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
-  1359→    }
-  1360→  }, [input]);
-  1361→
-  1362→  const handleSend = async (msgText?: string) => {
-  1363→    const userMsg = (msgText || input).trim();
-  1364→    if (!userMsg || isLoading) return;
-  1365→    const userMessage = { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: new Date().toISOString() };
-  1366→    setMessages(prev => [...prev, userMessage]);
-  1367→    setInput('');
-  1368→    setIsLoading(true);
-  1369→    try {
-  1370→      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
-  1371→      const data = await res.json();
-  1372→      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
-  1373→      setMessages(prev => [...prev, assistantMsg]);
-  1374→    } catch {
-  1375→      setMessages(prev => [...prev, {
-  1376→        id: (Date.now() + 1).toString(),
-  1377→        role: 'assistant',
-  1378→        content: 'Desculpe, ocorreu um erro. Tente novamente.',
-  1379→        createdAt: new Date().toISOString(),
-  1380→      }]);
-  1381→    }
-  1382→    setIsLoading(false);
-  1383→  };
-  1384→
-  1385→  const handleClear = async () => {
-  1386→    if (!confirm('Limpar toda a conversa?')) return;
-  1387→    try {
-  1388→      await fetch('/api/chat', { method: 'DELETE' });
-  1389→    } catch {}
-  1390→    setMessages([{
-  1391→      id: 'welcome-clear',
-  1392→      role: 'assistant',
-  1393→      content: `Conversa limpa! Ainda tenho acesso aos seus cadernos.
-  1394→
-  1395→*Como posso ajudar?*`,
-  1396→      createdAt: new Date().toISOString(),
-  1397→    }]);
-  1398→  };
-  1399→
-  1400→  const handleCopy = async (text: string, id: string) => {
-  1401→    try {
-  1402→      await navigator.clipboard.writeText(text);
-  1403→      setCopiedId(id);
-  1404→      setTimeout(() => setCopiedId(null), 2000);
-  1405→    } catch {}
-  1406→  };
-  1407→
-  1408→  const handleKeyDown = (e: React.KeyboardEvent) => {
-  1409→    if (e.key === 'Enter' && !e.shiftKey) {
-  1410→      e.preventDefault();
-  1411→      handleSend();
-  1412→    }
-  1413→  };
-  1414→
-  1415→  const isOnlyWelcome = messages.length <= 1;
-  1416→
-  1417→  // Build dynamic suggestions from notebooks
-  1418→  const notebookSuggestions = notebooks
-  1419→    .filter(nb => nb.content && nb.content.replace(/<[^>]*>/g, '').trim().length > 20)
-  1420→    .slice(0, 3);
-  1421→
-  1422→  const defaultSuggestions = [
-  1423→    { category: 'Estudo', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Dicas para memorizar melhor'] },
-  1424→    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo', 'Me ajude com tecnica Pomodoro'] },
-  1425→  ];
-  1426→
-  1427→  return (
-  1428→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-  1429→      <div className="mb-6 flex items-start justify-between">
-  1430→        <div>
-  1431→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
-  1432→            <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
-  1433→          </h1>
-  1434→          <p className="mt-1 flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
-  1435→            Seu tutor inteligente
-  1436→            {notebooks.length > 0 && (
-  1437→              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ws-verdigris)]/30 bg-[color-mix(in_srgb,var(--ws-verdigris)_8%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--ws-verdigris)]">
-  1438→                <Sparkles size={10} /> Lendo {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
-  1439→              </span>
-  1440→            )}
-  1441→          </p>
-  1442→        </div>
-  1443→        {messages.length > 1 && (
-  1444→          <button
-  1445→            onClick={handleClear}
-  1446→            className="flex items-center gap-1.5 rounded-ws-button border border-[var(--ws-glass-border)] px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:border-red-300/50 hover:text-red-400"
-  1447→          >
-  1448→            <Trash size={12} /> Limpar
-  1449→          </button>
-  1450→        )}
-  1451→      </div>
-  1452→
-  1453→      <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
-  1454→        {/* Header */}
-  1455→        <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
-  1456→          <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
-  1457→          <div className="min-w-0 flex-1">
-  1458→            <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
-  1459→            <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
-  1460→              {notebooks.length > 0
-  1461→                ? `Contexto: ${notebooks.map(n => n.title).join(', ')}`
-  1462→                : 'Conectado aos seus cadernos de estudo'
-  1463→              }
-  1464→            </p>
-  1465→          </div>
-  1466→          <div className="flex items-center gap-2">
-  1467→            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
-  1468→            <span className="text-xs text-[var(--ws-text-tertiary)]">Online</span>
-  1469→          </div>
-  1470→        </div>
-  1471→
-  1472→        {/* Messages */}
-  1473→        <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
-  1474→          <div className="space-y-6">
-  1475→            {messages.map((msg) => (
-  1476→                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-  1477→                  {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
-  1478→                  <div className="flex flex-col">
-  1479→                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)]'}`}>
-  1480→                      {msg.role === 'assistant' ? (
-  1481→                        <div className="markdown-content text-sm leading-relaxed">
-  1482→                          <ReactMarkdown>{msg.content}</ReactMarkdown>
-  1483→                        </div>
-  1484→                      ) : (
-  1485→                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-  1486→                      )}
-  1487→                      {/* Copy button on assistant messages */}
-  1488→                      {msg.role === 'assistant' && msg.id !== 'welcome' && msg.id !== 'welcome-clear' && (
-  1489→                        <button
-  1490→                          onClick={() => handleCopy(msg.content, msg.id)}
-  1491→                          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ws-text-tertiary)] opacity-0 transition-all hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] group-hover:opacity-100"
-  1492→                          title={copiedId === msg.id ? 'Copiado!' : 'Copiar resposta'}
-  1493→                        >
-  1494→                          {copiedId === msg.id ? <Check size={12} className="text-[var(--ws-verdigris)]" /> : <Copy size={12} />}
-  1495→                        </button>
-  1496→                      )}
-  1497→                    </div>
-  1498→                    <span className={`mt-1 text-[10px] text-[var(--ws-text-tertiary)] ${msg.role === 'user' ? 'text-right' : ''}`}>
-  1499→                      {formatTimestamp(msg.createdAt)}
-  1500→                    </span>
-  1501→                  </div>
-  1502→                </div>
-  1503→              ))}
-  1504→
-  1505→            {/* Loading animation */}
-  1506→            {isLoading && (
-  1507→              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-  1508→                <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />
-  1509→                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-5 py-3">
-  1510→                  <div className="flex items-center gap-1.5">
-  1511→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
-  1512→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
-  1513→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} />
-  1514→                  </div>
-  1515→                  <span className="ml-2 text-[10px] text-[var(--ws-text-tertiary)]">Sensei esta pensando...</span>
-  1516→                </div>
-  1517→              </motion.div>
-  1518→            )}
-  1519→          </div>
-  1520→
-  1521→          {/* Suggested prompts */}
-  1522→          {isOnlyWelcome && !isLoading && (
-  1523→            <div className="mt-6 space-y-4">
-  1524→              {/* Dynamic suggestions from user notebooks */}
-  1525→              {notebookSuggestions.length > 0 && (
-  1526→                <div>
-  1527→                  <div className="mb-2 flex items-center gap-1.5">
-  1528→                    <Sparkles size={12} className="text-[var(--ws-accent)]" />
-  1529→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">Baseado nos seus cadernos</span>
-  1530→                  </div>
-  1531→                  <div className="flex flex-wrap gap-2">
-  1532→                    {notebookSuggestions.map(nb => (
-  1533→                      <button key={nb.id} onClick={() => handleSend(`Me ajude a revisar o conteudo do caderno "${nb.title}". Me faca um resumo e me faca perguntas para testar meu conhecimento.`)} className="rounded-full border border-[var(--ws-accent)]/20 bg-[color-mix(in_srgb,var(--ws-accent)_6%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)]">
-  1534→                        Revisar: {nb.title}
-  1535→                      </button>
-  1536→                    ))}
-  1537→                    {notebookSuggestions.length > 0 && (
-  1538→                      <button onClick={() => handleSend('O que eu tenho estudado ultimamente? Me faca um resumo de todos os meus cadernos e sugira o que revisar primeiro.')} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
-  1539→                        Resumo geral dos estudos
-  1540→                      </button>
-  1541→                    )}
-  1542→                  </div>
-  1543→                </div>
-  1544→              )}
-  1545→              {/* Default suggestions */}
-  1546→              {defaultSuggestions.map((cat) => (
-  1547→                <div key={cat.category}>
-  1548→                  <div className="mb-2 flex items-center gap-1.5">
-  1549→                    <cat.icon size={12} className="text-[var(--ws-accent)]" />
-  1550→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">{cat.category}</span>
-  1551→                  </div>
-  1552→                  <div className="flex flex-wrap gap-2">
-  1553→                    {cat.prompts.map(p => (
-  1554→                      <button key={p} onClick={() => handleSend(p)} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
-  1555→                        {p}
-  1556→                      </button>
-  1557→                    ))}
-  1558→                  </div>
-  1559→                </div>
-  1560→              ))}
-  1561→            </div>
-  1562→          )}
-  1563→        </div>
-  1564→
-  1565→        {/* Input - textarea for multi-line */}
-  1566→        <div className="border-t border-[var(--ws-glass-border)] p-4">
-  1567→          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
-  1568→            <textarea
-  1569→              ref={textareaRef}
-  1570→              placeholder="Pergunte sobre seus estudos... (Shift+Enter para nova linha)"
-  1571→              className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
-  1572→              value={input}
-  1573→              onChange={e => setInput(e.target.value)}
-  1574→              onKeyDown={handleKeyDown}
-  1575→              rows={1}
-  1576→            />
-  1577→            <button
-  1578→              onClick={() => handleSend()}
-  1579→              disabled={isLoading || !input.trim()}
-  1580→              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
-  1581→              aria-label="Enviar"
-  1582→            >
-  1583→              <Send size={14} />
-  1584→            </button>
-  1585→          </div>
-  1586→          <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-  1587→            O Sensei IA le seus cadernos automaticamente para dar respostas mais precisas
-  1588→          </p>
-  1589→        </div>
-  1590→      </div>
-  1591→    </motion.div>
-  1592→  );
-  1593→}
-  1594→
+  1310→  const [memoryCount, setMemoryCount] = useState(0);
+  1311→  const scrollRef = useRef<HTMLDivElement>(null);
+  1312→  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  1313→  const fetchedRef = useRef(false);
+  1314→  const [copiedId, setCopiedId] = useState<string | null>(null);
+  1315→
+  1316→  // Fetch chat history, notebooks and memories on mount
+  1317→  useEffect(() => {
+  1318→    if (fetchedRef.current) return;
+  1319→    fetchedRef.current = true;
+  1320→    Promise.all([
+  1321→      fetch('/api/chat').then(r => r.json()),
+  1322→      fetch('/api/notebooks').then(r => r.json()),
+  1323→      fetch('/api/memories').then(r => r.json()).catch(() => ({ count: 0 })),
+  1324→    ]).then(([chatData, nbData, memData]) => {
+  1325→      if (nbData.notebooks) setNotebooks(nbData.notebooks);
+  1326→      if (memData?.count) setMemoryCount(memData.count);
+  1327→      if (chatData.messages && chatData.messages.length > 0) {
+  1328→        setMessages(chatData.messages);
+  1329→      } else {
+  1330→        setMessages([{
+  1331→          id: 'welcome',
+  1332→          role: 'assistant',
+  1333→          content: `Ola! Sou o **Sensei AI** — seu assistente inteligente. Posso te ajudar com **qualquer assunto**: estudos, programacao, matematica, escrita, ideias, analises, ou so conversar.
+  1334→
+  1335→Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizadas ficam minhas respostas.
+  1336→
+  1337→*Escolha uma sugestao abaixo ou me pergunte qualquer coisa!*`,
+  1338→          createdAt: new Date().toISOString(),
+  1339→        }]);
+  1340→      }
+  1341→    }).catch(() => {
+  1342→      setMessages([{
+  1343→        id: 'welcome',
+  1344→        role: 'assistant',
+  1345→        content: `Ola! Sou o **Sensei AI**. Posso te ajudar com qualquer assunto.
+  1346→
+  1347→*Como posso ajudar?*`,
+  1348→        createdAt: new Date().toISOString(),
+  1349→      }]);
+  1350→    });
+  1351→  }, []);
+  1352→
+  1353→  useEffect(() => {
+  1354→    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  1355→  }, [messages, isLoading]);
+  1356→
+  1357→  // Auto-resize textarea
+  1358→  useEffect(() => {
+  1359→    if (textareaRef.current) {
+  1360→      textareaRef.current.style.height = 'auto';
+  1361→      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+  1362→    }
+  1363→  }, [input]);
+  1364→
+  1365→  const handleSend = async (msgText?: string) => {
+  1366→    const userMsg = (msgText || input).trim();
+  1367→    if (!userMsg || isLoading) return;
+  1368→    const userMessage = { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: new Date().toISOString() };
+  1369→    setMessages(prev => [...prev, userMessage]);
+  1370→    setInput('');
+  1371→    setIsLoading(true);
+  1372→    try {
+  1373→      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
+  1374→      const data = await res.json();
+  1375→      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
+  1376→      setMessages(prev => [...prev, assistantMsg]);
+  1377→      if (typeof data.memoryCount === 'number' && data.memoryCount > memoryCount) {
+  1378→        setMemoryCount(data.memoryCount);
+  1379→      }
+  1380→    } catch {
+  1381→      setMessages(prev => [...prev, {
+  1382→        id: (Date.now() + 1).toString(),
+  1383→        role: 'assistant',
+  1384→        content: 'Desculpe, ocorreu um erro. Tente novamente.',
+  1385→        createdAt: new Date().toISOString(),
+  1386→      }]);
+  1387→    }
+  1388→    setIsLoading(false);
+  1389→  };
+  1390→
+  1391→  const handleClear = async () => {
+  1392→    if (!confirm('Limpar toda a conversa?')) return;
+  1393→    try {
+  1394→      await fetch('/api/chat', { method: 'DELETE' });
+  1395→    } catch {}
+  1396→    setMessages([{
+  1397→      id: 'welcome-clear',
+  1398→      role: 'assistant',
+  1399→      content: `Conversa limpa! Ainda tenho acesso aos seus cadernos.
+  1400→
+  1401→*Como posso ajudar?*`,
+  1402→      createdAt: new Date().toISOString(),
+  1403→    }]);
+  1404→  };
+  1405→
+  1406→  const handleCopy = async (text: string, id: string) => {
+  1407→    try {
+  1408→      await navigator.clipboard.writeText(text);
+  1409→      setCopiedId(id);
+  1410→      setTimeout(() => setCopiedId(null), 2000);
+  1411→    } catch {}
+  1412→  };
+  1413→
+  1414→  const handleKeyDown = (e: React.KeyboardEvent) => {
+  1415→    if (e.key === 'Enter' && !e.shiftKey) {
+  1416→      e.preventDefault();
+  1417→      handleSend();
+  1418→    }
+  1419→  };
+  1420→
+  1421→  const isOnlyWelcome = messages.length <= 1;
+  1422→
+  1423→  // Build dynamic suggestions from notebooks
+  1424→  const notebookSuggestions = notebooks
+  1425→    .filter(nb => nb.content && nb.content.replace(/<[^>]*>/g, '').trim().length > 20)
+  1426→    .slice(0, 3);
+  1427→
+  1428→  const defaultSuggestions = [
+  1429→    { category: 'Pergunte qualquer coisa', icon: Sparkles, prompts: ['Me explique como funciona a inteligencia artificial', 'Qual a diferenca entre React e Vue?', 'Como funciona o mercado de acoes?'] },
+  1430→    { category: 'Estudos e Aprendizado', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Me ajude a entender um conceito dificil'] },
+  1431→    { category: 'Programacao e Tecnologia', icon: Zap, prompts: ['Me ajude a debuggar um codigo', 'Explique um conceito de programacao', 'Boas praticas de desenvolvimento'] },
+  1432→    { category: 'Criatividade e Escrita', icon: Star, prompts: ['Me ajude a escrever um texto', 'Ideias para um projeto criativo', 'Me ajude a brainstormizar ideias'] },
+  1433→    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco', 'Me ajude a organizar minha rotina', 'Tecnicas de gestao de tempo'] },
+  1434→  ];
+  1435→
+  1436→  return (
+  1437→    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+  1438→      <div className="mb-6 flex items-start justify-between">
+  1439→        <div>
+  1440→          <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+  1441→            <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
+  1442→          </h1>
+  1443→          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
+  1444→            Assistente inteligente universal
+  1445→            {memoryCount > 0 && (
+  1446→              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/8 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+  1447→                <Brain size={10} /> {memoryCount} memorias sobre voce
+  1448→              </span>
+  1449→            )}
+  1450→            {notebooks.length > 0 && (
+  1451→              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ws-verdigris)]/30 bg-[color-mix(in_srgb,var(--ws-verdigris)_8%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--ws-verdigris)]">
+  1452→                <Sparkles size={10} /> {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
+  1453→              </span>
+  1454→            )}
+  1455→          </p>
+  1456→        </div>
+  1457→        {messages.length > 1 && (
+  1458→          <button
+  1459→            onClick={handleClear}
+  1460→            className="flex items-center gap-1.5 rounded-ws-button border border-[var(--ws-glass-border)] px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:border-red-300/50 hover:text-red-400"
+  1461→          >
+  1462→            <Trash size={12} /> Limpar
+  1463→          </button>
+  1464→        )}
+  1465→      </div>
+  1466→
+  1467→      <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
+  1468→        {/* Header */}
+  1469→        <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
+  1470→          <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
+  1471→          <div className="min-w-0 flex-1">
+  1472→            <div className="flex items-center gap-2">
+  1473→              <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
+  1474→              {memoryCount > 0 && (
+  1475→                <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">Nv.{Math.min(Math.floor(memoryCount / 5) + 1, 10)}</span>
+  1476→              )}
+  1477→            </div>
+  1478→            <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
+  1479→              {notebooks.length > 0
+  1480→                ? `${notebooks.map(n => n.title).join(', ')}${memoryCount > 0 ? ' + memoria ativa' : ''}`
+  1481→                : memoryCount > 0 ? 'Memoria ativa — quanto mais conversa, mais inteligente' : 'Pergunte qualquer coisa'
+  1482→              }
+  1483→            </p>
+  1484→          </div>
+  1485→          <div className="flex items-center gap-2">
+  1486→            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--ws-verdigris)]" />
+  1487→            <span className="text-xs text-[var(--ws-text-tertiary)]">Online</span>
+  1488→          </div>
+  1489→        </div>
+  1490→
+  1491→        {/* Messages */}
+  1492→        <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
+  1493→          <div className="space-y-6">
+  1494→            {messages.map((msg) => (
+  1495→                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+  1496→                  {msg.role === 'assistant' && <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />}
+  1497→                  <div className="flex flex-col">
+  1498→                    <div className={`group relative max-w-[85%] rounded-ws-organic px-5 py-3 ${msg.role === 'user' ? 'bg-[var(--ws-ink)] text-[var(--ws-text-on-dark)]' : 'border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)]'}`}>
+  1499→                      {msg.role === 'assistant' ? (
+  1500→                        <div className="markdown-content text-sm leading-relaxed">
+  1501→                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+  1502→                        </div>
+  1503→                      ) : (
+  1504→                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+  1505→                      )}
+  1506→                      {/* Copy button on assistant messages */}
+  1507→                      {msg.role === 'assistant' && msg.id !== 'welcome' && msg.id !== 'welcome-clear' && (
+  1508→                        <button
+  1509→                          onClick={() => handleCopy(msg.content, msg.id)}
+  1510→                          className="absolute right-2 top-2 rounded-md p-1.5 text-[var(--ws-text-tertiary)] opacity-0 transition-all hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] group-hover:opacity-100"
+  1511→                          title={copiedId === msg.id ? 'Copiado!' : 'Copiar resposta'}
+  1512→                        >
+  1513→                          {copiedId === msg.id ? <Check size={12} className="text-[var(--ws-verdigris)]" /> : <Copy size={12} />}
+  1514→                        </button>
+  1515→                      )}
+  1516→                    </div>
+  1517→                    <span className={`mt-1 text-[10px] text-[var(--ws-text-tertiary)] ${msg.role === 'user' ? 'text-right' : ''}`}>
+  1518→                      {formatTimestamp(msg.createdAt)}
+  1519→                    </span>
+  1520→                  </div>
+  1521→                </div>
+  1522→              ))}
+  1523→
+  1524→            {/* Loading animation */}
+  1525→            {isLoading && (
+  1526→              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+  1527→                <EnsoCircle size={28} strokeWidth={1.5} color="var(--ws-accent)" imperfection={0.08} animate={false} />
+  1528→                <div className="flex items-center gap-1.5 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-5 py-3">
+  1529→                  <div className="flex items-center gap-1.5">
+  1530→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
+  1531→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
+  1532→                    <motion.div className="h-2 w-2 rounded-full bg-[var(--ws-accent)]" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} />
+  1533→                  </div>
+  1534→                  <span className="ml-2 text-[10px] text-[var(--ws-text-tertiary)]">Sensei esta pensando...</span>
+  1535→                </div>
+  1536→              </motion.div>
+  1537→            )}
+  1538→          </div>
+  1539→
+  1540→          {/* Suggested prompts */}
+  1541→          {isOnlyWelcome && !isLoading && (
+  1542→            <div className="mt-6 space-y-4">
+  1543→              {/* Dynamic suggestions from user notebooks */}
+  1544→              {notebookSuggestions.length > 0 && (
+  1545→                <div>
+  1546→                  <div className="mb-2 flex items-center gap-1.5">
+  1547→                    <Sparkles size={12} className="text-[var(--ws-accent)]" />
+  1548→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">Baseado nos seus cadernos</span>
+  1549→                  </div>
+  1550→                  <div className="flex flex-wrap gap-2">
+  1551→                    {notebookSuggestions.map(nb => (
+  1552→                      <button key={nb.id} onClick={() => handleSend(`Me ajude a revisar o conteudo do caderno "${nb.title}". Me faca um resumo e me faca perguntas para testar meu conhecimento.`)} className="rounded-full border border-[var(--ws-accent)]/20 bg-[color-mix(in_srgb,var(--ws-accent)_6%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)]">
+  1553→                        Revisar: {nb.title}
+  1554→                      </button>
+  1555→                    ))}
+  1556→                    {notebookSuggestions.length > 0 && (
+  1557→                      <button onClick={() => handleSend('O que eu tenho estudado ultimamente? Me faca um resumo de todos os meus cadernos e sugira o que revisar primeiro.')} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+  1558→                        Resumo geral dos estudos
+  1559→                      </button>
+  1560→                    )}
+  1561→                  </div>
+  1562→                </div>
+  1563→              )}
+  1564→              {/* Default suggestions */}
+  1565→              {defaultSuggestions.map((cat) => (
+  1566→                <div key={cat.category}>
+  1567→                  <div className="mb-2 flex items-center gap-1.5">
+  1568→                    <cat.icon size={12} className="text-[var(--ws-accent)]" />
+  1569→                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--ws-text-tertiary)]">{cat.category}</span>
+  1570→                  </div>
+  1571→                  <div className="flex flex-wrap gap-2">
+  1572→                    {cat.prompts.map(p => (
+  1573→                      <button key={p} onClick={() => handleSend(p)} className="rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 text-xs text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/30 hover:bg-[color-mix(in_srgb,var(--ws-accent)_5%,transparent)]">
+  1574→                        {p}
+  1575→                      </button>
+  1576→                    ))}
+  1577→                  </div>
+  1578→                </div>
+  1579→              ))}
+  1580→            </div>
+  1581→          )}
+  1582→        </div>
+  1583→
+  1584→        {/* Input - textarea for multi-line */}
+  1585→        <div className="border-t border-[var(--ws-glass-border)] p-4">
+  1586→          <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
+  1587→            <textarea
+  1588→              ref={textareaRef}
+  1589→              placeholder="Pergunte qualquer coisa... (Shift+Enter para nova linha)"
+  1590→              className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
+  1591→              value={input}
+  1592→              onChange={e => setInput(e.target.value)}
+  1593→              onKeyDown={handleKeyDown}
+  1594→              rows={1}
+  1595→            />
+  1596→            <button
+  1597→              onClick={() => handleSend()}
+  1598→              disabled={isLoading || !input.trim()}
+  1599→              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
+  1600→              aria-label="Enviar"
+  1601→            >
+  1602→              <Send size={14} />
+  1603→            </button>
+  1604→          </div>
+  1605→          <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
+  1606→            {memoryCount > 0
+  1607→              ? `Sensei IA com ${memoryCount} memorias — quanto mais voce conversa, mais ele te conhece`
+  1608→              : 'O Sensei IA aprende sobre voce a cada conversa e fica mais inteligente'}
+  1609→          </p>
+  1610→        </div>
+  1611→      </div>
+  1612→    </motion.div>
+  1613→  );
+  1614→}
+  1615→
