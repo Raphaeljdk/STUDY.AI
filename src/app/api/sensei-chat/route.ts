@@ -276,7 +276,9 @@ export async function POST(request: Request) {
     const memoryCount = memories.length;
     return NextResponse.json({ reply, memoryCount });
   } catch (error) {
-    console.error('Sensei chat error:', error);
-    return NextResponse.json({ reply: 'Desculpe, ocorreu um erro inesperado. Tente enviar sua mensagem novamente.' });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : '';
+    console.error('Sensei chat error:', errMsg, errStack);
+    return NextResponse.json({ reply: `Erro de debug: ${errMsg}` });
   }
 }
