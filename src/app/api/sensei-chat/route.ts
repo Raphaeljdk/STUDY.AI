@@ -281,9 +281,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply, memoryCount });
   } catch (error) {
     console.error('Sensei chat error:', error);
-    const errMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({
-      reply: `Desculpe, algo deu errado. [Debug: ${errMsg}]`,
-    });
+    return NextResponse.json({ reply: 'Desculpe, ocorreu um erro inesperado. Tente enviar sua mensagem novamente.' });
   }
 }

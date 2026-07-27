@@ -43,7 +43,8 @@ yarn-error.log*
 next-env.d.ts
 local-*
 .claude
-.z-ai-config
+# z-ai-config (needed for ZAI SDK on Vercel)
+# .z-ai-config
 *.log
 dev.log
 dev.out.log
