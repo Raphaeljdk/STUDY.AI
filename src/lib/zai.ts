@@ -1,8 +1,11 @@
 // @ts-nocheck — ZAI SDK constructor is private in types but works at runtime
-// We bypass TypeScript to pass config directly, avoiding .z-ai-config file dependency
 
 import ZAI from 'z-ai-web-dev-sdk';
 import type { ZAIConfig } from 'z-ai-web-dev-sdk';
+
+// ═══════════════════════════════════════════
+// ZAI SDK (sandbox only — internal-api.z.ai)
+// ═══════════════════════════════════════════
 
 const ZAI_CONFIG: ZAIConfig = {
   baseUrl: 'https://internal-api.z.ai/v1',
@@ -16,41 +19,113 @@ let zaiInstance: any = null;
 
 function getZAI(): any {
   if (!zaiInstance) {
-    // Bypass TypeScript's private constructor check — works at runtime
     zaiInstance = new (ZAI as any)(ZAI_CONFIG);
   }
   return zaiInstance;
 }
 
-/**
- * Smart AI call — tries proxy first if AI_PROXY_URL is set, otherwise direct SDK
- */
-export async function aiChat(messages: { role: string; content: string }[]): Promise<string> {
-  const proxyUrl = process.env.AI_PROXY_URL;
+// ═══════════════════════════════════════════
+// Groq fallback (public API — works on Vercel)
+// ═══════════════════════════════════════════
 
-  if (proxyUrl) {
-    const url = proxyUrl.replace(/\/$/, '') + '/chat';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, thinking: { type: 'disabled' } }),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Proxy error ${res.status}: ${errText}`);
-    }
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Proxy returned failure');
-    return data.reply || '';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+function getGroqApiKey(): string | null {
+  return process.env.GROQ_API_KEY || null;
+}
+
+async function groqChat(messages: { role: string; content: string }[]): Promise<string> {
+  const apiKey = getGroqApiKey();
+  if (!apiKey) throw new Error('GROQ_API_KEY not set');
+
+  const res = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0.7,
+      max_tokens: 2048,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq API error ${res.status}: ${err}`);
   }
 
-  // Direct ZAI SDK (bypasses file-based config)
-  const zai = getZAI();
-  const completion = await zai.chat.completions.create({
-    messages,
-    thinking: { type: 'disabled' },
-  });
-  return completion.choices?.[0]?.message?.content || '';
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ═══════════════════════════════════════════
+// Main AI call with automatic fallback
+// ═══════════════════════════════════════════
+
+function isNetworkError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes('timeout') ||
+    msg.includes('fetch failed') ||
+    msg.includes('connect') ||
+    msg.includes('econnrefused') ||
+    msg.includes('enotfound') ||
+    msg.includes('network')
+  );
+}
+
+/**
+ * Smart AI call with automatic fallback:
+ * 1. AI_PROXY_URL → proxy (sandbox ai-proxy service)
+ * 2. ZAI SDK → direct internal API (sandbox only)
+ * 3. Groq → public fallback (Vercel, Railway, etc.)
+ */
+export async function aiChat(messages: { role: string; content: string }[]): Promise<string> {
+  // 1. Try proxy if configured
+  const proxyUrl = process.env.AI_PROXY_URL;
+  if (proxyUrl) {
+    try {
+      const url = proxyUrl.replace(/\/$/, '') + '/chat';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, thinking: { type: 'disabled' } }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Proxy error ${res.status}: ${errText}`);
+      }
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Proxy returned failure');
+      return data.reply || '';
+    } catch (err) {
+      if (!isNetworkError(err)) throw err;
+      console.warn('[AI] Proxy failed, falling back...');
+    }
+  }
+
+  // 2. Try ZAI SDK (works inside Z.ai sandbox)
+  try {
+    const zai = getZAI();
+    const completion = await zai.chat.completions.create({
+      messages,
+      thinking: { type: 'disabled' },
+    });
+    const reply = completion.choices?.[0]?.message?.content;
+    if (reply) return reply;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    console.warn('[AI] ZAI SDK unreachable, using Groq fallback...');
+  }
+
+  // 3. Groq fallback (works everywhere)
+  return groqChat(messages);
 }
 
 /**
