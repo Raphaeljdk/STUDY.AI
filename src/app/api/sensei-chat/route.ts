@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { getZAI } from '@/lib/zai';
 
 
 const BASE_SYSTEM_PROMPT = `Voce e o Sensei AI, um assistente de inteligencia artificial avancado da plataforma StudyAI. Voce e capaz de responder QUALQUER tipo de pergunta — nao apenas sobre estudos — como um assistente universal (similiar ao ChatGPT).
@@ -65,12 +65,7 @@ IMPORTANTE:
 
 Exemplo de resposta: [{"category":"interesses","content":"Estuda programacao em Python e React"},{"category":"objetivos","content":"Quer aprender japones para viagem"}]`;
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-
-async function getZAI() {
-  if (!zaiInstance) zaiInstance = await ZAI.create();
-  return zaiInstance;
-}
+// getZAI imported from @/lib/zai
 
 function stripHtml(html: string): string {
   return html
