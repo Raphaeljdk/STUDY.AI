@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Noto_Serif_JP, Inter } from "next/font/google";
+import { Noto_Serif, Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const notoSerifJP = Noto_Serif_JP({
+const notoSerifJP = Noto_Serif({
   variable: "--font-serif-jp",
   subsets: ["latin"],
   weight: ["400", "700"],
