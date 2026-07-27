@@ -46,3 +46,24 @@ Stage Summary:
 - Fix: Changed to `file:./db/custom.db` relative path format
 - Also improved db.ts with directory auto-creation and production logging config
 - Committed as ea4ba93, pushed to https://github.com/Raphaeljdk/STUDY.AI.git
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Sensei AI for Vercel deployment
+
+Work Log:
+- Investigated ZAI SDK source code - found constructor is private in types but works at runtime
+- Fixed zai.ts with (ZAI as any) bypass and @ts-nocheck
+- Discovered Vercel CANNOT reach internal-api.z.ai (private IPs 172.25.x.x)
+- Implemented Groq API fallback in zai.ts (auto-fallback chain: proxy → ZAI SDK → Groq)
+- User provided Groq API key
+- Set GROQ_API_KEY on Vercel production environment
+- Confirmed Groq API works from Vercel via test endpoint: {"success":true,"reply":"Sensei AI funcionou!"}
+- Cleaned up all debug/test endpoints
+- Final production deploy successful
+
+Stage Summary:
+- Sensei AI is now WORKING on Vercel via Groq fallback (LLaMA 3.3 70B)
+- The fallback chain: tries ZAI SDK first (sandbox), falls back to Groq (Vercel/Railway)
+- GROQ_API_KEY is configured on Vercel production
+- Deploy URL: https://study-ai-nine-xi.vercel.app
