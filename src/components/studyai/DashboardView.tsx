@@ -1307,31 +1307,34 @@ function SenseiChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [notebooks, setNotebooks] = useState<{ id: string; title: string; content: string }[]>([]);
+  const [memoryCount, setMemoryCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fetchedRef = useRef(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Fetch chat history and notebooks on mount
+  // Fetch chat history, notebooks and memories on mount
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     Promise.all([
       fetch('/api/chat').then(r => r.json()),
       fetch('/api/notebooks').then(r => r.json()),
-    ]).then(([chatData, nbData]) => {
+      fetch('/api/memories').then(r => r.json()).catch(() => ({ count: 0 })),
+    ]).then(([chatData, nbData, memData]) => {
       if (nbData.notebooks) setNotebooks(nbData.notebooks);
+      if (memData?.count) setMemoryCount(memData.count);
       if (chatData.messages && chatData.messages.length > 0) {
         setMessages(chatData.messages);
       } else {
         setMessages([{
           id: 'welcome',
           role: 'assistant',
-          content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal inteligente.
+          content: `Ola! Sou o **Sensei AI** — seu assistente inteligente. Posso te ajudar com **qualquer assunto**: estudos, programacao, matematica, escrita, ideias, analises, ou so conversar.
 
-Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar com o conteudo que voce ja esta estudando. Quanto mais voce usa, mais eu entendo seu perfil de estudo.
+Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizadas ficam minhas respostas.
 
-*Escolha uma sugestao abaixo ou digite sua pergunta!*`,
+*Escolha uma sugestao abaixo ou me pergunte qualquer coisa!*`,
           createdAt: new Date().toISOString(),
         }]);
       }
@@ -1339,7 +1342,7 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Konnichiwa! Sou o **Sensei AI**, seu tutor pessoal.
+        content: `Ola! Sou o **Sensei AI**. Posso te ajudar com qualquer assunto.
 
 *Como posso ajudar?*`,
         createdAt: new Date().toISOString(),
@@ -1371,6 +1374,9 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
       const data = await res.json();
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
+      if (typeof data.memoryCount === 'number' && data.memoryCount > memoryCount) {
+        setMemoryCount(data.memoryCount);
+      }
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -1420,8 +1426,11 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
     .slice(0, 3);
 
   const defaultSuggestions = [
-    { category: 'Estudo', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Dicas para memorizar melhor'] },
-    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco nos estudos', 'Tecnicas de aprendizado ativo', 'Me ajude com tecnica Pomodoro'] },
+    { category: 'Pergunte qualquer coisa', icon: Sparkles, prompts: ['Me explique como funciona a inteligencia artificial', 'Qual a diferenca entre React e Vue?', 'Como funciona o mercado de acoes?'] },
+    { category: 'Estudos e Aprendizado', icon: BookOpen, prompts: ['Como estudar de forma mais eficiente?', 'Crie um plano de estudos para mim', 'Me ajude a entender um conceito dificil'] },
+    { category: 'Programacao e Tecnologia', icon: Zap, prompts: ['Me ajude a debuggar um codigo', 'Explique um conceito de programacao', 'Boas praticas de desenvolvimento'] },
+    { category: 'Criatividade e Escrita', icon: Star, prompts: ['Me ajude a escrever um texto', 'Ideias para um projeto criativo', 'Me ajude a brainstormizar ideias'] },
+    { category: 'Produtividade', icon: Target, prompts: ['Como manter o foco', 'Me ajude a organizar minha rotina', 'Tecnicas de gestao de tempo'] },
   ];
 
   return (
@@ -1431,11 +1440,16 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
           <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
             <MessageCircle size={24} className="mr-2 inline text-[var(--ws-accent)]" strokeWidth={1.5} />Sensei IA
           </h1>
-          <p className="mt-1 flex items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
-            Seu tutor inteligente
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[var(--ws-text-tertiary)]">
+            Assistente inteligente universal
+            {memoryCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/8 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+                <Brain size={10} /> {memoryCount} memorias sobre voce
+              </span>
+            )}
             {notebooks.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ws-verdigris)]/30 bg-[color-mix(in_srgb,var(--ws-verdigris)_8%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--ws-verdigris)]">
-                <Sparkles size={10} /> Lendo {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
+                <Sparkles size={10} /> {notebooks.length} caderno{notebooks.length > 1 ? 's' : ''}
               </span>
             )}
           </p>
@@ -1455,11 +1469,16 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
         <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
           <EnsoCircle size={36} strokeWidth={2} color="var(--ws-accent)" imperfection={0.1} animate={false} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">Sensei AI</h3>
+              {memoryCount > 0 && (
+                <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">Nv.{Math.min(Math.floor(memoryCount / 5) + 1, 10)}</span>
+              )}
+            </div>
             <p className="truncate text-xs text-[var(--ws-text-tertiary)]">
               {notebooks.length > 0
-                ? `Contexto: ${notebooks.map(n => n.title).join(', ')}`
-                : 'Conectado aos seus cadernos de estudo'
+                ? `${notebooks.map(n => n.title).join(', ')}${memoryCount > 0 ? ' + memoria ativa' : ''}`
+                : memoryCount > 0 ? 'Memoria ativa — quanto mais conversa, mais inteligente' : 'Pergunte qualquer coisa'
               }
             </p>
           </div>
@@ -1567,7 +1586,7 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
           <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
             <textarea
               ref={textareaRef}
-              placeholder="Pergunte sobre seus estudos... (Shift+Enter para nova linha)"
+              placeholder="Pergunte qualquer coisa... (Shift+Enter para nova linha)"
               className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-[var(--ws-text-primary)] placeholder-[var(--ws-text-tertiary)] outline-none"
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -1584,7 +1603,9 @@ Eu tenho acesso a tudo que voce anota nos seus cadernos, entao posso te ajudar c
             </button>
           </div>
           <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-            O Sensei IA le seus cadernos automaticamente para dar respostas mais precisas
+            {memoryCount > 0
+              ? `Sensei IA com ${memoryCount} memorias — quanto mais voce conversa, mais ele te conhece`
+              : 'O Sensei IA aprende sobre voce a cada conversa e fica mais inteligente'}
           </p>
         </div>
       </div>
