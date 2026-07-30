@@ -16,6 +16,7 @@ import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
 import { toast } from '@/hooks/use-toast';
+import { useGoogleAds } from '@/hooks/useGoogleAds';
 import Image from 'next/image';
 
 // Lightweight error boundary for individual sections
@@ -172,6 +173,7 @@ export function DashboardView() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [editNotebookId, setEditNotebookId] = useState<string | null>(null);
   const activeUsers = useActiveUsers();
+  const { trackFlashcardGeneration, trackChatMessage, trackPageView } = useGoogleAds();
 
   const openNotebook = (id: string) => {
     if (!id) { setActiveTab('notebooks'); return; }
@@ -179,7 +181,10 @@ export function DashboardView() {
     setActiveTab('notebook-edit');
   };
 
-  const navigateTo = (tab: Tab) => setActiveTab(tab);
+  const navigateTo = (tab: Tab) => {
+    setActiveTab(tab);
+    trackPageView(`/dashboard/${tab}`);
+  };
 
   // Swipe navigation for mobile
   const validTabs = tabOrder.filter(t => t !== 'admin' || isAdmin);
@@ -752,6 +757,7 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
           }
         }
         toast({ title: 'Flashcards gerados!', description: `${created} flashcards foram criados.` });
+        trackFlashcardGeneration();
       } else {
         toast({ title: 'Nenhum flashcard gerado', description: data.error || 'Escreva mais conteudo para gerar flashcards.', variant: 'destructive' });
       }
@@ -907,6 +913,7 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
         }
         setGenContent('');
         setShowGenForm(false);
+        trackFlashcardGeneration();
       }
     } catch (err) {
       console.error('[FlashcardsManager] AI generate error:', err);
@@ -1376,6 +1383,7 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
     setInput('');
     setIsLoading(true);
     try {
+      trackChatMessage();
       const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
       const data = await res.json();
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };

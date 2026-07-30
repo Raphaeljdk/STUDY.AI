@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ZenButton } from './ZenButton';
+import { useGoogleAds } from '@/hooks/useGoogleAds';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,8 +21,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   const [status, setStatus] = useState<FormStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const { trackSignup, trackLogin } = useGoogleAds();
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -54,6 +55,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         setStatus('error');
         setErrorMsg('Email ou senha incorretos');
       } else if (res?.ok) {
+        trackLogin();
         setStatus('success');
         setSuccessMsg('Login realizado com sucesso!');
         setTimeout(() => {
@@ -140,6 +142,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         clearTimeout(loginTimeout);
 
         if (loginRes?.ok) {
+          trackSignup();
           setStatus('success');
           setSuccessMsg('Conta criada com sucesso! Bem-vindo(a)!');
           setTimeout(() => {
