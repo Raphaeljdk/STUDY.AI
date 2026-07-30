@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
+import { canUse, incrementUsage } from '@/lib/usage';
 
 // ═══════════════════════════════════════════
 // SISTEMA DE SABEDORIA DO SENSEI AI
@@ -138,8 +139,18 @@ export async function POST(request: Request) {
     const userId = (session.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
 
-    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true } });
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, plan: true, role: true } });
     if (!user) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+
+    // Usage limit check
+    const usageCheck = await canUse(userId, 'chatMessages');
+    if (!usageCheck.allowed) {
+      return NextResponse.json({
+        error: 'Limite diario atingido',
+        code: 'USAGE_LIMIT',
+        usage: { used: usageCheck.used, limit: usageCheck.limit, type: 'chatMessages' },
+      }, { status: 429 });
+    }
 
     const { message } = await request.json();
     if (!message || typeof message !== 'string' || message.length > 10000) {
@@ -231,6 +242,9 @@ ${wisdom.min >= 150 ? '- Voce e infinito — fale como o proprio universo conver
 
     // 7. Chamar IA
     const reply = await aiChat(trimmed);
+
+    // 7.1 Increment usage
+    incrementUsage(userId, 'chatMessages').catch(() => {});
 
     // 8. Salvar mensagens
     await db.chatMessage.createMany({

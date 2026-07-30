@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Serif, Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
-import { GoogleAdsScript } from '@/components/GoogleAds';
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -69,7 +68,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        <GoogleAdsScript />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

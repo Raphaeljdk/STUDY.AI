@@ -14,24 +14,29 @@ enum Role {
 
 enum Plan {
   FREE
-  SAMURAI
-  SENSEI
+  PREMIUM
+  ADMIN_PLAN
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  plan      Plan     @default(SENSEI)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  name                  String
+  email                 String   @unique
+  password              String
+  role                  Role     @default(USER)
+  plan                  Plan     @default(FREE)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   notebooks      Notebook[]
   studySessions  StudySession[]
   chatMessages   ChatMessage[]
   memories       UserMemory[]
+  dailyUsages    DailyUsage[]
 }
 
 model Notebook {
@@ -78,6 +83,18 @@ model ChatMessage {
   role      String
   content   String
   createdAt DateTime @default(now())
+}
+
+model DailyUsage {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime @default(now())
+  chatMessages  Int      @default(0)
+  flashcards    Int      @default(0)
+
+  @@unique([userId, date])
+  @@index([userId])
 }
 
 model UserMemory {

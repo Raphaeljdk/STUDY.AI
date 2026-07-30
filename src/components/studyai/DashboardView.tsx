@@ -9,14 +9,15 @@ import {
   LogOut, Shield, ChevronRight, Star, Send,
   Plus, Trash2, Edit3, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
-  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users
+  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
 import { toast } from '@/hooks/use-toast';
-import { useGoogleAds } from '@/hooks/useGoogleAds';
+import { useUsage } from '@/hooks/useUsage';
+import { PremiumUpgrade, UsageBar } from './PremiumUpgrade';
 import Image from 'next/image';
 
 // Lightweight error boundary for individual sections
@@ -173,7 +174,14 @@ export function DashboardView() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [editNotebookId, setEditNotebookId] = useState<string | null>(null);
   const activeUsers = useActiveUsers();
-  const { trackFlashcardGeneration, trackChatMessage, trackPageView } = useGoogleAds();
+  const usage = useUsage();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeTrigger, setUpgradeTrigger] = useState<'chat' | 'flashcards' | 'nav'>('nav');
+
+  const openUpgrade = (type: 'chat' | 'flashcards' | 'nav' = 'nav') => {
+    setUpgradeTrigger(type);
+    setUpgradeOpen(true);
+  };
 
   const openNotebook = (id: string) => {
     if (!id) { setActiveTab('notebooks'); return; }
@@ -181,10 +189,7 @@ export function DashboardView() {
     setActiveTab('notebook-edit');
   };
 
-  const navigateTo = (tab: Tab) => {
-    setActiveTab(tab);
-    trackPageView(`/dashboard/${tab}`);
-  };
+  const navigateTo = (tab: Tab) => setActiveTab(tab);
 
   // Swipe navigation for mobile
   const validTabs = tabOrder.filter(t => t !== 'admin' || isAdmin);
@@ -218,7 +223,7 @@ export function DashboardView() {
             </div>
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium text-[var(--ws-text-primary)]">{user?.name}</p>
-              <p className="text-xs text-[var(--ws-accent)]">Ilimitado{isAdmin && ' · Admin'}</p>
+              <p className="text-xs text-[var(--ws-accent)]">{usage.isPremium ? 'Premium' : isAdmin ? 'Admin · Ilimitado' : 'Gratuito'}{isAdmin && ' · Admin'}</p>
             </div>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] font-serif-jp text-xs font-bold text-[var(--ws-accent)] sm:h-9 sm:w-9 sm:text-sm">{user?.name?.charAt(0)?.toUpperCase()}</div>
             <button onClick={() => signOut({ callbackUrl: '/' })} data-ws-tooltip="Sair" className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-accent)]"><LogOut size={18} /></button>
@@ -230,10 +235,20 @@ export function DashboardView() {
           <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
           <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
           <TabBtn icon={MessageCircle} label="Sensei" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+          {!usage.isPremium && !isAdmin && (
+            <TabBtn icon={Crown} label="Premium" active={false} onClick={() => openUpgrade('nav')} />
+          )}
           {isAdmin && <TabBtn icon={Shield} label="Admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
         </div>
       </header>
       <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-4 sm:py-6 lg:px-24 lg:py-8">
+        {/* Usage bars — only for free users */}
+        {!usage.isPremium && !usage.loading && (
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <UsageBar type="chatMessages" used={usage.usage.chatMessages} limit={usage.limits.chatMessages} />
+            <UsageBar type="flashcards" used={usage.usage.flashcards} limit={usage.limits.flashcards} />
+          </div>
+        )}
         {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
         {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
         {activeTab === 'notebook-edit' && editNotebookId && <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />}
@@ -243,6 +258,9 @@ export function DashboardView() {
         {activeTab === 'chat' && <SenseiChat key="chat" />}
         {activeTab === 'admin' && isAdmin && <AdminPanel key="adm" />}
       </main>
+
+      {/* Premium upgrade modal */}
+      <PremiumUpgrade isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} triggerType={upgradeTrigger} />
     </div>
   );
 }
@@ -746,6 +764,13 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
     try {
       const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, count: 5 }) });
       const data = await res.json();
+
+      if (data.code === 'USAGE_LIMIT') {
+        toast({ title: 'Limite diario atingido', description: `Voce ja usou suas ${data.usage.limit} geracoes de flashcards hoje. Upgrade para Premium!`, variant: 'destructive' });
+        setGenerating(false);
+        return;
+      }
+
       if (data.flashcards && data.flashcards.length > 0) {
         let created = 0;
         for (const fc of data.flashcards) {
@@ -757,7 +782,6 @@ function NotebookEditor({ notebookId, onBack }: { notebookId: string; onBack: ()
           }
         }
         toast({ title: 'Flashcards gerados!', description: `${created} flashcards foram criados.` });
-        trackFlashcardGeneration();
       } else {
         toast({ title: 'Nenhum flashcard gerado', description: data.error || 'Escreva mais conteudo para gerar flashcards.', variant: 'destructive' });
       }
@@ -905,6 +929,13 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
     try {
       const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: genContent, count: 5 }) });
       const data = await res.json();
+
+      if (data.code === 'USAGE_LIMIT') {
+        toast({ title: 'Limite diario atingido', description: `Voce ja usou suas ${data.usage.limit} geracoes de flashcards hoje. Upgrade para Premium!`, variant: 'destructive' });
+        setGenerating(false);
+        return;
+      }
+
       if (data.flashcards && data.flashcards.length > 0) {
         for (const fc of data.flashcards) {
           const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back }) });
@@ -913,7 +944,6 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
         }
         setGenContent('');
         setShowGenForm(false);
-        trackFlashcardGeneration();
       }
     } catch (err) {
       console.error('[FlashcardsManager] AI generate error:', err);
@@ -1383,9 +1413,20 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
     setInput('');
     setIsLoading(true);
     try {
-      trackChatMessage();
       const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
       const data = await res.json();
+
+      // Handle usage limit
+      if (data.code === 'USAGE_LIMIT') {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(), role: 'assistant', content: `Voce atingiu seu **limite diario de ${data.usage.limit} mensagens**.
+
+Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt: new Date().toISOString(),
+        }]);
+        setIsLoading(false);
+        return;
+      }
+
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
       if (data.wisdom) setWisdom(data.wisdom);

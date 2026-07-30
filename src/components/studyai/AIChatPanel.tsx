@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import { EnsoCircle } from './EnsoCircle';
-import { useGoogleAds } from '@/hooks/useGoogleAds';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -25,7 +24,6 @@ export function AIChatPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { trackChatMessage } = useGoogleAds();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -43,7 +41,6 @@ export function AIChatPanel() {
     setIsLoading(true);
 
     try {
-      trackChatMessage();
       const res = await fetch('/api/sensei-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
+import { canUse, incrementUsage } from '@/lib/usage';
 
 const systemPrompt = `Voce e um gerador de flashcards educacionais. A partir do conteudo fornecido, gere flashcards de alta qualidade.
 
@@ -22,8 +23,18 @@ export async function POST(request: Request) {
     if (!session?.user) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     const userId = (session.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true, plan: true, role: true } });
     if (!userExists) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+
+    // Usage limit check
+    const usageCheck = await canUse(userId, 'flashcards');
+    if (!usageCheck.allowed) {
+      return NextResponse.json({
+        error: 'Limite diario atingido',
+        code: 'USAGE_LIMIT',
+        usage: { used: usageCheck.used, limit: usageCheck.limit, type: 'flashcards' },
+      }, { status: 429 });
+    }
 
     let body: any;
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 }); }
@@ -41,6 +52,9 @@ export async function POST(request: Request) {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Gere ${count} flashcards a partir deste conteudo:\n\n${plainContent}` },
     ]);
+
+    // Increment usage after successful generation
+    incrementUsage(userId, 'flashcards').catch(() => {});
 
     let clean = reply.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     try {
