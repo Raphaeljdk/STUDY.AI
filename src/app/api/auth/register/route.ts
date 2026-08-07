@@ -127,7 +127,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('[Register] Full error:', error?.message, error?.code, error?.meta);
     return NextResponse.json(
-      { error: 'Erro interno do servidor', debug: error?.message || String(error) },
+      { error: 'Erro interno do servidor' },
       { status: 500 }
     );
   }

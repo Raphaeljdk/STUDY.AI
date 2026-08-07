@@ -124,38 +124,29 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         return;
       }
 
-      // Step 2: Auto-login after successful registration (with timeout)
+      // Step 2: Auto-login after successful registration
+      setStatus('success');
+      setSuccessMsg('Conta criada com sucesso! Fazendo login...');
       try {
-        const loginController = new AbortController();
-        const loginTimeout = setTimeout(() => loginController.abort(), 10000);
-        const loginRes = await Promise.race([
-          signIn('credentials', {
-            email: form.email,
-            password: form.password,
-            redirect: false,
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
-        ]);
-        clearTimeout(loginTimeout);
+        const loginRes = await signIn('credentials', {
+          email: form.email,
+          password: form.password,
+          redirect: false,
+        });
 
         if (loginRes?.ok) {
-          setStatus('success');
-          setSuccessMsg('Conta criada com sucesso! Bem-vindo(a)!');
+          setSuccessMsg('Bem-vindo(a)! Entrando...');
           setTimeout(() => {
             onClose();
             window.location.reload();
-          }, 800);
+          }, 600);
         } else {
-          // Account created but auto-login failed
-          setStatus('success');
-          setSuccessMsg('Conta criada! Agora faca login para entrar.');
-          setTimeout(() => switchMode('login'), 1500);
+          setSuccessMsg('Conta criada! Clique em Entrar para acessar.');
+          setTimeout(() => switchMode('login'), 2000);
         }
       } catch {
-        // Account created but auto-login failed due to network error
-        setStatus('success');
-        setSuccessMsg('Conta criada! Agora faca login para entrar.');
-        setTimeout(() => switchMode('login'), 1500);
+        setSuccessMsg('Conta criada! Clique em Entrar para acessar.');
+        setTimeout(() => switchMode('login'), 2000);
       }
     } catch {
       setStatus('error');
