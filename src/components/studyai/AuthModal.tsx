@@ -85,7 +85,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, plan: 'SENSEI' }),
+          body: JSON.stringify({ ...form, plan: 'FREE' }),
           signal: controller.signal,
         });
       } catch (err: any) {

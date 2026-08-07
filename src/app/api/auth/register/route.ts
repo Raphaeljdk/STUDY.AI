@@ -52,9 +52,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const validPlans: ('FREE' | 'SAMURAI' | 'SENSEI')[] = ['FREE', 'SAMURAI', 'SENSEI'];
-    const userPlan = typeof plan === 'string' && validPlans.includes(plan as 'FREE' | 'SAMURAI' | 'SENSEI')
-      ? (plan as 'FREE' | 'SAMURAI' | 'SENSEI')
+    const validPlans: ('FREE' | 'PREMIUM')[] = ['FREE', 'PREMIUM'];
+    const userPlan = typeof plan === 'string' && validPlans.includes(plan as 'FREE' | 'PREMIUM')
+      ? (plan as 'FREE' | 'PREMIUM')
       : 'FREE' as const;
 
     const hashedPassword = await bcrypt.hash(password, 12);
