@@ -12,6 +12,22 @@ function isPostgres(): boolean {
 async function ensureDBSchema() {
   if (!isPostgres()) return; // Only run raw SQL on PostgreSQL
 
+  // CRITICAL: Fix invalid enum values from old code ('SENSEI' -> 'FREE')
+  // Prisma crashes on ANY user read if they have an invalid Plan enum value
+  try {
+    const result = await db.$executeRawUnsafe(`UPDATE "User" SET "plan" = 'FREE' WHERE "plan" NOT IN ('FREE', 'PREMIUM', 'ADMIN_PLAN')`);
+    console.log('[Schema] Fixed invalid plan values');
+  } catch (e: any) {
+    console.warn('[Schema] Could not fix plan values:', e?.message);
+  }
+
+  // Also fix the Plan enum type if SENSEI still exists
+  try {
+    await db.$executeRawUnsafe(`ALTER TYPE "Plan" RENAME VALUE 'SENSEI' TO 'FREE'`);
+  } catch {
+    // SENSEI might not exist in enum anymore - that's fine
+  }
+
   try {
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT`);
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT`);
