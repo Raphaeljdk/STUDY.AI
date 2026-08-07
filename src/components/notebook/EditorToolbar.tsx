@@ -273,13 +273,6 @@ export default function EditorToolbar({
       {/* -------- Acoes extras -------- */}
       <div className="flex items-center gap-0.5">
         <button
-          title="Adicionar texto"
-          onClick={onAddText}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100"
-        >
-          <Type size={16} />
-        </button>
-        <button
           title="Adicionar imagem"
           onClick={onAddImage}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100"

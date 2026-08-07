@@ -9,7 +9,7 @@ import React, {
 import {
   Canvas,
   PencilBrush,
-  FabricText,
+  Textbox,
   Rect,
   Circle,
   Line,
@@ -17,15 +17,19 @@ import {
   Group,
 } from 'fabric';
 
+import EditorToolbar from './EditorToolbar';
+import TextFormattingBar, { type TextFormat } from './TextFormattingBar';
+import { addTape, getTapeColors, StickyTapePicker } from './StickyTape';
+import PagePanel from './PagePanel';
+
 /* ========================================================================
    SmoothBrush - Caneta estabilizada para letra bonita
    ======================================================================== */
 
 class SmoothBrush extends PencilBrush {
   private buffer: Array<{ x: number; y: number }> = [];
-  private bufferSize = 4; // quantos pontos suavizar
+  private bufferSize = 4;
 
-  // Coletar pontos com suavizacao
   override onPointerDown(pointer: any) {
     this.buffer = [];
     super.onPointerDown(pointer);
@@ -36,7 +40,6 @@ class SmoothBrush extends PencilBrush {
     if (this.buffer.length > this.bufferSize) {
       this.buffer.shift();
     }
-    // Media dos pontos do buffer = ponto suavizado
     if (this.buffer.length > 1) {
       const avg = this.buffer.reduce(
         (acc, p) => ({ x: acc.x + p.x / this.buffer.length, y: acc.y + p.y / this.buffer.length }),
@@ -48,10 +51,6 @@ class SmoothBrush extends PencilBrush {
     }
   }
 }
-
-import EditorToolbar from './EditorToolbar';
-import { addTape, getTapeColors, StickyTapePicker } from './StickyTape';
-import PagePanel from './PagePanel';
 
 /* ========================================================================
    Tipos
@@ -83,6 +82,19 @@ const LINE_SPACING = 32;
 const MAX_UNDO = 50;
 const SAVE_DEBOUNCE_MS = 800;
 
+const DEFAULT_TEXT_FORMAT: TextFormat = {
+  fontFamily: 'Inter, sans-serif',
+  fontSize: 24,
+  fontWeight: 'normal',
+  fontStyle: 'normal',
+  underline: false,
+  linethrough: false,
+  textAlign: 'left',
+  fill: '#000000',
+  lineHeight: 1.3,
+  charSpacing: 0,
+};
+
 /* ========================================================================
    Componente principal
    ======================================================================== */
@@ -99,6 +111,7 @@ export default function CanvasEditor({
   const fcRef = useRef<Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeToolRef = useRef('select');
 
   /* ----- estado da ferramenta ----- */
   const [activeTool, setActiveTool] = useState('select');
@@ -110,6 +123,11 @@ export default function CanvasEditor({
   const [lineColor] = useState(initLineColor);
   const [tapeMode, setTapeMode] = useState(false);
   const [tapeColor, setTapeColor] = useState(getTapeColors()[0]);
+
+  /* ----- texto format (Canva-like) ----- */
+  const [textFormat, setTextFormat] = useState<TextFormat>({ ...DEFAULT_TEXT_FORMAT, fill: strokeColor });
+  const [showTextBar, setShowTextBar] = useState(false);
+  const [textBarPos, setTextBarPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   /* ----- undo/redo ----- */
   const undoStackRef = useRef<string[]>([]);
@@ -144,11 +162,10 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Gerador de fundo de papel
-     ======================================================================== */
+   ======================================================================== */
 
   const buildPaperBackground = useCallback(
     (fc: Canvas): void => {
-      // Remove background antigo
       const existing = fc.getObjects().find((o) => (o as any).__isPaperBg);
       if (existing) fc.remove(existing);
 
@@ -216,7 +233,7 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Undo / Redo
-     ======================================================================== */
+   ======================================================================== */
 
   const saveUndoState = useCallback((fc: Canvas) => {
     if (skipUndoRef.current) {
@@ -261,7 +278,7 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Auto-save debounced
-     ======================================================================== */
+   ======================================================================== */
 
   const scheduleAutoSave = useCallback((fc: Canvas) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -276,12 +293,13 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Atualizar brush/ferramenta
-     ======================================================================== */
+   ======================================================================== */
 
   const applyTool = useCallback(
     (fc: Canvas, tool: string) => {
       fc.isDrawingMode = false;
       fc.selection = tool === 'select';
+      activeToolRef.current = tool;
 
       switch (tool) {
         case 'pen': {
@@ -324,13 +342,99 @@ export default function CanvasEditor({
         case 'select':
           break;
       }
+
+      // Cursor
+      if (tool === 'text') {
+        fc.defaultCursor = 'text';
+        fc.hoverCursor = 'text';
+      } else if (tool === 'select') {
+        fc.defaultCursor = 'default';
+        fc.hoverCursor = 'move';
+      } else {
+        fc.defaultCursor = 'crosshair';
+        fc.hoverCursor = 'crosshair';
+      }
     },
     [strokeColor, paperColor],
   );
 
   /* ========================================================================
+     Text helpers
+   ======================================================================== */
+
+  const syncFormatFromText = useCallback((obj: any) => {
+    if (!obj || obj.type !== 'textbox') return;
+    setTextFormat({
+      fontFamily: obj.fontFamily || DEFAULT_TEXT_FORMAT.fontFamily,
+      fontSize: obj.fontSize || DEFAULT_TEXT_FORMAT.fontSize,
+      fontWeight: obj.fontWeight || 'normal',
+      fontStyle: obj.fontStyle || 'normal',
+      underline: !!obj.underline,
+      linethrough: !!obj.linethrough,
+      textAlign: obj.textAlign || 'left',
+      fill: obj.fill || '#000000',
+      lineHeight: obj.lineHeight || 1.3,
+      charSpacing: obj.charSpacing || 0,
+    });
+  }, []);
+
+  const applyFormatToActiveText = useCallback(
+    (patch: Partial<TextFormat>) => {
+      const fc = fcRef.current;
+      if (!fc) return;
+      const obj = fc.getActiveObject() as any;
+      if (!obj || obj.type !== 'textbox') return;
+
+      setTextFormat((prev) => {
+        const next = { ...prev, ...patch };
+        obj.set({
+          fontFamily: next.fontFamily,
+          fontSize: next.fontSize,
+          fontWeight: next.fontWeight,
+          fontStyle: next.fontStyle,
+          underline: next.underline,
+          linethrough: next.linethrough,
+          textAlign: next.textAlign,
+          fill: next.fill,
+          lineHeight: next.lineHeight,
+          charSpacing: next.charSpacing,
+        });
+        fc.renderAll();
+        scheduleAutoSave(fc);
+        return next;
+      });
+    },
+    [scheduleAutoSave],
+  );
+
+  const updateTextBarPosition = useCallback(() => {
+    const fc = fcRef.current;
+    if (!fc) return;
+    const obj = fc.getActiveObject() as any;
+    if (!obj || obj.type !== 'textbox') {
+      setShowTextBar(false);
+      return;
+    }
+
+    const canvasRect = containerRef.current?.querySelector('canvas')?.getBoundingClientRect();
+    if (!canvasRect) return;
+
+    // Get the bounding rect of the text object in viewport coordinates
+    const objBound = obj.getBoundingRect(true, true);
+    const vpt = fc.viewportTransform!;
+    const scaleX = vpt[0];
+    const scaleY = vpt[3];
+
+    const barLeft = canvasRect.left + objBound.left * scaleX;
+    const barTop = canvasRect.top + objBound.top * scaleY - 44;
+
+    setTextBarPos({ top: Math.max(4, barTop), left: barLeft });
+    setShowTextBar(true);
+  }, []);
+
+  /* ========================================================================
      Inicializacao do canvas
-     ======================================================================== */
+   ======================================================================== */
 
   useEffect(() => {
     const el = canvasElRef.current;
@@ -368,6 +472,7 @@ export default function CanvasEditor({
     fc.on('mouse:down', (opt) => {
       const e = opt.e as MouseEvent;
       const pointer = fc.getScenePoint(e);
+      const currentTool = activeToolRef.current;
 
       // Fita adesiva
       if (tapeMode) {
@@ -377,24 +482,55 @@ export default function CanvasEditor({
         return;
       }
 
-      // Ferramenta de texto
-      if (activeTool === 'text') {
-        const text = new FabricText('', {
+      // Ferramenta de texto - criar Textbox Canva-style
+      if (currentTool === 'text') {
+        // If clicking on existing text, let fabric handle it (double-click to edit)
+        const target = opt.target as any;
+        if (target && target.type === 'textbox') {
+          return; // Let fabric handle selection/editing of existing text
+        }
+
+        const textbox = new Textbox('', {
           left: pointer.x,
           top: pointer.y,
-          fontSize: 24,
+          width: 300,
+          fontSize: textFormat.fontSize,
           fill: strokeColor,
-          fontFamily: 'Inter, sans-serif',
+          fontFamily: textFormat.fontFamily,
+          fontWeight: textFormat.fontWeight,
+          fontStyle: textFormat.fontStyle,
+          underline: textFormat.underline,
+          linethrough: textFormat.linethrough,
+          textAlign: textFormat.textAlign,
+          lineHeight: textFormat.lineHeight,
+          charSpacing: textFormat.charSpacing,
           editable: true,
+          cursorColor: '#000000',
+          cursorWidth: 2,
+          editingBorderColor: '#f59e0b',
+          padding: 8,
         } as any);
-        fc.add(text);
-        fc.setActiveObject(text);
-        // Delay para fabric.js processar antes de entrar no modo edicao
-        requestAnimationFrame(() => {
-          (text as any).enterEditing();
-          // Selecionar texto para substituir ao digitar
-          (text as any).selectAll();
-        });
+
+        fc.add(textbox);
+        fc.setActiveObject(textbox);
+        fc.renderAll();
+
+        // Enter editing mode with a small delay for reliable focus
+        setTimeout(() => {
+          (textbox as any).enterEditing();
+          (textbox as any).selectAll();
+          // Focus the hidden textarea that fabric creates
+          const hiddenTextarea = el.parentElement?.querySelector('textarea.fabric-textbox') as HTMLTextAreaElement;
+          if (hiddenTextarea) {
+            hiddenTextarea.focus();
+          }
+        }, 50);
+
+        // Switch back to select after creating text (Canva behavior)
+        setActiveTool('select');
+        activeToolRef.current = 'select';
+        applyTool(fc, 'select');
+
         saveUndoState(fc);
         scheduleAutoSave(fc);
         return;
@@ -410,11 +546,11 @@ export default function CanvasEditor({
       }
 
       // Formas (retangulo, circulo, linha)
-      if (['rectangle', 'circle', 'line'].includes(activeTool)) {
+      if (['rectangle', 'circle', 'line'].includes(currentTool)) {
         isDrawingShape.current = true;
         shapeOriginRef.current = { x: pointer.x, y: pointer.y };
 
-        if (activeTool === 'rectangle') {
+        if (currentTool === 'rectangle') {
           const rect = new Rect({
             left: pointer.x,
             top: pointer.y,
@@ -427,7 +563,7 @@ export default function CanvasEditor({
           fc.add(rect);
           fc.setActiveObject(rect);
           tempShapeRef.current = rect;
-        } else if (activeTool === 'circle') {
+        } else if (currentTool === 'circle') {
           const circ = new Circle({
             left: pointer.x,
             top: pointer.y,
@@ -441,7 +577,7 @@ export default function CanvasEditor({
           fc.add(circ);
           fc.setActiveObject(circ);
           tempShapeRef.current = circ;
-        } else if (activeTool === 'line') {
+        } else if (currentTool === 'line') {
           const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
             stroke: strokeColor,
             strokeWidth,
@@ -456,7 +592,6 @@ export default function CanvasEditor({
     fc.on('mouse:move', (opt) => {
       const e = opt.e as MouseEvent;
 
-      // Pan
       if (isPanning.current) {
         const dx = e.clientX - panStart.current.x;
         const dy = e.clientY - panStart.current.y;
@@ -468,7 +603,6 @@ export default function CanvasEditor({
         return;
       }
 
-      // Desenho de forma
       if (isDrawingShape.current && tempShapeRef.current) {
         const pointer = fc.getScenePoint(e);
         const origin = shapeOriginRef.current;
@@ -497,7 +631,7 @@ export default function CanvasEditor({
     fc.on('mouse:up', () => {
       if (isPanning.current) {
         isPanning.current = false;
-        fc.selection = activeTool === 'select';
+        fc.selection = activeToolRef.current === 'select';
         return;
       }
 
@@ -509,16 +643,65 @@ export default function CanvasEditor({
       }
     });
 
-    // Salvar ao finalizar desenho livre
     fc.on('path:created', () => {
       saveUndoState(fc);
       scheduleAutoSave(fc);
     });
 
-    // Salvar apos modificacao de objetos
     fc.on('object:modified', () => {
       saveUndoState(fc);
       scheduleAutoSave(fc);
+    });
+
+    /* ---------- Text object events ---------- */
+
+    // When text starts/ends editing, update the toolbar
+    fc.on('text:editing:entered', () => {
+      const obj = fc.getActiveObject() as any;
+      if (obj) syncFormatFromText(obj);
+      updateTextBarPosition();
+    });
+
+    fc.on('text:editing:exited', () => {
+ const obj = fc.getActiveObject() as any;
+      if (obj && obj.type === 'textbox') {
+        // If text is empty after editing, remove it
+        if (!obj.text || obj.text.trim() === '') {
+          fc.remove(obj);
+          fc.renderAll();
+          setShowTextBar(false);
+          saveUndoState(fc);
+          scheduleAutoSave(fc);
+          return;
+        }
+        saveUndoState(fc);
+        scheduleAutoSave(fc);
+      }
+    });
+
+    // When selection changes, show/hide text bar
+    fc.on('selection:created', (opt) => {
+      const obj = opt.selected?.[0] as any;
+      if (obj && obj.type === 'textbox') {
+        syncFormatFromText(obj);
+        setTimeout(updateTextBarPosition, 10);
+      } else {
+        setShowTextBar(false);
+      }
+    });
+
+    fc.on('selection:updated', (opt) => {
+      const obj = opt.selected?.[0] as any;
+      if (obj && obj.type === 'textbox') {
+        syncFormatFromText(obj);
+        setTimeout(updateTextBarPosition, 10);
+      } else {
+        setShowTextBar(false);
+      }
+    });
+
+    fc.on('selection:cleared', () => {
+      setShowTextBar(false);
     });
 
     /* ---------- zoom com rolagem ---------- */
@@ -550,11 +733,11 @@ export default function CanvasEditor({
       fc.dispose();
       fcRef.current = null;
     };
-  }, []);
+    }, []);
 
   /* ========================================================================
      Sincronizar estado de ferramenta com canvas
-     ======================================================================== */
+   ======================================================================== */
 
   useEffect(() => {
     const fc = fcRef.current;
@@ -564,7 +747,7 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Mudanca de cor de papel / estilo - reconstruir fundo
-     ======================================================================== */
+   ======================================================================== */
 
   useEffect(() => {
     const fc = fcRef.current;
@@ -577,19 +760,44 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Atalhos de teclado
-     ======================================================================== */
+   ======================================================================== */
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Nao interceptar teclas se esta editando texto no canvas
       const fc = fcRef.current;
       const activeObj = fc?.getActiveObject() as any;
-      if (activeObj && activeObj.isEditing) return;
+
+      // Don't intercept if editing text
+      if (activeObj && activeObj.isEditing) {
+        // But handle formatting shortcuts inside text
+        if ((e.ctrlKey || e.metaKey)) {
+          if (e.key === 'b' || e.key === 'B') {
+            e.preventDefault();
+            const newWeight = activeObj.fontWeight === 'bold' ? 'normal' : 'bold';
+            activeObj.set('fontWeight', newWeight);
+            fc?.renderAll();
+            syncFormatFromText(activeObj);
+          } else if (e.key === 'i' || e.key === 'I') {
+            e.preventDefault();
+            const newStyle = activeObj.fontStyle === 'italic' ? 'normal' : 'italic';
+            activeObj.set('fontStyle', newStyle);
+            fc?.renderAll();
+            syncFormatFromText(activeObj);
+          } else if (e.key === 'u' || e.key === 'U') {
+            e.preventDefault();
+            activeObj.set('underline', !activeObj.underline);
+            fc?.renderAll();
+            syncFormatFromText(activeObj);
+          }
+        }
+        return;
+      }
 
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
         spaceHeld.current = true;
       }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -598,12 +806,38 @@ export default function CanvasEditor({
           handleUndo();
         }
       }
-      // Atalho T para texto
+
+      // Delete selected object
+      if ((e.key === 'Delete' || e.key === 'Backspace') && activeObj && !activeObj.isEditing) {
+        fc?.remove(activeObj);
+        fc?.renderAll();
+        saveUndoState(fc);
+        scheduleAutoSave(fc);
+      }
+
+      // Double-tap T shortcut for text
       if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
           setActiveTool('text');
         }
+      }
+
+      // Escape to deselect / exit text mode
+      if (e.key === 'Escape') {
+        if (activeObj && activeObj.isEditing) {
+          (activeObj as any).exitEditing();
+        } else {
+          fc?.discardActiveObject();
+          fc?.renderAll();
+          setShowTextBar(false);
+        }
+      }
+
+      // Enter on selected text to start editing
+      if (e.key === 'Enter' && activeObj && activeObj.type === 'textbox' && !activeObj.isEditing) {
+        e.preventDefault();
+        (activeObj as any).enterEditing();
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -617,18 +851,17 @@ export default function CanvasEditor({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, saveUndoState, scheduleAutoSave, syncFormatFromText]);
 
   /* ========================================================================
      Paginas
-     ======================================================================== */
+   ======================================================================== */
 
   const handlePageSelect = useCallback(
     (id: string) => {
       const fc = fcRef.current;
       if (!fc) return;
 
-      // Salva estado da pagina atual
       setPages((prev) =>
         prev.map((p) =>
           p.id === activePageId
@@ -643,6 +876,7 @@ export default function CanvasEditor({
       setActivePageId(id);
       setPaperStyle(page.paperStyle);
       setPaperColor(page.paperColor);
+      setShowTextBar(false);
 
       const objects = fc.getObjects();
       for (let i = objects.length - 1; i >= 0; i--) {
@@ -691,6 +925,7 @@ export default function CanvasEditor({
 
     setPages((prev) => [...prev, newPage]);
     setActivePageId(newId);
+    setShowTextBar(false);
 
     const objects = fc.getObjects();
     for (let i = objects.length - 1; i >= 0; i--) {
@@ -722,7 +957,7 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Adicionar texto / imagem
-     ======================================================================== */
+   ======================================================================== */
 
   const handleAddText = useCallback(() => {
     const fc = fcRef.current;
@@ -772,12 +1007,12 @@ export default function CanvasEditor({
 
   /* ========================================================================
      Render
-     ======================================================================== */
+   ======================================================================== */
 
   return (
     <div
       ref={containerRef}
-      className="flex h-full w-full flex-col bg-gray-100"
+      className="relative flex h-full w-full flex-col bg-gray-100"
       style={{ cursor: activeTool === 'select' ? 'default' : activeTool === 'text' ? 'text' : 'crosshair' }}
     >
       {/* Toolbar fixa no topo */}
@@ -802,6 +1037,14 @@ export default function CanvasEditor({
         onAddImage={handleAddImage}
         onToggleTape={() => setTapeMode((prev) => !prev)}
         tapeMode={tapeMode}
+      />
+
+      {/* Floating text formatting bar (Canva-style) */}
+      <TextFormattingBar
+        format={textFormat}
+        onFormatChange={applyFormatToActiveText}
+        visible={showTextBar}
+        position={textBarPos}
       />
 
       {/* Fita color picker (aparece quando tapeMode ativo) */}
