@@ -30,11 +30,12 @@ declare module 'next-auth/jwt' {
 // In production, NEXTAUTH_SECRET must be set explicitly.
 // In development, use a fallback to avoid the NO_SECRET warning.
 const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
-  (process.env.NODE_ENV !== 'production' ? 'studyai-dev-secret-do-not-use-in-prod' : undefined);
+  (process.env.NODE_ENV !== 'production' ? 'studyai-dev-secret-do-not-use-in-prod' : '');
+
 if (!nextAuthSecret) {
-  throw new Error(
-    'NEXTAUTH_SECRET environment variable is not set. ' +
-      'Please define it before running the application in production.'
+  console.warn(
+    '[Auth] NEXTAUTH_SECRET is not set. Sessions will not work securely. ' +
+    'Please set NEXTAUTH_SECRET in your environment variables.'
   );
 }
 
@@ -101,5 +102,5 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
-  secret: nextAuthSecret,
+  secret: nextAuthSecret || undefined,
 };

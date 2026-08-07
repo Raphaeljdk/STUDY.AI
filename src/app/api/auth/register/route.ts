@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
+// Detect if we're running on PostgreSQL vs SQLite
+function isPostgres(): boolean {
+  const url = process.env.DATABASE_URL || '';
+  return url.startsWith('postgres://') || url.startsWith('postgresql://');
+}
+
 // Ensure DB schema is up-to-date (creates tables/columns if missing)
 async function ensureDBSchema() {
+  if (!isPostgres()) return; // Only run raw SQL on PostgreSQL
+
   try {
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT`);
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT`);
@@ -69,7 +77,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, password, plan } = body;
+    const { name, email, password } = body;
 
     // Type validation
     if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {

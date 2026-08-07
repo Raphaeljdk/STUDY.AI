@@ -1,10 +1,10 @@
 // @ts-nocheck — ZAI SDK constructor is private in types but works at runtime
 
-import ZAI from 'z-ai-web-dev-sdk';
 import type { ZAIConfig } from 'z-ai-web-dev-sdk';
 
 // ═══════════════════════════════════════════
 // ZAI SDK (sandbox only — internal-api.z.ai)
+// Dynamic import to avoid crashing when package is unavailable
 // ═══════════════════════════════════════════
 
 const ZAI_CONFIG: ZAIConfig = {
@@ -16,16 +16,24 @@ const ZAI_CONFIG: ZAIConfig = {
 };
 
 let zaiInstance: any = null;
+let zaiLoadFailed = false;
 
-function getZAI(): any {
-  if (!zaiInstance) {
+async function getZAI(): Promise<any> {
+  if (zaiLoadFailed) return null;
+  if (zaiInstance) return zaiInstance;
+  try {
+    const ZAI = (await import('z-ai-web-dev-sdk')).default;
     zaiInstance = new (ZAI as any)(ZAI_CONFIG);
+    return zaiInstance;
+  } catch (err) {
+    console.warn('[AI] z-ai-web-dev-sdk not available, skipping:', err instanceof Error ? err.message : err);
+    zaiLoadFailed = true;
+    return null;
   }
-  return zaiInstance;
 }
 
 // ═══════════════════════════════════════════
-// Groq fallback (public API — works on Vercel)
+// Groq fallback (public API — works on Vercel/Railway)
 // ═══════════════════════════════════════════
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -81,9 +89,9 @@ function isNetworkError(err: unknown): boolean {
 
 /**
  * Smart AI call with automatic fallback:
- * 1. AI_PROXY_URL → proxy (sandbox ai-proxy service)
- * 2. ZAI SDK → direct internal API (sandbox only)
- * 3. Groq → public fallback (Vercel, Railway, etc.)
+ * 1. AI_PROXY_URL -> proxy (sandbox ai-proxy service)
+ * 2. ZAI SDK -> direct internal API (sandbox only)
+ * 3. Groq -> public fallback (Vercel, Railway, etc.)
  */
 export async function aiChat(messages: { role: string; content: string }[]): Promise<string> {
   // 1. Try proxy if configured
@@ -112,13 +120,15 @@ export async function aiChat(messages: { role: string; content: string }[]): Pro
 
   // 2. Try ZAI SDK (works inside Z.ai sandbox)
   try {
-    const zai = getZAI();
-    const completion = await zai.chat.completions.create({
-      messages,
-      thinking: { type: 'disabled' },
-    });
-    const reply = completion.choices?.[0]?.message?.content;
-    if (reply) return reply;
+    const zai = await getZAI();
+    if (zai) {
+      const completion = await zai.chat.completions.create({
+        messages,
+        thinking: { type: 'disabled' },
+      });
+      const reply = completion.choices?.[0]?.message?.content;
+      if (reply) return reply;
+    }
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     console.warn('[AI] ZAI SDK unreachable, using Groq fallback...');
@@ -131,6 +141,6 @@ export async function aiChat(messages: { role: string; content: string }[]): Pro
 /**
  * Get raw ZAI instance for direct usage (images, audio, etc.)
  */
-export function getRawZAI(): any {
+export async function getRawZAI(): Promise<any> {
   return getZAI();
 }

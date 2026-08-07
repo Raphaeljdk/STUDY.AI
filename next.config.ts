@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // External packages that should NOT be bundled by webpack/turbopack
+  // This prevents crash if they have native dependencies or aren't available
+  serverExternalPackages: [
+    'z-ai-web-dev-sdk',
+    'sharp',
+  ],
   transpilePackages: [
     '@tiptap/react',
     '@tiptap/starter-kit',
