@@ -1,166 +1,41 @@
 'use client';
 
-import { useState, useEffect, Component, type ReactNode, useCallback, useRef } from 'react';
-import { useSession } from 'next-auth/react';
-import { HeaderZen } from '@/components/studyai/HeaderZen';
-import { HeroSection } from '@/components/studyai/HeroSection';
-import { FeaturesSection } from '@/components/studyai/FeaturesSection';
-import { HowItWorksSection } from '@/components/studyai/HowItWorksSection';
-import { AIChatPanel } from '@/components/studyai/AIChatPanel';
-import { FooterZen } from '@/components/studyai/FooterZen';
-import { AuthModal } from '@/components/studyai/AuthModal';
 import dynamic from 'next/dynamic';
-import { AlertCircle, RotateCcw } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
-const DashboardView = dynamic(() => import('@/components/studyai/DashboardView').then(m => ({ default: m.DashboardView })), {
-  ssr: false,
-  loading: () => (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
-      <div className="text-center">
-        <div className="mx-auto mb-6 grid max-w-sm grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="skeleton-card">
-              <div className="skeleton mb-2 h-10 w-10 rounded-full" />
-              <div className="skeleton mb-1.5 h-4 w-16" />
-              <div className="skeleton h-3 w-12" />
-            </div>
-          ))}
-        </div>
-        <p className="text-sm text-[var(--ws-text-tertiary)]">Carregando seu espaco de estudo...</p>
-      </div>
-    </div>
-  ),
-});
-
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[StudyAI ErrorBoundary]', error, info.componentStack);
-  }
-  render() {
-    if (this.state.hasError) {
-      const msg = this.state.error?.message || 'Erro desconhecido';
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)] p-6">
-          <div className="max-w-md w-full text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ws-accent)]/10">
-              <AlertCircle size={28} className="text-[var(--ws-accent)]" />
-            </div>
-            <h2 className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)]">Ops, algo deu errado</h2>
-            <p className="mt-2 text-sm text-[var(--ws-text-tertiary)]">
-              Ocorreu um erro inesperado. Tente recarregar a pagina.
-            </p>
-            <details className="mt-4 text-left rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-bg-dark)] p-3">
-              <summary className="cursor-pointer text-xs font-medium text-[var(--ws-text-tertiary)]">Detalhes do erro</summary>
-              <pre className="mt-2 overflow-auto max-h-40 text-xs text-[var(--ws-accent)] whitespace-pre-wrap break-all">{msg}</pre>
-            </details>
-            <button
-              onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-              className="mt-6 inline-flex items-center gap-2 rounded-ws-button bg-[var(--ws-accent)] px-5 py-2.5 text-sm font-medium text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)]"
-            >
-              <RotateCcw size={14} /> Tentar Novamente
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-// Scroll progress hook
-function useScrollProgress() {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (docHeight > 0) {
-        setProgress((scrollTop / docHeight) * 100);
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-  return progress;
-}
+/* CanvasEditor carregado sem SSR pois usa fabric.js (canvas) */
+const CanvasEditor = dynamic(
+  () => import('@/components/notebook/CanvasEditor'),
+  { ssr: false },
+);
 
 export default function Home() {
-  const { data: session, status } = useSession();
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const scrollProgress = useScrollProgress();
+  const [canvasJSON, setCanvasJSON] = useState<string | null>(null);
 
-  // Update progress bar
-  useEffect(() => {
-    const bar = document.getElementById('scroll-progress-bar');
-    if (bar) bar.style.width = `${scrollProgress}%`;
-  }, [scrollProgress]);
-
-  // Expose auth open globally
-  useEffect(() => {
-    (window as any).__studyai_openAuth = (mode?: 'login' | 'register') => {
-      setAuthMode(mode || 'login');
-      setAuthOpen(true);
-    };
+  const handleChange = useCallback((json: string) => {
+    setCanvasJSON(json);
   }, []);
-
-  // Update header active users counter
-  useEffect(() => {
-    const updateCounter = () => {
-      const el = document.getElementById('header-active-users');
-      if (el) el.textContent = String(87 + Math.floor(Math.random() * 30));
-    };
-    updateCounter();
-    const id = setInterval(updateCounter, 5000);
-    return () => clearInterval(id);
-  }, []);
-
-  if (status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
-        <div className="text-center">
-          <div className="mx-auto mb-6 grid max-w-sm grid-cols-3 gap-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="skeleton-card">
-                <div className="skeleton mb-2 h-10 w-10 rounded-full" />
-                <div className="skeleton mb-1.5 h-4 w-16" />
-                <div className="skeleton h-3 w-12" />
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-[var(--ws-text-tertiary)]">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (session) {
-    return (
-      <ErrorBoundary>
-        <DashboardView />
-      </ErrorBoundary>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-[var(--ws-bg)]">
-      <HeaderZen />
-      <main>
-        <HeroSection />
-        <FeaturesSection />
-        <HowItWorksSection />
-        <AIChatPanel />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-100">
+      {/* Cabecalho simples */}
+      <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📓</span>
+          <h1 className="text-sm font-bold text-gray-800">StudyAI — Caderno</h1>
+        </div>
+        <span className="text-xs text-gray-400">Auto-salvo {canvasJSON ? '✓' : '...'}</span>
+      </header>
+
+      {/* Editor preenche o restante da tela */}
+      <main className="flex flex-1 overflow-hidden">
+        <CanvasEditor
+          paperStyle="grid"
+          paperColor="#ffffff"
+          lineColor="#e0e0e0"
+          onChange={handleChange}
+        />
       </main>
-      <FooterZen />
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} initialMode={authMode} />
     </div>
   );
 }

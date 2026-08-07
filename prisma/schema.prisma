@@ -40,16 +40,50 @@ model User {
 }
 
 model Notebook {
+  id          String        @id @default(cuid())
+  title       String
+  content     String        @default("")
+  color       String        @default("#c0392b")
+  icon        String        @default("book")
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcards  Flashcard[]
+  pages       NotebookPage[]
+  tags        NotebookTag[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model NotebookPage {
+  id         String   @id @default(cuid())
+  notebookId String
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  pageNumber Int      @default(1)
+  canvasData String?  // JSON fabric.js state
+  textContent String   @default("") // Fallback text
+  paperStyle String   @default("blank") // blank, lined, grid, dotted
+  paperColor String   @default("#ffffff")
+  lineColor  String   @default("#d1d5db")
+  width      Int      @default(1200)
+  height     Int      @default(1600)
+  layers     String?  // JSON array of layer configs
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([notebookId])
+}
+
+model NotebookTag {
   id        String   @id @default(cuid())
-  title     String
-  content   String   @default("")
-  color     String   @default("#c0392b")
-  icon      String   @default("book")
+  name      String
+  color     String   @default("#6b7280")
+  notebookId String
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  flashcards Flashcard[]
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([notebookId])
+  @@index([userId])
 }
 
 model Flashcard {

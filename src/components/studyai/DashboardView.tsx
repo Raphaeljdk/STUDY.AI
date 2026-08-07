@@ -18,6 +18,7 @@ import { AdminPanel } from './AdminPanel';
 import { toast } from '@/hooks/use-toast';
 import { useUsage } from '@/hooks/useUsage';
 import { PremiumUpgrade, UsageBar } from './PremiumUpgrade';
+import { CanvasNotebookView } from '@/components/notebook/CanvasNotebookView';
 import Image from 'next/image';
 
 // Lightweight error boundary for individual sections
@@ -251,7 +252,11 @@ export function DashboardView() {
         )}
         {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
         {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
-        {activeTab === 'notebook-edit' && editNotebookId && <NotebookEditor key={editNotebookId} notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />}
+        {activeTab === 'notebook-edit' && editNotebookId && (
+          <SectionErrorBoundary name="CanvasNotebook">
+            <CanvasNotebookView notebookId={editNotebookId} onBack={() => setActiveTab('notebooks')} />
+          </SectionErrorBoundary>
+        )}
         {activeTab === 'flashcards' && <FlashcardsManager key="fc" onReview={() => setActiveTab('flashcard-review')} />}
         {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
         {activeTab === 'timer' && <PomodoroTimer key="pom" />}
