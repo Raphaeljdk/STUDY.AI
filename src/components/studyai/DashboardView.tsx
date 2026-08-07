@@ -18,8 +18,20 @@ import { AdminPanel } from './AdminPanel';
 import { toast } from '@/hooks/use-toast';
 import { useUsage } from '@/hooks/useUsage';
 import { PremiumUpgrade, UsageBar } from './PremiumUpgrade';
-import { CanvasNotebookView } from '@/components/notebook/CanvasNotebookView';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
+
+const CanvasNotebookView = dynamic(
+  () => import('@/components/notebook/CanvasNotebookView').then(m => ({ default: m.CanvasNotebookView })),
+  { ssr: false, loading: () => (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="text-center">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[var(--ws-glass-border)] border-t-[var(--ws-accent)]" />
+        <p className="text-sm text-[var(--ws-text-tertiary)]">Carregando editor...</p>
+      </div>
+    </div>
+  )},
+);
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {

@@ -140,3 +140,23 @@ Stage Summary:
 - Sticky tape feature for review/memorization
 - Stripe payment integration for premium tier
 - Zero lint errors, dev server running
+---
+Task ID: 6
+Agent: main
+Task: Restore full app (landing + dashboard) with notebook as a tab
+
+Work Log:
+- Found page.tsx was replaced with just CanvasEditor, losing all previous StudyAI functionality
+- DashboardView.tsx already had full tab system: Dashboard, Cadernos (with CanvasNotebookView), Flashcards, Pomodoro, Sensei IA, Admin
+- Restored page.tsx to show landing page (HeaderZen, HeroSection, FeaturesSection, PricingSection, FooterZen) for non-auth users
+- Authenticated users see full DashboardView with all features including notebook editor
+- Fixed CanvasNotebookView import in DashboardView: changed from static import to dynamic import with ssr:false (fabric.js is browser-only)
+- Fixed named vs default export mismatches in CanvasNotebookView.tsx (PagePanel, PDFImporter, EditorToolbar, AudioRecorder, CanvasEditor all use export default)
+- Removed unused eslint-disable from CanvasEditor.tsx
+- Final state: 0 lint errors, 0 console errors, HTTP 200
+
+Stage Summary:
+- App now shows landing page for visitors, full dashboard for authenticated users
+- All previous features preserved: Dashboard, Cadernos (canvas editor), Flashcards, Pomodoro, Sensei IA, Admin, Premium
+- Notebook editor (FreeNotes-style canvas) is accessible via the Cadernos tab inside the dashboard
+- Zero lint errors, browser-verified landing page and auth modal

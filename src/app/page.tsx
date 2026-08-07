@@ -1,41 +1,60 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useCallback, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
-/* CanvasEditor carregado sem SSR pois usa fabric.js (canvas) */
-const CanvasEditor = dynamic(
-  () => import('@/components/notebook/CanvasEditor'),
-  { ssr: false },
-);
+import { DashboardView } from '@/components/studyai/DashboardView';
+import { AuthModal } from '@/components/studyai/AuthModal';
+import { HeaderZen } from '@/components/studyai/HeaderZen';
+import { HeroSection } from '@/components/studyai/HeroSection';
+import { FeaturesSection } from '@/components/studyai/FeaturesSection';
+import { PricingSection } from '@/components/studyai/PricingSection';
+import { FooterZen } from '@/components/studyai/FooterZen';
+import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const [canvasJSON, setCanvasJSON] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
 
-  const handleChange = useCallback((json: string) => {
-    setCanvasJSON(json);
+  const openAuth = useCallback((mode: 'login' | 'register' = 'register') => {
+    setAuthMode(mode);
+    setAuthOpen(true);
   }, []);
 
-  return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-100">
-      {/* Cabecalho simples */}
-      <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">📓</span>
-          <h1 className="text-sm font-bold text-gray-800">StudyAI — Caderno</h1>
-        </div>
-        <span className="text-xs text-gray-400">Auto-salvo {canvasJSON ? '✓' : '...'}</span>
-      </header>
+  // Expose auth opener globally for landing page CTAs
+  useEffect(() => {
+    (window as any).__studyai_openAuth = openAuth;
+    return () => { delete (window as any).__studyai_openAuth; };
+  }, [openAuth]);
 
-      {/* Editor preenche o restante da tela */}
-      <main className="flex flex-1 overflow-hidden">
-        <CanvasEditor
-          paperStyle="grid"
-          paperColor="#ffffff"
-          lineColor="#e0e0e0"
-          onChange={handleChange}
-        />
-      </main>
-    </div>
+  // Loading state while session loads
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--ws-accent)]" />
+      </div>
+    );
+  }
+
+  // Authenticated → full dashboard
+  if (session) {
+    return <DashboardView />;
+  }
+
+  // Not authenticated → landing page
+  return (
+    <>
+      <HeaderZen />
+      <HeroSection />
+      <FeaturesSection />
+      <PricingSection />
+      <FooterZen />
+      <AuthModal
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialMode={authMode}
+      />
+    </>
   );
 }

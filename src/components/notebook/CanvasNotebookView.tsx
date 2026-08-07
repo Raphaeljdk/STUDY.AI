@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { CanvasEditor } from './CanvasEditor';
-import { EditorToolbar } from './EditorToolbar';
-import { PagePanel } from './PagePanel';
-import { PDFImporter } from './PDFImporter';
-import { AudioRecorder } from './AudioRecorder';
+import CanvasEditor from './CanvasEditor';
+import EditorToolbar from './EditorToolbar';
+import PagePanel from './PagePanel';
+import PDFImporter from './PDFImporter';
+import AudioRecorder from './AudioRecorder';
 import { addTape } from './StickyTape';
-import { SplitView } from './SplitView';
 import {
   ArrowLeft, Save, BookOpen, MessageCircle, FileText,
   Plus, Trash2, Image, Mic, CalendarDays, Columns2, Rows2,
