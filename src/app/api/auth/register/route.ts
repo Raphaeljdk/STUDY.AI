@@ -133,9 +133,12 @@ export async function POST(request: Request) {
       user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
     });
   } catch (error: any) {
-    console.error('[Register] Full error:', error?.message, error?.code, error?.meta);
+    const msg = error?.message || 'Unknown error';
+    const code = error?.code || '';
+    console.error('[Register] Full error:', msg, code, error?.meta);
+    // Return real error details so frontend can display them
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: 'Erro interno do servidor', details: `${code || 'ERR'}: ${msg}` },
       { status: 500 }
     );
   }

@@ -119,10 +119,16 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         } else if (res.status === 400) {
           setErrorMsg(msg);
         } else {
-          setErrorMsg('Nao foi possivel criar a conta. Tente novamente.');
+          // Show real error details for 500 + add debugging info
+          const details = data.details || '';
+          console.error('[Register Error]', res.status, data);
+          setErrorMsg(details ? `${msg} (${details})` : msg);
         }
         return;
       }
+
+      // Debug: log successful register response
+      console.log('[Register Success]', data);
 
       // Step 2: Auto-login after successful registration
       setStatus('success');
