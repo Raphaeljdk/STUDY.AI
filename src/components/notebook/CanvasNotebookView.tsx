@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import CanvasEditor from './CanvasEditor';
-import EditorToolbar from './EditorToolbar';
 import PagePanel from './PagePanel';
 import PDFImporter from './PDFImporter';
 import AudioRecorder from './AudioRecorder';
-import { addTape } from './StickyTape';
 import {
-  ArrowLeft, Save, BookOpen, MessageCircle, FileText,
-  Plus, Trash2, Image, Mic, CalendarDays, Columns2, Rows2,
+  ArrowLeft, BookOpen, MessageCircle, FileText,
+  Columns2, Rows2, CalendarDays,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -32,10 +30,7 @@ interface CanvasNotebookViewProps {
 
 type SplitMode = 'none' | 'vertical' | 'horizontal';
 
-type ToolType = 'select' | 'pen' | 'pencil' | 'highlighter' | 'eraser' | 'text' | 'rect' | 'circle' | 'line' | 'tape';
-
 export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewProps) {
-  // --- State ---
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState('');
@@ -45,20 +40,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
   const [splitMode, setSplitMode] = useState<SplitMode>('none');
   const [showPlanner, setShowPlanner] = useState(false);
 
-  // Tool state
-  const [activeTool, setActiveTool] = useState<string>('pen');
-  const [strokeColor, setStrokeColor] = useState('#000000');
-  const [strokeWidth, setStrokeWidth] = useState(2);
-  const [paperStyle, setPaperStyle] = useState('grid');
-  const [paperColor, setPaperColor] = useState('#ffffff');
-  const [lineColor, setLineColor] = useState('#d1d5db');
-  const [tapeMode, setTapeMode] = useState(false);
-  const [tapeColor, setTapeColor] = useState('#fbbf24');
-
-  // Canvas refs
-  const canvasRef = useRef<any>(null);
-  const undoStackRef = useRef<string[]>([]);
-  const redoStackRef = useRef<string[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchedRef = useRef<boolean | null>(null);
 
@@ -79,7 +60,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
       if (pgData.pages && pgData.pages.length > 0) {
         setPages(pgData.pages);
       } else {
-        // Create first page
         const createRes = await fetch(`/api/notebooks/${notebookId}/pages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -116,24 +96,11 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     setSaving(false);
   }, [activePage]);
 
-  // --- Handle canvas change ---
+  // --- Handle canvas change (auto-save) ---
   const handleCanvasChange = useCallback((json: string) => {
-    undoStackRef.current.push(json);
-    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
-    redoStackRef.current = [];
-
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => savePage(json), 1500);
   }, [savePage]);
-
-  // --- Undo/Redo ---
-  const handleUndo = useCallback(() => {
-    // The canvas handles its own undo via Ctrl+Z
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    // The canvas handles its own redo via Ctrl+Shift+Z
-  }, []);
 
   // --- Page management ---
   const handleAddPage = async () => {
@@ -141,7 +108,7 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
       const res = await fetch(`/api/notebooks/${notebookId}/pages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paperStyle, paperColor }),
+        body: JSON.stringify({ paperStyle: 'grid', paperColor: '#ffffff' }),
       });
       const data = await res.json();
       if (data.page) {
@@ -170,32 +137,9 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
 
   // --- PDF import ---
   const handlePDFImported = useCallback(async (imageUrl: string) => {
-    // The canvas editor will handle adding the image
-    // We trigger it via a custom event or by calling a method on the canvas
     const event = new CustomEvent('pdf-imported', { detail: { imageUrl } });
     window.dispatchEvent(event);
     toast({ title: 'PDF importado', description: 'A primeira pagina do PDF foi adicionada ao canvas.' });
-  }, []);
-
-  // --- Toggle tape mode ---
-  const handleToggleTape = useCallback(() => {
-    const next = !tapeMode;
-    setTapeMode(next);
-    if (next) {
-      setActiveTool('tape');
-    } else {
-      setActiveTool('pen');
-    }
-  }, [tapeMode]);
-
-  // --- Tool change handler ---
-  const handleToolChange = useCallback((tool: string) => {
-    if (tool === 'tape') {
-      setTapeMode(true);
-    } else {
-      setTapeMode(false);
-    }
-    setActiveTool(tool);
   }, []);
 
   // --- Loading ---
@@ -222,7 +166,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
 
         {saving && <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salvando...</span>}
 
-        {/* Split view buttons */}
         <button
           onClick={() => setSplitMode(m => m === 'vertical' ? 'none' : 'vertical')}
           className={`rounded-ws-button p-2 transition-colors ${splitMode === 'vertical' ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
@@ -238,7 +181,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
           <Rows2 size={16} />
         </button>
 
-        {/* Page panel toggle */}
         <button
           onClick={() => setShowPagePanel(p => !p)}
           className={`rounded-ws-button p-2 transition-colors ${showPagePanel ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
@@ -247,7 +189,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
           <FileText size={16} />
         </button>
 
-        {/* Planner toggle */}
         <button
           onClick={() => setShowPlanner(p => !p)}
           className={`rounded-ws-button p-2 transition-colors ${showPlanner ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
@@ -275,38 +216,15 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
           </div>
         )}
 
-        {/* Canvas Area */}
+        {/* Canvas Area - toolbar is inside CanvasEditor */}
         <div className="relative flex-1 overflow-hidden bg-gray-100">
-          <EditorToolbar
-            activeTool={activeTool}
-            onToolChange={handleToolChange}
-            strokeColor={strokeColor}
-            onColorChange={setStrokeColor}
-            strokeWidth={strokeWidth}
-            onWidthChange={setStrokeWidth}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-            canUndo={false}
-            canRedo={false}
-            zoom={100}
-            onZoomChange={() => {}}
-            paperStyle={paperStyle}
-            onPaperStyleChange={setPaperStyle}
-            paperColor={paperColor}
-            onPaperColorChange={setPaperColor}
-            onAddText={() => setActiveTool('text')}
-            onAddImage={() => {}}
-            onToggleTape={handleToggleTape}
-            tapeMode={tapeMode}
-          />
-
           {activePage && (
             <CanvasEditor
               key={activePage.id}
               initialData={activePage.canvasData}
-              paperStyle={(activePage.paperStyle as any) || paperStyle}
-              paperColor={activePage.paperColor || paperColor}
-              lineColor={activePage.lineColor || lineColor}
+              paperStyle={(activePage.paperStyle as any) || 'grid'}
+              paperColor={activePage.paperColor || '#ffffff'}
+              lineColor={activePage.lineColor || '#d1d5db'}
               onChange={handleCanvasChange}
             />
           )}
