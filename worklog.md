@@ -160,3 +160,21 @@ Stage Summary:
 - All previous features preserved: Dashboard, Cadernos (canvas editor), Flashcards, Pomodoro, Sensei IA, Admin, Premium
 - Notebook editor (FreeNotes-style canvas) is accessible via the Cadernos tab inside the dashboard
 - Zero lint errors, browser-verified landing page and auth modal
+---
+Task ID: 7
+Agent: main
+Task: Fix user registration on Vercel deployment
+
+Work Log:
+- Identified plan: 'SENSEI' sent by AuthModal but Prisma enum only has FREE|PREMIUM|ADMIN_PLAN
+- Fixed AuthModal to send plan: 'FREE'
+- Added ensureDBSchema() to auto-create missing DB columns (Stripe fields) and tables (NotebookPage, NotebookTag, DailyUsage)
+- Created /api/setup-db endpoint for manual DB setup
+- Changed register API to always create users as FREE (ignore client value)
+- Improved AuthModal flow: show success immediately, then try auto-login
+- Verified with agent-browser: registration → auto-login → dashboard works perfectly
+
+Stage Summary:
+- Root causes: (1) Invalid plan enum value, (2) Missing DB columns/tables on Neon PostgreSQL
+- Both fixed with auto-setup and hardcoded FREE plan
+- Confirmed working via agent-browser on deployed site
