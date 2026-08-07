@@ -1,0 +1,808 @@
+     1→/* eslint-disable */
+     2→'use client';
+     3→
+     4→import React, {
+     5→  useEffect,
+     6→  useRef,
+     7→  useState,
+     8→  useCallback,
+     9→} from 'react';
+    10→import {
+    11→  Canvas,
+    12→  PencilBrush,
+    13→  FabricText,
+    14→  Rect,
+    15→  Circle,
+    16→  Line,
+    17→  Image as FabricImage,
+    18→  Group,
+    19→} from 'fabric';
+    20→
+    21→import EditorToolbar from './EditorToolbar';
+    22→import { addTape, getTapeColors, StickyTapePicker } from './StickyTape';
+    23→import PagePanel from './PagePanel';
+    24→
+    25→/* ========================================================================
+    26→   Tipos
+    27→   ======================================================================== */
+    28→
+    29→interface CanvasEditorProps {
+    30→  initialData?: string | null;
+    31→  paperStyle?: 'blank' | 'lined' | 'grid' | 'dotted';
+    32→  paperColor?: string;
+    33→  lineColor?: string;
+    34→  onChange?: (json: string) => void;
+    35→}
+    36→
+    37→interface PageData {
+    38→  id: string;
+    39→  pageNumber: number;
+    40→  paperStyle: string;
+    41→  paperColor: string;
+    42→  canvasJSON?: string;
+    43→}
+    44→
+    45→/* ========================================================================
+    46→   Constantes
+    47→   ======================================================================== */
+    48→
+    49→const CANVAS_W = 1200;
+    50→const CANVAS_H = 1600;
+    51→const LINE_SPACING = 32;
+    52→const MAX_UNDO = 50;
+    53→const SAVE_DEBOUNCE_MS = 800;
+    54→
+    55→/* ========================================================================
+    56→   Componente principal
+    57→   ======================================================================== */
+    58→
+    59→export default function CanvasEditor({
+    60→  initialData,
+    61→  paperStyle: initPaperStyle = 'blank',
+    62→  paperColor: initPaperColor = '#ffffff',
+    63→  lineColor: initLineColor = '#e0e0e0',
+    64→  onChange,
+    65→}: CanvasEditorProps) {
+    66→  /* ----- refs ----- */
+    67→  const canvasElRef = useRef<HTMLCanvasElement>(null);
+    68→  const fcRef = useRef<Canvas | null>(null);
+    69→  const containerRef = useRef<HTMLDivElement>(null);
+    70→  const fileInputRef = useRef<HTMLInputElement>(null);
+    71→
+    72→  /* ----- estado da ferramenta ----- */
+    73→  const [activeTool, setActiveTool] = useState('select');
+    74→  const [strokeColor, setStrokeColor] = useState('#000000');
+    75→  const [strokeWidth, setStrokeWidth] = useState(2);
+    76→  const [zoom, setZoom] = useState(1);
+    77→  const [paperStyle, setPaperStyle] = useState(initPaperStyle);
+    78→  const [paperColor, setPaperColor] = useState(initPaperColor);
+    79→  const [lineColor] = useState(initLineColor);
+    80→  const [tapeMode, setTapeMode] = useState(false);
+    81→  const [tapeColor, setTapeColor] = useState(getTapeColors()[0]);
+    82→
+    83→  /* ----- undo/redo ----- */
+    84→  const undoStackRef = useRef<string[]>([]);
+    85→  const redoStackRef = useRef<string[]>([]);
+    86→  const [canUndo, setCanUndo] = useState(false);
+    87→  const [canRedo, setCanRedo] = useState(false);
+    88→  const skipUndoRef = useRef(false);
+    89→
+    90→  /* ----- paginas ----- */
+    91→  const [pages, setPages] = useState<PageData[]>([
+    92→    { id: 'page-1', pageNumber: 1, paperStyle: initPaperStyle, paperColor: initPaperColor },
+    93→  ]);
+    94→  const [activePageId, setActivePageId] = useState('page-1');
+    95→
+    96→  /* ----- desenho de formas (temporarios) ----- */
+    97→  const isDrawingShape = useRef(false);
+    98→  const shapeOriginRef = useRef({ x: 0, y: 0 });
+    99→  const tempShapeRef = useRef<Rect | Circle | Line | null>(null);
+   100→
+   101→  /* ----- auto-save debounced ----- */
+   102→  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   103→  const lastSavedJSON = useRef<string>('');
+   104→
+   105→  /* ----- space pan ----- */
+   106→  const spaceHeld = useRef(false);
+   107→  const isPanning = useRef(false);
+   108→  const panStart = useRef({ x: 0, y: 0 });
+   109→  const viewportOffset = useRef({ left: 0, top: 0 });
+   110→
+   111→  /* ===== propriedades especiais para serializacao ===== */
+   112→  const SERIALIZE_PROPS = ['__isPaperBg', '__isTape', '__tapeColor'];
+   113→
+   114→  /* ========================================================================
+   115→     Gerador de fundo de papel
+   116→     ======================================================================== */
+   117→
+   118→  const buildPaperBackground = useCallback(
+   119→    (fc: Canvas): void => {
+   120→      // Remove background antigo
+   121→      const existing = fc.getObjects().find((o) => (o as any).__isPaperBg);
+   122→      if (existing) fc.remove(existing);
+   123→
+   124→      if (paperStyle === 'blank') return;
+   125→
+   126→      const objs: any[] = [];
+   127→
+   128→      if (paperStyle === 'lined') {
+   129→        for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   130→          objs.push(
+   131→            new Line([0, y, CANVAS_W, y], {
+   132→              stroke: lineColor,
+   133→              strokeWidth: 1,
+   134→              selectable: false,
+   135→              evented: false,
+   136→            } as any),
+   137→          );
+   138→        }
+   139→      } else if (paperStyle === 'grid') {
+   140→        for (let x = LINE_SPACING; x < CANVAS_W; x += LINE_SPACING) {
+   141→          objs.push(
+   142→            new Line([x, 0, x, CANVAS_H], {
+   143→              stroke: lineColor,
+   144→              strokeWidth: 0.5,
+   145→              selectable: false,
+   146→              evented: false,
+   147→            } as any),
+   148→          );
+   149→        }
+   150→        for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   151→          objs.push(
+   152→            new Line([0, y, CANVAS_W, y], {
+   153→              stroke: lineColor,
+   154→              strokeWidth: 0.5,
+   155→              selectable: false,
+   156→              evented: false,
+   157→            } as any),
+   158→          );
+   159→        }
+   160→      } else if (paperStyle === 'dotted') {
+   161→        for (let x = LINE_SPACING; x < CANVAS_W; x += LINE_SPACING) {
+   162→          for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   163→            objs.push(
+   164→              new Circle(
+   165→                { left: x, top: y, radius: 1.2, fill: lineColor, originX: 'center', originY: 'center' } as any,
+   166→              ),
+   167→            );
+   168→          }
+   169→        }
+   170→      }
+   171→
+   172→      if (objs.length === 0) return;
+   173→
+   174→      const group = new Group(objs, {
+   175→        selectable: false,
+   176→        evented: false,
+   177→      } as any);
+   178→      (group as any).__isPaperBg = true;
+   179→
+   180→      fc.add(group);
+   181→      fc.sendObjectToBack(group);
+   182→    },
+   183→    [paperStyle, lineColor],
+   184→  );
+   185→
+   186→  /* ========================================================================
+   187→     Undo / Redo
+   188→     ======================================================================== */
+   189→
+   190→  const saveUndoState = useCallback((fc: Canvas) => {
+   191→    if (skipUndoRef.current) {
+   192→      skipUndoRef.current = false;
+   193→      return;
+   194→    }
+   195→    const json = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   196→    undoStackRef.current.push(json);
+   197→    if (undoStackRef.current.length > MAX_UNDO) undoStackRef.current.shift();
+   198→    redoStackRef.current = [];
+   199→    setCanUndo(undoStackRef.current.length > 0);
+   200→    setCanRedo(false);
+   201→  }, []);
+   202→
+   203→  const handleUndo = useCallback(() => {
+   204→    const fc = fcRef.current;
+   205→    if (!fc || undoStackRef.current.length === 0) return;
+   206→    const currentJSON = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   207→    redoStackRef.current.push(currentJSON);
+   208→    const prevJSON = undoStackRef.current.pop()!;
+   209→    skipUndoRef.current = true;
+   210→    fc.loadFromJSON(prevJSON).then(() => {
+   211→      fc.renderAll();
+   212→      setCanUndo(undoStackRef.current.length > 0);
+   213→      setCanRedo(true);
+   214→    });
+   215→  }, []);
+   216→
+   217→  const handleRedo = useCallback(() => {
+   218→    const fc = fcRef.current;
+   219→    if (!fc || redoStackRef.current.length === 0) return;
+   220→    const currentJSON = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   221→    undoStackRef.current.push(currentJSON);
+   222→    const nextJSON = redoStackRef.current.pop()!;
+   223→    skipUndoRef.current = true;
+   224→    fc.loadFromJSON(nextJSON).then(() => {
+   225→      fc.renderAll();
+   226→      setCanUndo(true);
+   227→      setCanRedo(redoStackRef.current.length > 0);
+   228→    });
+   229→  }, []);
+   230→
+   231→  /* ========================================================================
+   232→     Auto-save debounced
+   233→     ======================================================================== */
+   234→
+   235→  const scheduleAutoSave = useCallback((fc: Canvas) => {
+   236→    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+   237→    debounceTimerRef.current = setTimeout(() => {
+   238→      const json = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   239→      if (json !== lastSavedJSON.current) {
+   240→        lastSavedJSON.current = json;
+   241→        onChange?.(json);
+   242→      }
+   243→    }, SAVE_DEBOUNCE_MS);
+   244→  }, [onChange]);
+   245→
+   246→  /* ========================================================================
+   247→     Atualizar brush/ferramenta
+   248→     ======================================================================== */
+   249→
+   250→  const applyTool = useCallback(
+   251→    (fc: Canvas, tool: string) => {
+   252→      fc.isDrawingMode = false;
+   253→      fc.selection = tool === 'select';
+   254→
+   255→      switch (tool) {
+   256→        case 'pen': {
+   257→          fc.isDrawingMode = true;
+   258→          const brush = new PencilBrush(fc);
+   259→          brush.color = strokeColor;
+   260→          brush.width = 1.5;
+   261→          fc.freeDrawingBrush = brush;
+   262→          break;
+   263→        }
+   264→        case 'pencil': {
+   265→          fc.isDrawingMode = true;
+   266→          const brush = new PencilBrush(fc);
+   267→          brush.color = strokeColor;
+   268→          brush.width = 3;
+   269→          fc.freeDrawingBrush = brush;
+   270→          break;
+   271→        }
+   272→        case 'highlighter': {
+   273→          fc.isDrawingMode = true;
+   274→          const brush = new PencilBrush(fc);
+   275→          brush.color = strokeColor;
+   276→          brush.width = 20;
+   277→          (brush as any).globalCompositeOperation = 'multiply';
+   278→          fc.freeDrawingBrush = brush;
+   279→          break;
+   280→        }
+   281→        case 'eraser': {
+   282→          fc.isDrawingMode = true;
+   283→          const brush = new PencilBrush(fc);
+   284→          brush.color = paperColor;
+   285→          brush.width = 20;
+   286→          fc.freeDrawingBrush = brush;
+   287→          break;
+   288→        }
+   289→        case 'text':
+   290→        case 'rectangle':
+   291→        case 'circle':
+   292→        case 'line':
+   293→        case 'select':
+   294→          break;
+   295→      }
+   296→    },
+   297→    [strokeColor, paperColor],
+   298→  );
+   299→
+   300→  /* ========================================================================
+   301→     Inicializacao do canvas
+   302→     ======================================================================== */
+   303→
+   304→  useEffect(() => {
+   305→    const el = canvasElRef.current;
+   306→    if (!el) return;
+   307→
+   308→    const fc = new Canvas(el, {
+   309→      width: CANVAS_W,
+   310→      height: CANVAS_H,
+   311→      backgroundColor: paperColor,
+   312→      selection: true,
+   313→      preserveObjectStacking: true,
+   314→    });
+   315→    fcRef.current = fc;
+   316→
+   317→    // Fundo do papel
+   318→    buildPaperBackground(fc);
+   319→    fc.renderAll();
+   320→
+   321→    // Carregar estado inicial se existir
+   322→    if (initialData) {
+   323→      try {
+   324→        fc.loadFromJSON(initialData).then(() => {
+   325→          fc.renderAll();
+   326→          saveUndoState(fc);
+   327→        });
+   328→      } catch {
+   329→        saveUndoState(fc);
+   330→      }
+   331→    } else {
+   332→      saveUndoState(fc);
+   333→    }
+   334→
+   335→    /* ---------- eventos de ferramenta ---------- */
+   336→
+   337→    fc.on('mouse:down', (opt) => {
+   338→      const e = opt.e as MouseEvent;
+   339→      const pointer = fc.getScenePoint(e);
+   340→
+   341→      // Fita adesiva
+   342→      if (tapeMode) {
+   343→        addTape(fc, pointer.x, pointer.y, tapeColor);
+   344→        saveUndoState(fc);
+   345→        scheduleAutoSave(fc);
+   346→        return;
+   347→      }
+   348→
+   349→      // Ferramenta de texto
+   350→      if (activeTool === 'text') {
+   351→        const text = new FabricText('Digite aqui', {
+   352→          left: pointer.x,
+   353→          top: pointer.y,
+   354→          fontSize: 24,
+   355→          fill: strokeColor,
+   356→          fontFamily: 'Inter, sans-serif',
+   357→          editable: true,
+   358→        } as any);
+   359→        fc.add(text);
+   360→        fc.setActiveObject(text);
+   361→        (text as any).enterEditing();
+   362→        saveUndoState(fc);
+   363→        scheduleAutoSave(fc);
+   364→        return;
+   365→      }
+   366→
+   367→      // Pan com space ou botao do meio
+   368→      if (spaceHeld.current || e.button === 1) {
+   369→        isPanning.current = true;
+   370→        panStart.current = { x: e.clientX, y: e.clientY };
+   371→        viewportOffset.current = { left: fc.viewportLeft, top: fc.viewportTop };
+   372→        fc.selection = false;
+   373→        return;
+   374→      }
+   375→
+   376→      // Formas (retangulo, circulo, linha)
+   377→      if (['rectangle', 'circle', 'line'].includes(activeTool)) {
+   378→        isDrawingShape.current = true;
+   379→        shapeOriginRef.current = { x: pointer.x, y: pointer.y };
+   380→
+   381→        if (activeTool === 'rectangle') {
+   382→          const rect = new Rect({
+   383→            left: pointer.x,
+   384→            top: pointer.y,
+   385→            width: 0,
+   386→            height: 0,
+   387→            fill: 'transparent',
+   388→            stroke: strokeColor,
+   389→            strokeWidth,
+   390→          } as any);
+   391→          fc.add(rect);
+   392→          fc.setActiveObject(rect);
+   393→          tempShapeRef.current = rect;
+   394→        } else if (activeTool === 'circle') {
+   395→          const circ = new Circle({
+   396→            left: pointer.x,
+   397→            top: pointer.y,
+   398→            radius: 1,
+   399→            fill: 'transparent',
+   400→            stroke: strokeColor,
+   401→            strokeWidth,
+   402→            originX: 'center',
+   403→            originY: 'center',
+   404→          } as any);
+   405→          fc.add(circ);
+   406→          fc.setActiveObject(circ);
+   407→          tempShapeRef.current = circ;
+   408→        } else if (activeTool === 'line') {
+   409→          const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+   410→            stroke: strokeColor,
+   411→            strokeWidth,
+   412→          } as any);
+   413→          fc.add(line);
+   414→          fc.setActiveObject(line);
+   415→          tempShapeRef.current = line;
+   416→        }
+   417→      }
+   418→    });
+   419→
+   420→    fc.on('mouse:move', (opt) => {
+   421→      const e = opt.e as MouseEvent;
+   422→
+   423→      // Pan
+   424→      if (isPanning.current) {
+   425→        const dx = e.clientX - panStart.current.x;
+   426→        const dy = e.clientY - panStart.current.y;
+   427→        fc.setViewportTransform([
+   428→          zoom, 0, 0, zoom,
+   429→          viewportOffset.current.left + dx,
+   430→          viewportOffset.current.top + dy,
+   431→        ]);
+   432→        return;
+   433→      }
+   434→
+   435→      // Desenho de forma
+   436→      if (isDrawingShape.current && tempShapeRef.current) {
+   437→        const pointer = fc.getScenePoint(e);
+   438→        const origin = shapeOriginRef.current;
+   439→        const shape = tempShapeRef.current;
+   440→
+   441→        if (activeTool === 'rectangle') {
+   442→          const left = Math.min(origin.x, pointer.x);
+   443→          const top = Math.min(origin.y, pointer.y);
+   444→          const w = Math.abs(pointer.x - origin.x);
+   445→          const h = Math.abs(pointer.y - origin.y);
+   446→          shape.set({ left, top, width: w, height: h });
+   447→        } else if (activeTool === 'circle') {
+   448→          const dx = pointer.x - origin.x;
+   449→          const dy = pointer.y - origin.y;
+   450→          const r = Math.sqrt(dx * dx + dy * dy) / 2;
+   451→          const cx = (origin.x + pointer.x) / 2;
+   452→          const cy = (origin.y + pointer.y) / 2;
+   453→          shape.set({ left: cx, top: cy, radius: Math.max(1, r) } as any);
+   454→        } else if (activeTool === 'line') {
+   455→          (shape as any).set({ x2: pointer.x, y2: pointer.y });
+   456→        }
+   457→        fc.renderAll();
+   458→      }
+   459→    });
+   460→
+   461→    fc.on('mouse:up', () => {
+   462→      if (isPanning.current) {
+   463→        isPanning.current = false;
+   464→        fc.selection = activeTool === 'select';
+   465→        return;
+   466→      }
+   467→
+   468→      if (isDrawingShape.current) {
+   469→        isDrawingShape.current = false;
+   470→        tempShapeRef.current = null;
+   471→        saveUndoState(fc);
+   472→        scheduleAutoSave(fc);
+   473→      }
+   474→    });
+   475→
+   476→    // Salvar ao finalizar desenho livre
+   477→    fc.on('path:created', () => {
+   478→      saveUndoState(fc);
+   479→      scheduleAutoSave(fc);
+   480→    });
+   481→
+   482→    // Salvar apos modificacao de objetos
+   483→    fc.on('object:modified', () => {
+   484→      saveUndoState(fc);
+   485→      scheduleAutoSave(fc);
+   486→    });
+   487→
+   488→    /* ---------- zoom com rolagem ---------- */
+   489→
+   490→    fc.on('mouse:wheel', (opt) => {
+   491→      const e = opt.e as WheelEvent;
+   492→      e.preventDefault();
+   493→      e.stopPropagation();
+   494→
+   495→      const delta = e.deltaY;
+   496→      let newZoom = zoom + (delta > 0 ? -0.05 : 0.05);
+   497→      newZoom = Math.min(5, Math.max(0.1, newZoom));
+   498→
+   499→      const vpt = fc.viewportTransform;
+   500→      const newVpt = [...vpt];
+   501→      newVpt[0] = newZoom;
+   502→      newVpt[3] = newZoom;
+   503→      newVpt[4] = vpt[4] + (vpt[0] - newZoom) * (CANVAS_W / 2);
+   504→      newVpt[5] = vpt[5] + (vpt[3] - newZoom) * (CANVAS_H / 2);
+   505→
+   506→      fc.setViewportTransform(newVpt as [number, number, number, number, number, number]);
+   507→      setZoom(newZoom);
+   508→    });
+   509→
+   510→    // Ferramenta inicial
+   511→    applyTool(fc, activeTool);
+   512→
+   513→    return () => {
+   514→      fc.dispose();
+   515→      fcRef.current = null;
+   516→    };
+   517→  }, []);
+   518→
+   519→  /* ========================================================================
+   520→     Sincronizar estado de ferramenta com canvas
+   521→     ======================================================================== */
+   522→
+   523→  useEffect(() => {
+   524→    const fc = fcRef.current;
+   525→    if (!fc) return;
+   526→    applyTool(fc, activeTool);
+   527→  }, [activeTool, strokeColor, strokeWidth, paperColor, applyTool]);
+   528→
+   529→  /* ========================================================================
+   530→     Mudanca de cor de papel / estilo - reconstruir fundo
+   531→     ======================================================================== */
+   532→
+   533→  useEffect(() => {
+   534→    const fc = fcRef.current;
+   535→    if (!fc) return;
+   536→    fc.backgroundColor = paperColor;
+   537→    buildPaperBackground(fc);
+   538→    fc.renderAll();
+   539→    scheduleAutoSave(fc);
+   540→  }, [paperColor, paperStyle, buildPaperBackground, scheduleAutoSave]);
+   541→
+   542→  /* ========================================================================
+   543→     Atalhos de teclado
+   544→     ======================================================================== */
+   545→
+   546→  useEffect(() => {
+   547→    const handleKeyDown = (e: KeyboardEvent) => {
+   548→      if (e.code === 'Space' && !e.repeat) {
+   549→        e.preventDefault();
+   550→        spaceHeld.current = true;
+   551→      }
+   552→      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+   553→        e.preventDefault();
+   554→        if (e.shiftKey) {
+   555→          handleRedo();
+   556→        } else {
+   557→          handleUndo();
+   558→        }
+   559→      }
+   560→    };
+   561→    const handleKeyUp = (e: KeyboardEvent) => {
+   562→      if (e.code === 'Space') {
+   563→        spaceHeld.current = false;
+   564→      }
+   565→    };
+   566→    window.addEventListener('keydown', handleKeyDown);
+   567→    window.addEventListener('keyup', handleKeyUp);
+   568→    return () => {
+   569→      window.removeEventListener('keydown', handleKeyDown);
+   570→      window.removeEventListener('keyup', handleKeyUp);
+   571→    };
+   572→  }, [handleUndo, handleRedo]);
+   573→
+   574→  /* ========================================================================
+   575→     Paginas
+   576→     ======================================================================== */
+   577→
+   578→  const handlePageSelect = useCallback(
+   579→    (id: string) => {
+   580→      const fc = fcRef.current;
+   581→      if (!fc) return;
+   582→
+   583→      // Salva estado da pagina atual
+   584→      setPages((prev) =>
+   585→        prev.map((p) =>
+   586→          p.id === activePageId
+   587→            ? { ...p, canvasJSON: JSON.stringify(fc.toJSON(SERIALIZE_PROPS)) }
+   588→            : p,
+   589→        ),
+   590→      );
+   591→
+   592→      const page = pages.find((p) => p.id === id);
+   593→      if (!page) return;
+   594→
+   595→      setActivePageId(id);
+   596→      setPaperStyle(page.paperStyle);
+   597→      setPaperColor(page.paperColor);
+   598→
+   599→      const objects = fc.getObjects();
+   600→      for (let i = objects.length - 1; i >= 0; i--) {
+   601→        fc.remove(objects[i]);
+   602→      }
+   603→
+   604→      if (page.canvasJSON) {
+   605→        try {
+   606→          fc.loadFromJSON(page.canvasJSON).then(() => {
+   607→            fc.renderAll();
+   608→            saveUndoState(fc);
+   609→          });
+   610→        } catch {
+   611→          buildPaperBackground(fc);
+   612→          fc.renderAll();
+   613→          saveUndoState(fc);
+   614→        }
+   615→      } else {
+   616→        buildPaperBackground(fc);
+   617→        fc.renderAll();
+   618→        saveUndoState(fc);
+   619→      }
+   620→    },
+   621→    [activePageId, pages, buildPaperBackground, saveUndoState],
+   622→  );
+   623→
+   624→  const handleAddPage = useCallback(() => {
+   625→    const fc = fcRef.current;
+   626→    if (!fc) return;
+   627→
+   628→    setPages((prev) =>
+   629→      prev.map((p) =>
+   630→        p.id === activePageId
+   631→          ? { ...p, canvasJSON: JSON.stringify(fc.toJSON(SERIALIZE_PROPS)) }
+   632→          : p,
+   633→      ),
+   634→    );
+   635→
+   636→    const newId = `page-${Date.now()}`;
+   637→    const newPage: PageData = {
+   638→      id: newId,
+   639→      pageNumber: pages.length + 1,
+   640→      paperStyle,
+   641→      paperColor,
+   642→    };
+   643→
+   644→    setPages((prev) => [...prev, newPage]);
+   645→    setActivePageId(newId);
+   646→
+   647→    const objects = fc.getObjects();
+   648→    for (let i = objects.length - 1; i >= 0; i--) {
+   649→      fc.remove(objects[i]);
+   650→    }
+   651→    buildPaperBackground(fc);
+   652→    fc.renderAll();
+   653→    saveUndoState(fc);
+   654→  }, [activePageId, pages.length, paperStyle, paperColor, buildPaperBackground, saveUndoState]);
+   655→
+   656→  const handleDeletePage = useCallback(
+   657→    (id: string) => {
+   658→      if (pages.length <= 1) return;
+   659→
+   660→      setPages((prev) => {
+   661→        const filtered = prev.filter((p) => p.id !== id);
+   662→        return filtered.map((p, i) => ({ ...p, pageNumber: i + 1 }));
+   663→      });
+   664→
+   665→      if (id === activePageId) {
+   666→        const remaining = pages.filter((p) => p.id !== id);
+   667→        if (remaining.length > 0) {
+   668→          handlePageSelect(remaining[0].id);
+   669→        }
+   670→      }
+   671→    },
+   672→    [pages, activePageId, handlePageSelect],
+   673→  );
+   674→
+   675→  /* ========================================================================
+   676→     Adicionar texto / imagem
+   677→     ======================================================================== */
+   678→
+   679→  const handleAddText = useCallback(() => {
+   680→    const fc = fcRef.current;
+   681→    if (!fc) return;
+   682→    setActiveTool('text');
+   683→    applyTool(fc, 'text');
+   684→  }, [applyTool]);
+   685→
+   686→  const handleAddImage = useCallback(() => {
+   687→    fileInputRef.current?.click();
+   688→  }, []);
+   689→
+   690→  const handleFileChange = useCallback(
+   691→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   692→      const fc = fcRef.current;
+   693→      if (!fc) return;
+   694→      const file = e.target.files?.[0];
+   695→      if (!file) return;
+   696→
+   697→      const reader = new FileReader();
+   698→      reader.onload = () => {
+   699→        const dataUrl = reader.result as string;
+   700→        FabricImage.fromURL(dataUrl).then((img) => {
+   701→          const scale = Math.min(
+   702→            (CANVAS_W * 0.6) / (img.width || 1),
+   703→            (CANVAS_H * 0.6) / (img.height || 1),
+   704→            1,
+   705→          );
+   706→          img.set({
+   707→            scaleX: scale,
+   708→            scaleY: scale,
+   709→            left: CANVAS_W / 2 - ((img.width || 0) * scale) / 2,
+   710→            top: CANVAS_H / 2 - ((img.height || 0) * scale) / 2,
+   711→          } as any);
+   712→          fc.add(img);
+   713→          fc.setActiveObject(img);
+   714→          fc.renderAll();
+   715→          saveUndoState(fc);
+   716→          scheduleAutoSave(fc);
+   717→        });
+   718→      };
+   719→      reader.readAsDataURL(file);
+   720→      e.target.value = '';
+   721→    },
+   722→    [saveUndoState, scheduleAutoSave],
+   723→  );
+   724→
+   725→  /* ========================================================================
+   726→     Render
+   727→     ======================================================================== */
+   728→
+   729→  return (
+   730→    <div
+   731→      ref={containerRef}
+   732→      className="flex h-full w-full flex-col bg-gray-100"
+   733→      style={{ cursor: activeTool === 'select' ? 'default' : 'crosshair' }}
+   734→    >
+   735→      {/* Toolbar fixa no topo */}
+   736→      <EditorToolbar
+   737→        activeTool={activeTool}
+   738→        onToolChange={setActiveTool}
+   739→        strokeColor={strokeColor}
+   740→        onColorChange={setStrokeColor}
+   741→        strokeWidth={strokeWidth}
+   742→        onWidthChange={setStrokeWidth}
+   743→        onUndo={handleUndo}
+   744→        onRedo={handleRedo}
+   745→        canUndo={canUndo}
+   746→        canRedo={canRedo}
+   747→        zoom={zoom}
+   748→        onZoomChange={setZoom}
+   749→        paperStyle={paperStyle}
+   750→        onPaperStyleChange={setPaperStyle}
+   751→        paperColor={paperColor}
+   752→        onPaperColorChange={setPaperColor}
+   753→        onAddText={handleAddText}
+   754→        onAddImage={handleAddImage}
+   755→        onToggleTape={() => setTapeMode((prev) => !prev)}
+   756→        tapeMode={tapeMode}
+   757→      />
+   758→
+   759→      {/* Fita color picker (aparece quando tapeMode ativo) */}
+   760→      {tapeMode && (
+   761→        <div className="flex items-center gap-3 rounded-b-xl border border-t-0 border-black/5 bg-white/80 px-3 py-2 backdrop-blur-md">
+   762→          <span className="text-xs font-medium text-gray-500">Cor da fita:</span>
+   763→          <StickyTapePicker activeTapeColor={tapeColor} onColorSelect={setTapeColor} />
+   764→          <span className="ml-auto text-xs text-gray-400">Clique no canvas para adicionar fita</span>
+   765→        </div>
+   766→      )}
+   767→
+   768→      {/* Area principal */}
+   769→      <div className="flex flex-1 overflow-hidden">
+   770→        {/* Painel de paginas (desktop) */}
+   771→        <div className="hidden md:block">
+   772→          <PagePanel
+   773→            pages={pages}
+   774→            activePageId={activePageId}
+   775→            onPageSelect={handlePageSelect}
+   776→            onAddPage={handleAddPage}
+   777→            onDeletePage={handleDeletePage}
+   778→          />
+   779→        </div>
+   780→
+   781→        {/* Canvas wrapper */}
+   782→        <div className="relative flex-1 overflow-auto flex items-start justify-center p-4">
+   783→          <div
+   784→            className="shadow-xl"
+   785→            style={{
+   786→              width: CANVAS_W * zoom,
+   787→              height: CANVAS_H * zoom,
+   788→              overflow: 'hidden',
+   789→              borderRadius: '4px',
+   790→            }}
+   791→          >
+   792→            <canvas ref={canvasElRef} />
+   793→          </div>
+   794→
+   795→          {/* Hidden file input */}
+   796→          <input
+   797→            ref={fileInputRef}
+   798→            type="file"
+   799→            accept="image/*"
+   800→            className="hidden"
+   801→            onChange={handleFileChange}
+   802→          />
+   803→        </div>
+   804→      </div>
+   805→    </div>
+   806→  );
+   807→}
+   808→
