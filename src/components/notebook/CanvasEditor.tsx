@@ -17,6 +17,38 @@ import {
   Group,
 } from 'fabric';
 
+/* ========================================================================
+   SmoothBrush - Caneta estabilizada para letra bonita
+   ======================================================================== */
+
+class SmoothBrush extends PencilBrush {
+  private buffer: Array<{ x: number; y: number }> = [];
+  private bufferSize = 4; // quantos pontos suavizar
+
+  // Coletar pontos com suavizacao
+  override onPointerDown(pointer: any) {
+    this.buffer = [];
+    super.onPointerDown(pointer);
+  }
+
+  override onPointerMove(pointer: any) {
+    this.buffer.push({ x: pointer.x, y: pointer.y });
+    if (this.buffer.length > this.bufferSize) {
+      this.buffer.shift();
+    }
+    // Media dos pontos do buffer = ponto suavizado
+    if (this.buffer.length > 1) {
+      const avg = this.buffer.reduce(
+        (acc, p) => ({ x: acc.x + p.x / this.buffer.length, y: acc.y + p.y / this.buffer.length }),
+        { x: 0, y: 0 },
+      );
+      super.onPointerMove(avg);
+    } else {
+      super.onPointerMove(pointer);
+    }
+  }
+}
+
 import EditorToolbar from './EditorToolbar';
 import { addTape, getTapeColors, StickyTapePicker } from './StickyTape';
 import PagePanel from './PagePanel';
@@ -254,7 +286,7 @@ export default function CanvasEditor({
       switch (tool) {
         case 'pen': {
           fc.isDrawingMode = true;
-          const brush = new PencilBrush(fc);
+          const brush = new SmoothBrush(fc);
           brush.color = strokeColor;
           brush.width = 1.5;
           fc.freeDrawingBrush = brush;
@@ -262,7 +294,7 @@ export default function CanvasEditor({
         }
         case 'pencil': {
           fc.isDrawingMode = true;
-          const brush = new PencilBrush(fc);
+          const brush = new SmoothBrush(fc);
           brush.color = strokeColor;
           brush.width = 3;
           fc.freeDrawingBrush = brush;
