@@ -347,7 +347,7 @@ export default function CanvasEditor({
 
       // Ferramenta de texto
       if (activeTool === 'text') {
-        const text = new FabricText('Digite aqui', {
+        const text = new FabricText('', {
           left: pointer.x,
           top: pointer.y,
           fontSize: 24,
@@ -357,7 +357,12 @@ export default function CanvasEditor({
         } as any);
         fc.add(text);
         fc.setActiveObject(text);
-        (text as any).enterEditing();
+        // Delay para fabric.js processar antes de entrar no modo edicao
+        requestAnimationFrame(() => {
+          (text as any).enterEditing();
+          // Selecionar texto para substituir ao digitar
+          (text as any).selectAll();
+        });
         saveUndoState(fc);
         scheduleAutoSave(fc);
         return;
@@ -544,6 +549,11 @@ export default function CanvasEditor({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Nao interceptar teclas se esta editando texto no canvas
+      const fc = fcRef.current;
+      const activeObj = fc?.getActiveObject() as any;
+      if (activeObj && activeObj.isEditing) return;
+
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
         spaceHeld.current = true;
@@ -554,6 +564,13 @@ export default function CanvasEditor({
           handleRedo();
         } else {
           handleUndo();
+        }
+      }
+      // Atalho T para texto
+      if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          setActiveTool('text');
         }
       }
     };
@@ -729,7 +746,7 @@ export default function CanvasEditor({
     <div
       ref={containerRef}
       className="flex h-full w-full flex-col bg-gray-100"
-      style={{ cursor: activeTool === 'select' ? 'default' : 'crosshair' }}
+      style={{ cursor: activeTool === 'select' ? 'default' : activeTool === 'text' ? 'text' : 'crosshair' }}
     >
       {/* Toolbar fixa no topo */}
       <EditorToolbar
