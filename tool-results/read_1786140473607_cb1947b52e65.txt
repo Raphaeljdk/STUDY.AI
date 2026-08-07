@@ -1,0 +1,1233 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { formatDistanceToNow, parseISO } from 'date-fns';
+     6→import { ptBR } from 'date-fns/locale';
+     7→import {
+     8→  BookOpen,
+     9→  Code,
+    10→  FlaskConical,
+    11→  Calculator,
+    12→  Globe,
+    13→  Music,
+    14→  Palette,
+    15→  Microscope,
+    16→  Scale,
+    17→  Landmark,
+    18→  GraduationCap,
+    19→  Beaker,
+    20→  Plus,
+    21→  ArrowLeft,
+    22→  Pencil,
+    23→  Trash2,
+    24→  X,
+    25→  Loader2,
+    26→  Layers,
+    27→  ClipboardList,
+    28→  Clock,
+    29→  Timer,
+    30→  Target,
+    31→  Check,
+    32→} from 'lucide-react';
+    33→import type { LucideIcon } from 'lucide-react';
+    34→import { Button } from '@/components/ui/button';
+    35→import { Input } from '@/components/ui/input';
+    36→import { Label } from '@/components/ui/label';
+    37→import { Badge } from '@/components/ui/badge';
+    38→import { Skeleton } from '@/components/ui/skeleton';
+    39→import {
+    40→  Dialog,
+    41→  DialogContent,
+    42→  DialogHeader,
+    43→  DialogTitle,
+    44→  DialogDescription,
+    45→  DialogFooter,
+    46→} from '@/components/ui/dialog';
+    47→import {
+    48→  AlertDialog,
+    49→  AlertDialogAction,
+    50→  AlertDialogCancel,
+    51→  AlertDialogContent,
+    52→  AlertDialogDescription,
+    53→  AlertDialogFooter,
+    54→  AlertDialogHeader,
+    55→  AlertDialogTitle,
+    56→} from '@/components/ui/alert-dialog';
+    57→import { Textarea } from '@/components/ui/textarea';
+    58→import { toast } from '@/hooks/use-toast';
+    59→
+    60→// ===== TYPES =====
+    61→interface SubjectsViewProps {
+    62→  onNavigate: (tab: string, data?: any) => void;
+    63→}
+    64→
+    65→interface Topic {
+    66→  id: string;
+    67→  name: string;
+    68→  description?: string | null;
+    69→ mastery: number;
+    70→  totalQuestions: number;
+    71→  correctAnswers: number;
+    72→  sortOrder: number;
+    73→  createdAt: string;
+    74→  updatedAt: string;
+    75→}
+    76→
+    77→interface Task {
+    78→  id: string;
+    79→  title: string;
+    80→  status: string;
+    81→  priority: string;
+    82→  dueDate?: string | null;
+    83→}
+    84→
+    85→interface SubjectList {
+    86→  id: string;
+    87→  name: string;
+    88→  description?: string | null;
+    89→  color: string;
+    90→  icon: string;
+    91→  sortOrder: number;
+    92→  isActive: boolean;
+    93→  createdAt: string;
+    94→  updatedAt: string;
+    95→  _count: {
+    96→    topics: number;
+    97→    tasks: number;
+    98→  };
+    99→}
+   100→
+   101→interface SubjectDetail extends Omit<SubjectList, '_count'> {
+   102→  _count: {
+   103→    topics: number;
+   104→    tasks: number;
+   105→    goals: number;
+   106→    sessions: number;
+   107→  };
+   108→  topics: Topic[];
+   109→}
+   110→
+   111→interface SubjectWithMastery extends SubjectList {
+   112→ mastery: number;
+   113→  lastStudied?: string | null;
+   114→  pendingTasks: number;
+   115→}
+   116→
+   117→// ===== CONSTANTS =====
+   118→const COLOR_PRESETS = [
+   119→  { name: 'Vermelho', value: '#ef4444' },
+   120→  { name: 'Laranja', value: '#f97316' },
+   121→  { name: 'Amarelo', value: '#f59e0b' },
+   122→  { name: 'Verde', value: '#22c55e' },
+   123→  { name: 'Teal', value: '#14b8a6' },
+   124→  { name: 'Rosa', value: '#f43f5e' },
+   125→  { name: 'Violeta', value: '#8b5cf6' },
+   126→  { name: 'Pedra', value: '#78716c' },
+   127→];
+   128→
+   129→const ICON_OPTIONS: { name: string; value: string; icon: LucideIcon }[] = [
+   130→  { name: 'Livro', value: 'book', icon: BookOpen },
+   131→  { name: 'Codigo', value: 'code', icon: Code },
+   132→  { name: 'Flask', value: 'flask', icon: FlaskConical },
+   133→  { name: 'Calculadora', value: 'calculator', icon: Calculator },
+   134→  { name: 'Globo', value: 'globe', icon: Globe },
+   135→  { name: 'Musica', value: 'music', icon: Music },
+   136→  { name: 'Paleta', value: 'palette', icon: Palette },
+   137→  { name: 'Microscopio', value: 'microscope', icon: Microscope },
+   138→  { name: 'Balanca', value: 'scale', icon: Scale },
+   139→  { name: 'Monumento', value: 'landmark', icon: Landmark },
+   140→  { name: 'Formatura', value: 'graduation', icon: GraduationCap },
+   141→  { name: 'Beker', value: 'beaker', icon: Beaker },
+   142→];
+   143→
+   144→const ICON_MAP: Record<string, LucideIcon> = {
+   145→  book: BookOpen,
+   146→  code: Code,
+   147→  flask: FlaskConical,
+   148→  calculator: Calculator,
+   149→  globe: Globe,
+   150→  music: Music,
+   151→  palette: Palette,
+   152→  microscope: Microscope,
+   153→  scale: Scale,
+   154→  landmark: Landmark,
+   155→  graduation: GraduationCap,
+   156→  beaker: Beaker,
+   157→};
+   158→
+   159→// ===== ANIMATION VARIANTS =====
+   160→const containerVariants = {
+   161→  hidden: { opacity: 0 },
+   162→  visible: {
+   163→    opacity: 1,
+   164→    transition: { staggerChildren: 0.06 },
+   165→  },
+   166→};
+   167→
+   168→const itemVariants = {
+   169→  hidden: { opacity: 0, y: 16 },
+   170→  visible: {
+   171→    opacity: 1,
+   172→    y: 0,
+   173→    transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+   174→  },
+   175→};
+   176→
+   177→const slideInVariants = {
+   178→  hidden: { opacity: 0, x: -20 },
+   179→  visible: {
+   180→    opacity: 1,
+   181→    x: 0,
+   182→    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+   183→  },
+   184→  exit: {
+   185→    opacity: 0,
+   186→    x: 20,
+   187→    transition: { duration: 0.2 },
+   188→  },
+   189→};
+   190→
+   191→// ===== HELPERS =====
+   192→function getSubjectIcon(iconName: string): LucideIcon {
+   193→  return ICON_MAP[iconName] || BookOpen;
+   194→}
+   195→
+   196→function getMasteryColor(mastery: number): string {
+   197→  if (mastery >= 80) return '#22c55e';
+   198→  if (mastery >= 60) return '#84cc16';
+   199→  if (mastery >= 40) return '#f59e0b';
+   200→  if (mastery >= 20) return '#f97316';
+   201→  return '#ef4444';
+   202→}
+   203→
+   204→function getMasteryLabel(mastery: number): string {
+   205→  if (mastery >= 90) return 'Dominio total';
+   206→  if (mastery >= 70) return 'Avancado';
+   207→  if (mastery >= 50) return 'Intermediario';
+   208→  if (mastery >= 25) return 'Iniciante';
+   209→  return 'Nao iniciado';
+   210→}
+   211→
+   212→function formatRelativeDate(dateStr: string | null | undefined): string {
+   213→  if (!dateStr) return '—';
+   214→  try {
+   215→    return formatDistanceToNow(parseISO(dateStr), {
+   216→      addSuffix: true,
+   217→      locale: ptBR,
+   218→    });
+   219→  } catch {
+   220→    return '—';
+   221→  }
+   222→}
+   223→
+   224→// ===== COMPONENTS =====
+   225→
+   226→// Skeleton card for loading state
+   227→function SubjectCardSkeleton() {
+   228→  return (
+   229→    <div className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
+   230→      style={{ borderRadius: 'var(--ws-radius-card)' }}
+   231→    >
+   232→      <div className="flex items-start gap-3">
+   233→        <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
+   234→        <div className="flex-1 space-y-2">
+   235→          <Skeleton className="h-5 w-3/4" />
+   236→          <Skeleton className="h-3 w-1/2" />
+   237→        </div>
+   238→      </div>
+   239→      <div className="mt-4 space-y-3">
+   240→        <Skeleton className="h-3 w-full" />
+   241→        <Skeleton className="h-2 w-full" />
+   242→        <div className="flex gap-4">
+   243→          <Skeleton className="h-4 w-16" />
+   244→          <Skeleton className="h-4 w-16" />
+   245→          <Skeleton className="h-4 w-20" />
+   246→        </div>
+   247→      </div>
+   248→    </div>
+   249→  );
+   250→}
+   251→
+   252→// Main export
+   253→export function SubjectsView({ onNavigate }: SubjectsViewProps) {
+   254→  // ===== STATE =====
+   255→  const [subjects, setSubjects] = useState<SubjectWithMastery[]>([]);
+   256→  const [loading, setLoading] = useState(true);
+   257→  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+   258→  const [subjectDetail, setSubjectDetail] = useState<SubjectDetail | null>(null);
+   259→  const [detailLoading, setDetailLoading] = useState(false);
+   260→  const [detailTopics, setDetailTopics] = useState<Topic[]>([]);
+   261→
+   262→  // Add/Edit dialog state
+   263→  const [showAddDialog, setShowAddDialog] = useState(false);
+   264→  const [showEditDialog, setShowEditDialog] = useState(false);
+   265→  const [formSubmitting, setFormSubmitting] = useState(false);
+   266→  const [formName, setFormName] = useState('');
+   267→  const [formDescription, setFormDescription] = useState('');
+   268→  const [formColor, setFormColor] = useState('#f59e0b');
+   269→  const [formIcon, setFormIcon] = useState('book');
+   270→
+   271→  // Delete confirmation
+   272→  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+   273→  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+   274→  const [deleting, setDeleting] = useState(false);
+   275→
+   276→  // Add topic form
+   277→  const [showAddTopic, setShowAddTopic] = useState(false);
+   278→  const [topicName, setTopicName] = useState('');
+   279→  const [topicDescription, setTopicDescription] = useState('');
+   280→  const [topicSubmitting, setTopicSubmitting] = useState(false);
+   281→
+   282→  // ===== FETCH SUBJECTS =====
+   283→  const fetchSubjects = useCallback(async () => {
+   284→    try {
+   285→      setLoading(true);
+   286→      const res = await fetch('/api/subjects');
+   287→      if (!res.ok) throw new Error('Erro ao carregar materias');
+   288→      const data = await res.json();
+   289→
+   290→      // Enrich subjects with mastery and pending task data
+   291→      const enriched: SubjectWithMastery[] = await Promise.all(
+   292→        (data.subjects || []).map(async (s: SubjectList) => {
+   293→          try {
+   294→            const detailRes = await fetch(`/api/subjects/${s.id}`);
+   295→            if (!detailRes.ok) {
+   296→              return {
+   297→                ...s,
+   298→                mastery: 0,
+   299→                lastStudied: null,
+   300→                pendingTasks: 0,
+   301→              };
+   302→            }
+   303→            const detailData = await detailRes.json();
+   304→            const detail: SubjectDetail = detailData.subject;
+   305→            const topics = detail.topics || [];
+   306→            const avgMastery =
+   307→              topics.length > 0
+   308→                ? Math.round(topics.reduce((sum: number, t: Topic) => sum + t.mastery, 0) / topics.length)
+   309→                : 0;
+   310→
+   311→            // Get pending tasks count - we need to fetch tasks separately
+   312→            let pendingTasks = 0;
+   313→            let lastStudied: string | null = null;
+   314→
+   315→            // Use sessions count as a proxy - if sessions exist, it was studied
+   316→            if (detail._count?.sessions > 0) {
+   317→              lastStudied = detail.updatedAt || detail.createdAt;
+   318→            }
+   319→
+   320→            return {
+   321→              ...s,
+   322→              mastery: avgMastery,
+   323→              lastStudied,
+   324→              pendingTasks,
+   325→            };
+   326→          } catch {
+   327→            return {
+   328→              ...s,
+   329→              mastery: 0,
+   330→              lastStudied: null,
+   331→              pendingTasks: 0,
+   332→            };
+   333→          }
+   334→        })
+   335→      );
+   336→
+   337→      setSubjects(enriched);
+   338→    } catch (err: any) {
+   339→      toast({
+   340→        title: 'Erro ao carregar',
+   341→        description: err.message || 'Nao foi possivel carregar suas materias.',
+   342→        variant: 'destructive',
+   343→      });
+   344→    } finally {
+   345→      setLoading(false);
+   346→    }
+   347→  }, []);
+   348→
+   349→  useEffect(() => {
+   350→    fetchSubjects();
+   351→  }, [fetchSubjects]);
+   352→
+   353→  // ===== FETCH SUBJECT DETAIL =====
+   354→  const fetchSubjectDetail = useCallback(async (subjectId: string) => {
+   355→    try {
+   356→      setDetailLoading(true);
+   357→      const res = await fetch(`/api/subjects/${subjectId}`);
+   358→      if (!res.ok) throw new Error('Materia nao encontrada');
+   359→      const data = await res.json();
+   360→      setSubjectDetail(data.subject);
+   361→      setDetailTopics(data.subject.topics || []);
+   362→    } catch (err: any) {
+   363→      toast({
+   364→        title: 'Erro',
+   365→        description: err.message || 'Nao foi possivel carregar os detalhes.',
+   366→        variant: 'destructive',
+   367→      });
+   368→    } finally {
+   369→      setDetailLoading(false);
+   370→    }
+   371→  }, []);
+   372→
+   373→  useEffect(() => {
+   374→    if (selectedSubjectId) {
+   375→      fetchSubjectDetail(selectedSubjectId);
+   376→      setShowAddTopic(false);
+   377→      setTopicName('');
+   378→      setTopicDescription('');
+   379→    } else {
+   380→      setSubjectDetail(null);
+   381→      setDetailTopics([]);
+   382→    }
+   383→  }, [selectedSubjectId, fetchSubjectDetail]);
+   384→
+   385→  // ===== HANDLERS =====
+   386→
+   387→  // Open add dialog
+   388→  const openAddDialog = () => {
+   389→    setFormName('');
+   390→    setFormDescription('');
+   391→    setFormColor('#f59e0b');
+   392→    setFormIcon('book');
+   393→    setShowAddDialog(true);
+   394→  };
+   395→
+   396→  // Open edit dialog
+   397→  const openEditDialog = () => {
+   398→    if (!subjectDetail) return;
+   399→    setFormName(subjectDetail.name);
+   400→    setFormDescription(subjectDetail.description || '');
+   401→    setFormColor(subjectDetail.color);
+   402→    setFormIcon(subjectDetail.icon);
+   403→    setShowEditDialog(true);
+   404→  };
+   405→
+   406→  // Submit add
+   407→  const handleAddSubject = async () => {
+   408→    if (!formName.trim()) {
+   409→      toast({ title: 'Campo obrigatorio', description: 'Informe o nome da materia.', variant: 'destructive' });
+   410→      return;
+   411→    }
+   412→    try {
+   413→      setFormSubmitting(true);
+   414→      const res = await fetch('/api/subjects', {
+   415→        method: 'POST',
+   416→        headers: { 'Content-Type': 'application/json' },
+   417→        body: JSON.stringify({
+   418→          name: formName.trim(),
+   419→          description: formDescription.trim() || null,
+   420→          color: formColor,
+   421→          icon: formIcon,
+   422→        }),
+   423→      });
+   424→      if (!res.ok) {
+   425→        const err = await res.json();
+   426→        throw new Error(err.error || 'Erro ao criar materia');
+   427→      }
+   428→      toast({ title: 'Materia criada!', description: `${formName.trim()} foi adicionada com sucesso.` });
+   429→      setShowAddDialog(false);
+   430→      fetchSubjects();
+   431→    } catch (err: any) {
+   432→      toast({ title: 'Erro ao criar', description: err.message, variant: 'destructive' });
+   433→    } finally {
+   434→      setFormSubmitting(false);
+   435→    }
+   436→  };
+   437→
+   438→  // Submit edit
+   439→  const handleEditSubject = async () => {
+   440→    if (!subjectDetail || !formName.trim()) {
+   441→      toast({ title: 'Campo obrigatorio', description: 'Informe o nome da materia.', variant: 'destructive' });
+   442→      return;
+   443→    }
+   444→    try {
+   445→      setFormSubmitting(true);
+   446→      const res = await fetch(`/api/subjects/${subjectDetail.id}`, {
+   447→        method: 'PATCH',
+   448→        headers: { 'Content-Type': 'application/json' },
+   449→        body: JSON.stringify({
+   450→          name: formName.trim(),
+   451→          description: formDescription.trim() || null,
+   452→          color: formColor,
+   453→          icon: formIcon,
+   454→        }),
+   455→      });
+   456→      if (!res.ok) {
+   457→        const err = await res.json();
+   458→        throw new Error(err.error || 'Erro ao atualizar materia');
+   459→      }
+   460→      toast({ title: 'Materia atualizada!', description: `${formName.trim()} foi salva com sucesso.` });
+   461→      setShowEditDialog(false);
+   462→      fetchSubjectDetail(subjectDetail.id);
+   463→      fetchSubjects();
+   464→    } catch (err: any) {
+   465→      toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' });
+   466→    } finally {
+   467→      setFormSubmitting(false);
+   468→    }
+   469→  };
+   470→
+   471→  // Delete
+   472→  const handleDelete = async () => {
+   473→    if (!deleteTarget) return;
+   474→    try {
+   475→      setDeleting(true);
+   476→      const res = await fetch(`/api/subjects/${deleteTarget}`, { method: 'DELETE' });
+   477→      if (!res.ok) {
+   478→        const err = await res.json();
+   479→        throw new Error(err.error || 'Erro ao excluir materia');
+   480→      }
+   481→      toast({ title: 'Materia excluida', description: 'A materia foi removida com sucesso.' });
+   482→      setShowDeleteDialog(false);
+   483→      setDeleteTarget(null);
+   484→      if (selectedSubjectId === deleteTarget) {
+   485→        setSelectedSubjectId(null);
+   486→      }
+   487→      fetchSubjects();
+   488→    } catch (err: any) {
+   489→      toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' });
+   490→    } finally {
+   491→      setDeleting(false);
+   492→    }
+   493→  };
+   494→
+   495→  // Add topic
+   496→  const handleAddTopic = async () => {
+   497→    if (!selectedSubjectId || !topicName.trim()) {
+   498→      toast({ title: 'Campo obrigatorio', description: 'Informe o nome do topico.', variant: 'destructive' });
+   499→      return;
+   500→    }
+   501→    try {
+   502→      setTopicSubmitting(true);
+   503→      const res = await fetch(`/api/subjects/${selectedSubjectId}/topics`, {
+   504→        method: 'POST',
+   505→        headers: { 'Content-Type': 'application/json' },
+   506→        body: JSON.stringify({
+   507→          name: topicName.trim(),
+   508→          description: topicDescription.trim() || null,
+   509→        }),
+   510→      });
+   511→      if (!res.ok) {
+   512→        const err = await res.json();
+   513→        throw new Error(err.error || 'Erro ao criar topico');
+   514→      }
+   515→      toast({ title: 'Topico adicionado!', description: `${topicName.trim()} foi criado com sucesso.` });
+   516→      setTopicName('');
+   517→      setTopicDescription('');
+   518→      setShowAddTopic(false);
+   519→      fetchSubjectDetail(selectedSubjectId);
+   520→      fetchSubjects();
+   521→    } catch (err: any) {
+   522→      toast({ title: 'Erro ao criar topico', description: err.message, variant: 'destructive' });
+   523→    } finally {
+   524→      setTopicSubmitting(false);
+   525→    }
+   526→  };
+   527→
+   528→  // ===== RENDER: SUBJECT FORM DIALOG =====
+   529→  const renderFormDialog = (
+   530→    open: boolean,
+   531→    onOpenChange: (v: boolean) => void,
+   532→    title: string,
+   533→    description: string,
+   534→    onSubmit: () => void,
+   535→    submitting: boolean,
+   536→  ) => (
+   537→    <Dialog open={open} onOpenChange={onOpenChange}>
+   538→      <DialogContent className="sm:max-w-[480px] border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl"
+   539→        style={{ borderRadius: 'var(--ws-radius-card)' }}
+   540→      >
+   541→        <DialogHeader>
+   542→          <DialogTitle className="text-[var(--ws-text-primary)]">{title}</DialogTitle>
+   543→          <DialogDescription className="text-[var(--ws-text-tertiary)]">{description}</DialogDescription>
+   544→        </DialogHeader>
+   545→
+   546→        <div className="space-y-4 py-2">
+   547→          {/* Name */}
+   548→          <div className="space-y-2">
+   549→            <Label htmlFor="subject-name" className="text-[var(--ws-text-secondary)]">Nome da materia *</Label>
+   550→            <Input
+   551→              id="subject-name"
+   552→              value={formName}
+   553→              onChange={(e) => setFormName(e.target.value)}
+   554→              placeholder="Ex: Matematica, Portugues, Fisica..."
+   555→              className="border-[var(--ws-glass-border)] bg-[var(--ws-bg)] text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)]"
+   556→              onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+   557→            />
+   558→          </div>
+   559→
+   560→          {/* Description */}
+   561→          <div className="space-y-2">
+   562→            <Label htmlFor="subject-desc" className="text-[var(--ws-text-secondary)]">Descricao</Label>
+   563→            <Textarea
+   564→              id="subject-desc"
+   565→              value={formDescription}
+   566→              onChange={(e) => setFormDescription(e.target.value)}
+   567→              placeholder="Opcional: uma breve descricao da materia..."
+   568→              rows={2}
+   569→              className="border-[var(--ws-glass-border)] bg-[var(--ws-bg)] text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] resize-none"
+   570→            />
+   571→          </div>
+   572→
+   573→          {/* Color picker */}
+   574→          <div className="space-y-2">
+   575→            <Label className="text-[var(--ws-text-secondary)]">Cor</Label>
+   576→            <div className="flex flex-wrap gap-2">
+   577→              {COLOR_PRESETS.map((c) => (
+   578→                <button
+   579→                  key={c.value}
+   580→                  type="button"
+   581→                  onClick={() => setFormColor(c.value)}
+   582→                  className="relative h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--ws-bg)]"
+   583→                  style={{
+   584→                    backgroundColor: c.value,
+   585→                    focusRingColor: c.value,
+   586→                    boxShadow: formColor === c.value ? `0 0 0 3px var(--ws-bg), 0 0 0 5px ${c.value}` : 'none',
+   587→                  }}
+   588→                  title={c.name}
+   589→                  aria-label={`Cor ${c.name}`}
+   590→                />
+   591→              ))}
+   592→            </div>
+   593→          </div>
+   594→
+   595→          {/* Icon picker */}
+   596→          <div className="space-y-2">
+   597→            <Label className="text-[var(--ws-text-secondary)]">Icone</Label>
+   598→            <div className="grid grid-cols-6 gap-2 sm:grid-cols-4">
+   599→              {ICON_OPTIONS.map((opt) => {
+   600→                const Icon = opt.icon;
+   601→                const isSelected = formIcon === opt.value;
+   602→                return (
+   603→                  <button
+   604→                    key={opt.value}
+   605→                    type="button"
+   606→                    onClick={() => setFormIcon(opt.value)}
+   607→                    className={`flex flex-col items-center justify-center gap-1 rounded-lg border p-2.5 transition-all duration-200 hover:scale-105 focus:outline-none ${
+   608→                      isSelected
+   609→                        ? 'border-[var(--ws-accent)] bg-[var(--ws-accent)]/10'
+   610→                        : 'border-[var(--ws-glass-border)] bg-transparent hover:bg-[var(--ws-glass)]'
+   611→                    }`}
+   612→                    title={opt.name}
+   613→                    aria-label={`Icone ${opt.name}`}
+   614→                  >
+   615→                    <Icon
+   616→                      size={20}
+   617→                      className={isSelected ? 'text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)]'}
+   618→                    />
+   619→                    <span className="text-[10px] text-[var(--ws-text-tertiary)]">{opt.name}</span>
+   620→                  </button>
+   621→                );
+   622→              })}
+   623→            </div>
+   624→          </div>
+   625→        </div>
+   626→
+   627→        <DialogFooter className="gap-2 sm:gap-0">
+   628→          <Button
+   629→            variant="ghost"
+   630→            onClick={() => onOpenChange(false)}
+   631→            disabled={submitting}
+   632→            className="text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]"
+   633→          >
+   634→            Cancelar
+   635→          </Button>
+   636→          <Button
+   637→            onClick={onSubmit}
+   638→            disabled={submitting || !formName.trim()}
+   639→            className="bg-[var(--ws-accent)] text-white hover:bg-[var(--ws-accent)]/90"
+   640→          >
+   641→            {submitting && <Loader2 size={14} className="mr-2 animate-spin" />}
+   642→            {title.includes('Nova') ? 'Criar materia' : 'Salvar alteracoes'}
+   643→          </Button>
+   644→        </DialogFooter>
+   645→      </DialogContent>
+   646→    </Dialog>
+   647→  );
+   648→
+   649→  // ===== RENDER: DELETE DIALOG =====
+   650→  const renderDeleteDialog = () => (
+   651→    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+   652→      <AlertDialogContent className="border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl"
+   653→        style={{ borderRadius: 'var(--ws-radius-card)' }}
+   654→      >
+   655→        <AlertDialogHeader>
+   656→          <AlertDialogTitle className="text-[var(--ws-text-primary)]">Excluir materia?</AlertDialogTitle>
+   657→          <AlertDialogDescription className="text-[var(--ws-text-tertiary)]">
+   658→            Esta acao nao pode ser desfeita. Todos os topicos, tarefas e sessoes associados a esta materia serao permanentemente removidos.
+   659→          </AlertDialogDescription>
+   660→        </AlertDialogHeader>
+   661→        <AlertDialogFooter>
+   662→          <AlertDialogCancel
+   663→            disabled={deleting}
+   664→            className="border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:bg-[var(--ws-glass)]"
+   665→          >
+   666→            Cancelar
+   667→          </AlertDialogCancel>
+   668→          <AlertDialogAction
+   669→            onClick={handleDelete}
+   670→            disabled={deleting}
+   671→            className="bg-red-500 text-white hover:bg-red-600"
+   672→          >
+   673→            {deleting && <Loader2 size={14} className="mr-2 animate-spin" />}
+   674→            Excluir
+   675→          </AlertDialogAction>
+   676→        </AlertDialogFooter>
+   677→      </AlertDialogContent>
+   678→    </AlertDialog>
+   679→  );
+   680→
+   681→  // ===== RENDER: SUBJECT CARD (LIST VIEW) =====
+   682→  const renderSubjectCard = (subject: SubjectWithMastery, index: number) => {
+   683→    const Icon = getSubjectIcon(subject.icon);
+   684→    const masteryColor = getMasteryColor(subject.mastery);
+   685→    const masteryLabel = getMasteryLabel(subject.mastery);
+   686→
+   687→    return (
+   688→      <motion.div
+   689→        key={subject.id}
+   690→        variants={itemVariants}
+   691→        whileHover={{
+   692→          y: -4,
+   693→          boxShadow: '0 16px 48px rgba(0,0,0,0.1)',
+   694→          transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+   695→        }}
+   696→        whileTap={{ scale: 0.985 }}
+   697→        onClick={() => setSelectedSubjectId(subject.id)}
+   698→        className="group cursor-pointer border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl transition-colors hover:border-[var(--ws-accent)]/30"
+   699→        style={{ borderRadius: 'var(--ws-radius-card)' }}
+   700→        role="button"
+   701→        tabIndex={0}
+   702→        aria-label={`Abrir materia ${subject.name}`}
+   703→        onKeyDown={(e) => e.key === 'Enter' && setSelectedSubjectId(subject.id)}
+   704→      >
+   705→        {/* Color bar at top */}
+   706→        <div
+   707→          className="h-1.5 w-full"
+   708→          style={{
+   709→            background: `linear-gradient(90deg, ${subject.color}, ${subject.color}88)`,
+   710→            borderRadius: 'var(--ws-radius-card) var(--ws-radius-card) 0 0',
+   711→          }}
+   712→        />
+   713→
+   714→        <div className="p-5">
+   715→          {/* Header: icon + name */}
+   716→          <div className="flex items-start gap-3">
+   717→            <div
+   718→              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110"
+   719→              style={{ backgroundColor: `${subject.color}18` }}
+   720→            >
+   721→              <Icon size={20} style={{ color: subject.color }} />
+   722→            </div>
+   723→            <div className="min-w-0 flex-1">
+   724→              <h3 className="truncate text-sm font-semibold text-[var(--ws-text-primary)]">
+   725→                {subject.name}
+   726→              </h3>
+   727→              {subject.description && (
+   728→                <p className="mt-0.5 truncate text-xs text-[var(--ws-text-tertiary)]">
+   729→                  {subject.description}
+   730→                </p>
+   731→              )}
+   732→            </div>
+   733→          </div>
+   734→
+   735→          {/* Stats row */}
+   736→          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+   737→            <div className="flex items-center gap-1.5 text-xs text-[var(--ws-text-tertiary)]">
+   738→              <Layers size={13} className="shrink-0" />
+   739→              <span>{subject._count.topics} {subject._count.topics === 1 ? 'topico' : 'topicos'}</span>
+   740→            </div>
+   741→            <div className="flex items-center gap-1.5 text-xs text-[var(--ws-text-tertiary)]">
+   742→              <ClipboardList size={13} className="shrink-0" />
+   743→              <span>{subject._count.tasks} {subject._count.tasks === 1 ? 'tarefa' : 'tarefas'}</span>
+   744→            </div>
+   745→          </div>
+   746→
+   747→          {/* Mastery bar */}
+   748→          <div className="mt-3.5">
+   749→            <div className="mb-1.5 flex items-center justify-between">
+   750→              <span className="text-xs font-medium text-[var(--ws-text-tertiary)]">Dominio</span>
+   751→              <span className="text-xs font-semibold" style={{ color: masteryColor }}>
+   752→                {subject._count.topics === 0 ? '—' : `${subject.mastery}%`}
+   753→              </span>
+   754→            </div>
+   755→            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ws-glass-border)]">
+   756→              <motion.div
+   757→                className="h-full rounded-full"
+   758→                style={{ backgroundColor: masteryColor }}
+   759→                initial={{ width: 0 }}
+   760→                animate={{ width: subject._count.topics === 0 ? '0%' : `${subject.mastery}%` }}
+   761→                transition={{ duration: 0.8, delay: index * 0.08, ease: [0.4, 0, 0.2, 1] }}
+   762→              />
+   763→            </div>
+   764→            {subject._count.topics > 0 && (
+   765→              <p className="mt-1 text-[10px] text-[var(--ws-text-tertiary)]">{masteryLabel}</p>
+   766→            )}
+   767→          </div>
+   768→
+   769→          {/* Last studied */}
+   770→          {subject.lastStudied && (
+   771→            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--ws-text-tertiary)]">
+   772→              <Clock size={11} />
+   773→              <span>Estudado {formatRelativeDate(subject.lastStudied)}</span>
+   774→            </div>
+   775→          )}
+   776→        </div>
+   777→      </motion.div>
+   778→    );
+   779→  };
+   780→
+   781→  // ===== RENDER: SUBJECT DETAIL VIEW =====
+   782→  const renderDetailView = () => {
+   783→    if (detailLoading) {
+   784→      return (
+   785→        <div className="space-y-6">
+   786→          <div className="flex items-center gap-3">
+   787→            <Skeleton className="h-8 w-8 rounded-lg" />
+   788→            <Skeleton className="h-6 w-48" />
+   789→          </div>
+   790→          <Skeleton className="h-32 w-full" />
+   791→          <Skeleton className="h-48 w-full" />
+   792→          <Skeleton className="h-32 w-full" />
+   793→        </div>
+   794→      );
+   795→    }
+   796→
+   797→    if (!subjectDetail) return null;
+   798→
+   799→    const Icon = getSubjectIcon(subjectDetail.icon);
+   800→    const totalMastery =
+   801→      detailTopics.length > 0
+   802→        ? Math.round(detailTopics.reduce((s, t) => s + t.mastery, 0) / detailTopics.length)
+   803→        : 0;
+   804→
+   805→    return (
+   806→      <motion.div
+   807→        key="detail"
+   808→        initial="hidden"
+   809→        animate="visible"
+   810→        exit="exit"
+   811→        variants={slideInVariants}
+   812→        className="space-y-6"
+   813→      >
+   814→        {/* Back button + Header */}
+   815→        <div>
+   816→          <button
+   817→            onClick={() => setSelectedSubjectId(null)}
+   818→            className="mb-4 flex items-center gap-1.5 text-sm text-[var(--ws-text-tertiary)] transition-colors hover:text-[var(--ws-accent)]"
+   819→          >
+   820→            <ArrowLeft size={16} />
+   821→            <span>Voltar as materias</span>
+   822→          </button>
+   823→
+   824→          <div className="flex items-start justify-between gap-4">
+   825→            <div className="flex items-start gap-3">
+   826→              <div
+   827→                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+   828→                style={{ backgroundColor: `${subjectDetail.color}18` }}
+   829→              >
+   830→                <Icon size={24} style={{ color: subjectDetail.color }} />
+   831→              </div>
+   832→              <div>
+   833→                <h2 className="text-xl font-bold text-[var(--ws-text-primary)]">{subjectDetail.name}</h2>
+   834→                {subjectDetail.description && (
+   835→                  <p className="mt-0.5 text-sm text-[var(--ws-text-tertiary)]">{subjectDetail.description}</p>
+   836→                )}
+   837→              </div>
+   838→            </div>
+   839→
+   840→            <div className="flex items-center gap-2 shrink-0">
+   841→              <Button
+   842→                variant="ghost"
+   843→                size="icon"
+   844→                onClick={openEditDialog}
+   845→                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+   846→                aria-label="Editar materia"
+   847→              >
+   848→                <Pencil size={16} />
+   849→              </Button>
+   850→              <Button
+   851→                variant="ghost"
+   852→                size="icon"
+   853→                onClick={() => {
+   854→                  setDeleteTarget(subjectDetail.id);
+   855→                  setShowDeleteDialog(true);
+   856→                }}
+   857→                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
+   858→                aria-label="Excluir materia"
+   859→              >
+   860→                <Trash2 size={16} />
+   861→              </Button>
+   862→            </div>
+   863→          </div>
+   864→        </div>
+   865→
+   866→        {/* Stats cards row */}
+   867→        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   868→          <motion.div
+   869→            initial={{ opacity: 0, y: 12 }}
+   870→            animate={{ opacity: 1, y: 0 }}
+   871→            transition={{ delay: 0.1 }}
+   872→            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+   873→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+   874→          >
+   875→            <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
+   876→              <Layers size={14} />
+   877→              <span>Topicos</span>
+   878→            </div>
+   879→            <p className="mt-1.5 text-2xl font-bold text-[var(--ws-text-primary)]">{subjectDetail._count.topics}</p>
+   880→          </motion.div>
+   881→
+   882→          <motion.div
+   883→            initial={{ opacity: 0, y: 12 }}
+   884→            animate={{ opacity: 1, y: 0 }}
+   885→            transition={{ delay: 0.15 }}
+   886→            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+   887→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+   888→          >
+   889→            <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
+   890→              <Target size={14} />
+   891→              <span>Dominio medio</span>
+   892→            </div>
+   893→            <p className="mt-1.5 text-2xl font-bold" style={{ color: getMasteryColor(totalMastery) }}>
+   894→              {detailTopics.length === 0 ? '—' : `${totalMastery}%`}
+   895→            </p>
+   896→          </motion.div>
+   897→
+   898→          <motion.div
+   899→            initial={{ opacity: 0, y: 12 }}
+   900→            animate={{ opacity: 1, y: 0 }}
+   901→            transition={{ delay: 0.2 }}
+   902→            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+   903→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+   904→          >
+   905→            <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
+   906→              <Timer size={14} />
+   907→              <span>Sessoes</span>
+   908→            </div>
+   909→            <p className="mt-1.5 text-2xl font-bold text-[var(--ws-text-primary)]">{subjectDetail._count.sessions}</p>
+   910→          </motion.div>
+   911→
+   912→          <motion.div
+   913→            initial={{ opacity: 0, y: 12 }}
+   914→            animate={{ opacity: 1, y: 0 }}
+   915→            transition={{ delay: 0.25 }}
+   916→            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+   917→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+   918→          >
+   919→            <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
+   920→              <ClipboardList size={14} />
+   921→              <span>Tarefas</span>
+   922→            </div>
+   923→            <p className="mt-1.5 text-2xl font-bold text-[var(--ws-text-primary)]">{subjectDetail._count.tasks}</p>
+   924→          </motion.div>
+   925→        </div>
+   926→
+   927→        {/* Topics section */}
+   928→        <div className="space-y-3">
+   929→          <div className="flex items-center justify-between">
+   930→            <h3 className="text-sm font-semibold text-[var(--ws-text-primary)]">Topicos</h3>
+   931→            <Button
+   932→              variant="ghost"
+   933→              size="sm"
+   934→              onClick={() => setShowAddTopic(!showAddTopic)}
+   935→              className="h-7 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 hover:text-[var(--ws-accent)]"
+   936→            >
+   937→              {showAddTopic ? <X size={14} /> : <Plus size={14} />}
+   938→              {showAddTopic ? 'Cancelar' : 'Adicionar topico'}
+   939→            </Button>
+   940→          </div>
+   941→
+   942→          {/* Add topic form */}
+   943→          <AnimatePresence>
+   944→            {showAddTopic && (
+   945→              <motion.div
+   946→                initial={{ opacity: 0, height: 0 }}
+   947→                animate={{ opacity: 1, height: 'auto' }}
+   948→                exit={{ opacity: 0, height: 0 }}
+   949→                transition={{ duration: 0.25 }}
+   950→                className="overflow-hidden"
+   951→              >
+   952→                <div className="space-y-3 rounded-lg border border-dashed border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4"
+   953→                  style={{ borderRadius: 'var(--ws-radius-card)' }}
+   954→                >
+   955→                  <div className="space-y-1.5">
+   956→                    <Label htmlFor="topic-name" className="text-xs text-[var(--ws-text-secondary)]">Nome do topico *</Label>
+   957→                    <Input
+   958→                      id="topic-name"
+   959→                      value={topicName}
+   960→                      onChange={(e) => setTopicName(e.target.value)}
+   961→                      placeholder="Ex: Equacoes do 2o grau"
+   962→                      className="h-9 border-[var(--ws-glass-border)] bg-[var(--ws-bg)] text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)]"
+   963→                      onKeyDown={(e) => e.key === 'Enter' && handleAddTopic()}
+   964→                    />
+   965→                  </div>
+   966→                  <div className="space-y-1.5">
+   967→                    <Label htmlFor="topic-desc" className="text-xs text-[var(--ws-text-secondary)]">Descricao (opcional)</Label>
+   968→                    <Input
+   969→                      id="topic-desc"
+   970→                      value={topicDescription}
+   971→                      onChange={(e) => setTopicDescription(e.target.value)}
+   972→                      placeholder="Breve descricao do topico..."
+   973→                      className="h-9 border-[var(--ws-glass-border)] bg-[var(--ws-bg)] text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)]"
+   974→                      onKeyDown={(e) => e.key === 'Enter' && handleAddTopic()}
+   975→                    />
+   976→                  </div>
+   977→                  <div className="flex justify-end">
+   978→                    <Button
+   979→                      size="sm"
+   980→                      onClick={handleAddTopic}
+   981→                      disabled={topicSubmitting || !topicName.trim()}
+   982→                      className="h-8 gap-1.5 bg-[var(--ws-accent)] text-xs text-white hover:bg-[var(--ws-accent)]/90"
+   983→                    >
+   984→                      {topicSubmitting && <Loader2 size={12} className="animate-spin" />}
+   985→                      <Check size={12} />
+   986→                      Adicionar
+   987→                    </Button>
+   988→                  </div>
+   989→                </div>
+   990→              </motion.div>
+   991→            )}
+   992→          </AnimatePresence>
+   993→
+   994→          {/* Topics list */}
+   995→          {detailTopics.length === 0 && !showAddTopic ? (
+   996→            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--ws-glass-border)] py-10 text-center"
+   997→              style={{ borderRadius: 'var(--ws-radius-card)' }}
+   998→            >
+   999→              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ws-accent)]/10">
+  1000→                <Layers size={22} className="text-[var(--ws-accent)]" />
+  1001→              </div>
+  1002→              <p className="text-sm font-medium text-[var(--ws-text-primary)]">Nenhum topico ainda</p>
+  1003→              <p className="mt-1 max-w-[240px] text-xs text-[var(--ws-text-tertiary)]">
+  1004→                Comece adicionando topicos para organizar seus estudos e acompanhar seu dominio.
+  1005→              </p>
+  1006→              <Button
+  1007→                variant="ghost"
+  1008→                size="sm"
+  1009→                onClick={() => setShowAddTopic(true)}
+  1010→                className="mt-3 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+  1011→              >
+  1012→                <Plus size={14} />
+  1013→                Adicionar primeiro topico
+  1014→              </Button>
+  1015→            </div>
+  1016→          ) : (
+  1017→            <div className="max-h-80 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+  1018→              <AnimatePresence>
+  1019→                {detailTopics.map((topic, idx) => {
+  1020→                  const mc = getMasteryColor(topic.mastery);
+  1021→                  return (
+  1022→                    <motion.div
+  1023→                      key={topic.id}
+  1024→                      initial={{ opacity: 0, x: -12 }}
+  1025→                      animate={{ opacity: 1, x: 0 }}
+  1026→                      exit={{ opacity: 0, x: 12 }}
+  1027→                      transition={{ duration: 0.2, delay: idx * 0.04 }}
+  1028→                      className="group border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-3.5 transition-colors hover:bg-[var(--ws-glass)]/80"
+  1029→                      style={{ borderRadius: 'var(--ws-radius-card)' }}
+  1030→                    >
+  1031→                      <div className="flex items-start justify-between gap-3">
+  1032→                        <div className="min-w-0 flex-1">
+  1033→                          <p className="text-sm font-medium text-[var(--ws-text-primary)]">{topic.name}</p>
+  1034→                          {topic.description && (
+  1035→                            <p className="mt-0.5 truncate text-xs text-[var(--ws-text-tertiary)]">{topic.description}</p>
+  1036→                          )}
+  1037→                        </div>
+  1038→                        <Badge
+  1039→                          variant="secondary"
+  1040→                          className="shrink-0 text-[10px] font-semibold"
+  1041→                          style={{
+  1042→                            backgroundColor: `${mc}18`,
+  1043→                            color: mc,
+  1044→                            borderColor: `${mc}30`,
+  1045→                          }}
+  1046→                        >
+  1047→                          {topic.mastery}%
+  1048→                        </Badge>
+  1049→                      </div>
+  1050→                      <div className="mt-2.5">
+  1051→                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ws-glass-border)]">
+  1052→                          <motion.div
+  1053→                            className="h-full rounded-full"
+  1054→                            style={{ backgroundColor: mc }}
+  1055→                            initial={{ width: 0 }}
+  1056→                            animate={{ width: `${topic.mastery}%` }}
+  1057→                            transition={{ duration: 0.6, delay: idx * 0.06, ease: 'easeOut' }}
+  1058→                          />
+  1059→                        </div>
+  1060→                      </div>
+  1061→                      {topic.totalQuestions > 0 && (
+  1062→                        <p className="mt-1.5 text-[10px] text-[var(--ws-text-tertiary)]">
+  1063→                          {topic.correctAnswers}/{topic.totalQuestions} questoes corretas
+  1064→                        </p>
+  1065→                      )}
+  1066→                    </motion.div>
+  1067→                  );
+  1068→                })}
+  1069→              </AnimatePresence>
+  1070→            </div>
+  1071→          )}
+  1072→        </div>
+  1073→
+  1074→        {/* Related tasks summary */}
+  1075→        {subjectDetail._count.tasks > 0 && (
+  1076→          <div className="space-y-3">
+  1077→            <h3 className="text-sm font-semibold text-[var(--ws-text-primary)]">Tarefas relacionadas</h3>
+  1078→            <div className="flex items-center gap-3 rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4"
+  1079→              style={{ borderRadius: 'var(--ws-radius-card)' }}
+  1080→            >
+  1081→              <ClipboardList size={20} className="text-[var(--ws-text-tertiary)]" />
+  1082→              <div>
+  1083→                <p className="text-sm font-medium text-[var(--ws-text-primary)]">
+  1084→                  {subjectDetail._count.tasks} {subjectDetail._count.tasks === 1 ? 'tarefa vinculada' : 'tarefas vinculadas'}
+  1085→                </p>
+  1086→                <p className="text-xs text-[var(--ws-text-tertiary)]">
+  1087→                  Gerencie suas tarefas na aba de tarefas
+  1088→                </p>
+  1089→              </div>
+  1090→              <Button
+  1091→                variant="ghost"
+  1092→                size="sm"
+  1093→                onClick={() => onNavigate('tasks')}
+  1094→                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+  1095→              >
+  1096→                Ver tarefas
+  1097→              </Button>
+  1098→            </div>
+  1099→          </div>
+  1100→        )}
+  1101→
+  1102→        {/* Study sessions summary */}
+  1103→        <div className="space-y-3">
+  1104→          <h3 className="text-sm font-semibold text-[var(--ws-text-primary)]">Sessoes de estudo</h3>
+  1105→          <div className="flex items-center gap-3 rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4"
+  1106→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+  1107→          >
+  1108→            <Timer size={20} className="text-[var(--ws-text-tertiary)]" />
+  1109→            <div>
+  1110→              <p className="text-sm font-medium text-[var(--ws-text-primary)]">
+  1111→                {subjectDetail._count.sessions} {subjectDetail._count.sessions === 1 ? 'sessao registrada' : 'sessoes registradas'}
+  1112→              </p>
+  1113→              <p className="text-xs text-[var(--ws-text-tertiary)]">
+  1114→                Cada sessao contribui para seu XP e sequencia de estudos
+  1115→              </p>
+  1116→            </div>
+  1117→            {subjectDetail._count.sessions > 0 && (
+  1118→              <Button
+  1119→                variant="ghost"
+  1120→                size="sm"
+  1121→                onClick={() => onNavigate('sessions')}
+  1122→                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+  1123→              >
+  1124→                Ver sessoes
+  1125→              </Button>
+  1126→            )}
+  1127→          </div>
+  1128→        </div>
+  1129→      </motion.div>
+  1130→    );
+  1131→  };
+  1132→
+  1133→  // ===== RENDER: LIST VIEW =====
+  1134→  const renderListView = () => {
+  1135→    if (loading) {
+  1136→      return (
+  1137→        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+  1138→          {Array.from({ length: 4 }).map((_, i) => (
+  1139→            <SubjectCardSkeleton key={i} />
+  1140→          ))}
+  1141→        </div>
+  1142→      );
+  1143→    }
+  1144→
+  1145→    if (subjects.length === 0) {
+  1146→      return (
+  1147→        <motion.div
+  1148→          initial={{ opacity: 0, y: 20 }}
+  1149→          animate={{ opacity: 1, y: 0 }}
+  1150→          transition={{ duration: 0.5 }}
+  1151→          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--ws-glass-border)] py-16 text-center"
+  1152→        >
+  1153→          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ws-accent)]/10">
+  1154→            <BookOpen size={28} className="text-[var(--ws-accent)]" />
+  1155→          </div>
+  1156→          <h3 className="text-lg font-semibold text-[var(--ws-text-primary)]">
+  1157→            Nenhuma materia cadastrada
+  1158→          </h3>
+  1159→          <p className="mt-2 max-w-[320px] text-sm text-[var(--ws-text-tertiary)]">
+  1160→            Comece sua jornada de estudos organizada! Adicione suas materias para acompanhar seu progresso e dominio em cada uma delas.
+  1161→          </p>
+  1162→          <Button
+  1163→            onClick={openAddDialog}
+  1164→            className="mt-5 gap-2 bg-[var(--ws-accent)] text-white hover:bg-[var(--ws-accent)]/90"
+  1165→          >
+  1166→            <Plus size={16} />
+  1167→            Adicionar primeira materia
+  1168→          </Button>
+  1169→        </motion.div>
+  1170→      );
+  1171→    }
+  1172→
+  1173→    return (
+  1174→      <motion.div
+  1175→        variants={containerVariants}
+  1176→        initial="hidden"
+  1177→        animate="visible"
+  1178→        className="grid grid-cols-1 gap-4 md:grid-cols-2"
+  1179→      >
+  1180→        {subjects.map((subject, idx) => renderSubjectCard(subject, idx))}
+  1181→      </motion.div>
+  1182→    );
+  1183→  };
+  1184→
+  1185→  // ===== MAIN RENDER =====
+  1186→  return (
+  1187→    <section className="mx-auto w-full max-w-4xl" aria-label="Gerenciamento de materias">
+  1188→      {/* Page header */}
+  1189→      <div className="mb-6 flex items-center justify-between">
+  1190→        <div>
+  1191→          <h2 className="text-xl font-bold text-[var(--ws-text-primary)]">Minhas Materias</h2>
+  1192→          <p className="mt-0.5 text-sm text-[var(--ws-text-tertiary)]">
+  1193→            {selectedSubjectId ? 'Detalhes da materia' : 'Organize e acompanhe seus estudos por disciplina'}
+  1194→          </p>
+  1195→        </div>
+  1196→        {!selectedSubjectId && (
+  1197→          <Button
+  1198→            onClick={openAddDialog}
+  1199→            className="gap-2 bg-[var(--ws-accent)] text-white hover:bg-[var(--ws-accent)]/90"
+  1200→          >
+  1201→            <Plus size={16} />
+  1202→            <span className="hidden sm:inline">Nova materia</span>
+  1203→          </Button>
+  1204→        )}
+  1205→      </div>
+  1206→
+  1207→      {/* Content */}
+  1208→      <AnimatePresence mode="wait">
+  1209→        {selectedSubjectId ? renderDetailView() : renderListView()}
+  1210→      </AnimatePresence>
+  1211→
+  1212→      {/* Dialogs */}
+  1213→      {renderFormDialog(
+  1214→        showAddDialog,
+  1215→        setShowAddDialog,
+  1216→        'Nova materia',
+  1217→        'Adicione uma disciplina para organizar seus estudos e acompanhar seu progresso.',
+  1218→        handleAddSubject,
+  1219→        formSubmitting,
+  1220→      )}
+  1221→      {renderFormDialog(
+  1222→        showEditDialog,
+  1223→        setShowEditDialog,
+  1224→        'Editar materia',
+  1225→        'Altere as informacoes da materia.',
+  1226→        handleEditSubject,
+  1227→        formSubmitting,
+  1228→      )}
+  1229→      {renderDeleteDialog()}
+  1230→    </section>
+  1231→  );
+  1232→}
+  1233→

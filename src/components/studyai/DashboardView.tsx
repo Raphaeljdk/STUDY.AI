@@ -9,7 +9,8 @@ import {
   LogOut, Shield, ChevronRight, Star, Send,
   Plus, Trash2, Edit3, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
-  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown
+  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown,
+  ListTodo, Flag, Trophy, CalendarDays
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
@@ -32,6 +33,19 @@ const CanvasNotebookView = dynamic(
     </div>
   )},
 );
+
+// @ts-expect-error dynamic import
+const HomeDashboard = dynamic(() => import('./HomeDashboard'), { ssr: false });
+// @ts-expect-error dynamic import
+const SubjectsView = dynamic(() => import('./SubjectsView'), { ssr: false });
+// @ts-expect-error dynamic import
+const TasksView = dynamic(() => import('./TasksView'), { ssr: false });
+// @ts-expect-error dynamic import
+const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false });
+// @ts-expect-error dynamic import
+const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false });
+// @ts-expect-error dynamic import
+const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -124,7 +138,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-type Tab = 'dashboard' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'admin';
+type Tab = 'dashboard' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'progress' | 'admin';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -178,7 +192,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'notebooks', 'flashcards', 'timer', 'chat', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'progress', 'admin'];
 
 export function DashboardView() {
   const { data: session } = useSession();
@@ -202,7 +216,7 @@ export function DashboardView() {
     setActiveTab('notebook-edit');
   };
 
-  const navigateTo = (tab: Tab) => setActiveTab(tab);
+  const navigateTo = (tab: string) => setActiveTab(tab as Tab);
 
   // Swipe navigation for mobile
   const validTabs = tabOrder.filter(t => t !== 'admin' || isAdmin);
@@ -220,12 +234,17 @@ export function DashboardView() {
             <Image src="/logo.png" alt="StudyAI" width={32} height={32} className="rounded-full" />
             <span className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)] sm:text-lg">StudyAI</span>
           </button>
-          <nav className="hidden items-center gap-1 md:flex">
-            <TabBtn icon={BarChart3} label="Dashboard" tooltip="Visao geral" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <TabBtn icon={BookOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
-            <TabBtn icon={Brain} label="Flashcards" tooltip="Revisao espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
-            <TabBtn icon={Timer} label="Pomodoro" tooltip="Timer de foco" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
-            <TabBtn icon={MessageCircle} label="Sensei IA" tooltip="Tutor inteligente" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+          <nav className="flex items-center gap-0.5 overflow-x-auto md:gap-1">
+            <TabBtn icon={BarChart3} label="Home" tooltip="Visao geral" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+            <TabBtn icon={BookOpen} label="Matérias" tooltip="Suas matérias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
+            <TabBtn icon={ListTodo} label="Tarefas" tooltip="Suas tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+            <TabBtn icon={Target} label="Metas" tooltip="Suas metas" active={activeTab === 'goals'} onClick={() => setActiveTab('goals')} />
+            <TabBtn icon={CalendarDays} label="Calendário" tooltip="Calendário" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+            <TabBtn icon={FolderOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
+            <TabBtn icon={Brain} label="Cards" tooltip="Revisão espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
+            <TabBtn icon={Timer} label="Timer" tooltip="Timer de foco" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
+            <TabBtn icon={MessageCircle} label="Sensei" tooltip="Tutor IA" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+            <TabBtn icon={Trophy} label="Progresso" tooltip="Desempenho" active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} />
             {isAdmin && <TabBtn icon={Shield} label="Admin" tooltip="Painel admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -244,10 +263,15 @@ export function DashboardView() {
         </div>
         <div className="flex overflow-x-auto md:hidden no-scrollbar px-1">
           <TabBtn icon={BarChart3} label="Home" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <TabBtn icon={BookOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
+          <TabBtn icon={BookOpen} label="Matérias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
+          <TabBtn icon={ListTodo} label="Tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+          <TabBtn icon={Target} label="Metas" active={activeTab === 'goals'} onClick={() => setActiveTab('goals')} />
+          <TabBtn icon={CalendarDays} label="Calend." active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+          <TabBtn icon={FolderOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
           <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
           <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
           <TabBtn icon={MessageCircle} label="Sensei" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+          <TabBtn icon={Trophy} label="Progresso" active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} />
           {!usage.isPremium && !isAdmin && (
             <TabBtn icon={Crown} label="Premium" active={false} onClick={() => openUpgrade('nav')} />
           )}
@@ -262,7 +286,31 @@ export function DashboardView() {
             <UsageBar type="flashcards" used={usage.usage.flashcards} limit={usage.limits.flashcards} />
           </div>
         )}
-        {activeTab === 'dashboard' && <DashboardHome key="home" user={user} openNotebook={openNotebook} onNavigate={navigateTo} />}
+        {activeTab === 'dashboard' && (
+          <SectionErrorBoundary name="HomeDashboard">
+            <HomeDashboard user={user} onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'subjects' && (
+          <SectionErrorBoundary name="SubjectsView">
+            <SubjectsView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'tasks' && (
+          <SectionErrorBoundary name="TasksView">
+            <TasksView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'goals' && (
+          <SectionErrorBoundary name="GoalsView">
+            <GoalsView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'calendar' && (
+          <SectionErrorBoundary name="CalendarView">
+            <CalendarView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
         {activeTab === 'notebooks' && <NotebooksList key="nb-list" onOpen={openNotebook} />}
         {activeTab === 'notebook-edit' && editNotebookId && (
           <SectionErrorBoundary name="CanvasNotebook">
@@ -273,6 +321,11 @@ export function DashboardView() {
         {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
         {activeTab === 'timer' && <PomodoroTimer key="pom" />}
         {activeTab === 'chat' && <SenseiChat key="chat" />}
+        {activeTab === 'progress' && (
+          <SectionErrorBoundary name="ProgressView">
+            <ProgressView user={user} />
+          </SectionErrorBoundary>
+        )}
         {activeTab === 'admin' && isAdmin && <AdminPanel key="adm" />}
       </main>
 

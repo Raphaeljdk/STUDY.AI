@@ -1,0 +1,722 @@
+    60→}
+    61→
+    62→// ===== HELPERS =====
+    63→function getGreeting(): string {
+    64→  const h = new Date().getHours();
+    65→  if (h < 12) return 'Bom dia';
+    66→  if (h < 18) return 'Boa tarde';
+    67→  return 'Boa noite';
+    68→}
+    69→
+    70→function getGreetingSubtext(): string {
+    71→  const h = new Date().getHours();
+    72→  if (h < 12) return 'Comece o dia com foco e determinacao. Cada estudo e um passo adiante.';
+    73→  if (h < 18) return 'A tarde e perfeita para revisar e consolidar o conhecimento.';
+    74→  return 'Boas sessoes noturnas fixam melhor o que voce aprendeu.';
+    75→}
+    76→
+    77→function getLevelName(level: number): string {
+    78→  if (level <= 1) return 'Iniciante';
+    79→  if (level <= 2) return 'Aprendiz';
+    80→  if (level <= 3) return 'Estudante';
+    81→  if (level <= 4) return 'Dedicado';
+    82→  if (level <= 5) return 'Especialista';
+    83→  return 'Mestre';
+    84→}
+    85→
+    86→function getXpForLevel(level: number): number {
+    87→  // XP thresholds: 0->100->250->500->850->1300...
+    88→  const thresholds = [0, 100, 250, 500, 850, 1300];
+    89→  if (level <= 0) return 0;
+    90→  if (level >= thresholds.length) {
+    91→    // Beyond defined levels: 450 per level
+    92→    const lastDefined = thresholds[thresholds.length - 1];
+    93→    return lastDefined + (level - (thresholds.length - 1)) * 450;
+    94→  }
+    95→  return thresholds[level];
+    96→}
+    97→
+    98→function getPriorityIndicator(priority: string) {
+    99→  switch (priority?.toUpperCase()) {
+   100→    case 'ALTA': return { dot: 'bg-red-500', label: 'Alta', emoji: '🔴' };
+   101→    case 'MEDIA': return { dot: 'bg-amber-500', label: 'Media', emoji: '🟡' };
+   102→    case 'BAIXA': return { dot: 'bg-green-500', label: 'Baixa', emoji: '🟢' };
+   103→    default: return { dot: 'bg-gray-400', label: priority || 'Media', emoji: '🟡' };
+   104→  }
+   105→}
+   106→
+   107→function getEventTypeLabel(type: string) {
+   108→  switch (type?.toUpperCase()) {
+   109→    case 'EXAM': return 'Prova';
+   110→    case 'DELIVERY': return 'Entrega';
+   111→    case 'EVENT': return 'Evento';
+   112→    case 'STUDY': return 'Sessao';
+   113→    default: return type || 'Evento';
+   114→  }
+   115→}
+   116→
+   117→function getEventColor(color?: string | null, type?: string) {
+   118→  if (color) return color;
+   119→  switch (type?.toUpperCase()) {
+   120→    case 'EXAM': return '#D93838';
+   121→    case 'DELIVERY': return '#B8A088';
+   122→    case 'STUDY': return '#5B8C5A';
+   123→    default: return 'var(--ws-accent)';
+   124→  }
+   125→}
+   126→
+   127→// Framer motion variants
+   128→const fadeInUp = {
+   129→  initial: { opacity: 0, y: 16 },
+   130→  animate: { opacity: 1, y: 0 },
+   131→};
+   132→
+   133→const staggerContainer = {
+   134→  animate: { transition: { staggerChildren: 0.07 } },
+   135→};
+   136→
+   137→// ===== MAIN COMPONENT =====
+   138→export function HomeDashboard({
+   139→  user,
+   140→  stats: propsStats,
+   141→  upcomingEvents: propsEvents,
+   142→  todayTasks: propsTasks,
+   143→  onNavigate,
+   144→}: HomeDashboardProps) {
+   145→  // Derive initial loading state — skip fetching if stats were passed via props
+   146→  const hasInitialProps = !!propsStats;
+   147→  const [stats, setStats] = useState<HomeDashboardProps['stats']>(propsStats);
+   148→  const [todayTasks, setTodayTasks] = useState<HomeDashboardProps['todayTasks']>(propsTasks);
+   149→  const [upcomingEvents, setUpcomingEvents] = useState<HomeDashboardProps['upcomingEvents']>(propsEvents);
+   150→  const [dailyGoals, setDailyGoals] = useState<GoalItem[]>([]);
+   151→  const [loading, setLoading] = useState(!hasInitialProps);
+   152→
+   153→  useEffect(() => {
+   154→    if (hasInitialProps) return;
+   155→
+   156→    const month = format(new Date(), 'yyyy-MM');
+   157→
+   158→    Promise.all([
+   159→      fetch('/api/stats').then(r => r.json()).catch(() => null),
+   160→      fetch('/api/tasks?status=PENDING&limit=5').then(r => r.json()).catch(() => null),
+   161→      fetch(`/api/calendar?month=${month}`).then(r => r.json()).catch(() => null),
+   162→      fetch('/api/goals?type=DAILY').then(r => r.json()).catch(() => null),
+   163→    ]).then(([statsData, tasksData, eventsData, goalsData]) => {
+   164→      if (statsData) {
+   165→        setStats({
+   166→          minutesToday: statsData.todayMinutes ?? 0,
+   167→          minutesThisWeek: statsData.weeklyMinutes ?? 0,
+   168→          pendingTasks: statsData.pendingTasks ?? 0,
+   169→          dueFlashcards: statsData.dueFlashcards ?? 0,
+   170→          subjectCount: statsData.notebooks ?? 0,
+   171→          completedToday: statsData.completedToday ?? 0,
+   172→        });
+   173→      }
+   174→      if (tasksData?.tasks) setTodayTasks(tasksData.tasks);
+   175→      if (eventsData?.events) setUpcomingEvents(eventsData.events);
+   176→      if (goalsData?.goals) setDailyGoals(goalsData);
+   177→    }).finally(() => setLoading(false));
+   178→  }, [propsStats, propsTasks, propsEvents]);
+   179→
+   180→  // XP calculations
+   181→  const currentLevelXp = getXpForLevel(user.level);
+   182→  const nextLevelXp = getXpForLevel(user.level + 1);
+   183→  const xpInCurrentLevel = user.xp - currentLevelXp;
+   184→  const xpNeededForNext = nextLevelXp - currentLevelXp;
+   185→  const xpProgress = xpNeededForNext > 0 ? Math.min((xpInCurrentLevel / xpNeededForNext) * 100, 100) : 100;
+   186→  const levelName = getLevelName(user.level);
+   187→
+   188→  const firstName = user.name?.split(' ')[0] || 'Estudante';
+   189→  const initials = user.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '??';
+   190→
+   191→  // Study plan slots (placeholder AI recommendation)
+   192→  const studyPlanSlots = stats && stats.subjectCount > 0
+   193→    ? [
+   194→        { time: 'Agora', activity: 'Revisar flashcards pendentes', duration: '15 min', icon: Brain },
+   195→        { time: '+30 min', activity: 'Estudar anotacoes recentes', duration: '25 min', icon: BookOpen },
+   196→        { time: '+1h', activity: 'Praticar com Pomodoro', duration: '25 min', icon: Clock },
+   197→      ]
+   198→    : [];
+   199→
+   200→  if (loading) {
+   201→    return (
+   202→      <div>
+   203→        <div className="mb-8">
+   204→          <div className="skeleton mb-2 h-8 w-64" />
+   205→          <div className="skeleton h-4 w-80" />
+   206→        </div>
+   207→        <div className="skeleton-card mb-6 h-48" />
+   208→        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+   209→          {[...Array(4)].map((_, i) => (
+   210→            <div key={i} className="skeleton-card h-28" />
+   211→          ))}
+   212→        </div>
+   213→        <div className="skeleton-card mb-6 h-40" />
+   214→        <div className="skeleton-card mb-6 h-32" />
+   215→        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+   216→          <div className="skeleton-card h-48" />
+   217→          <div className="skeleton-card h-48" />
+   218→        </div>
+   219→      </div>
+   220→    );
+   221→  }
+   222→
+   223→  return (
+   224→    <motion.div
+   225→      initial={{ opacity: 0 }}
+   226→      animate={{ opacity: 1 }}
+   227→      transition={{ duration: 0.4 }}
+   228→    >
+   229→      {/* ===== 1. GREETING SECTION ===== */}
+   230→      <motion.section
+   231→        className="mb-8"
+   232→        {...fadeInUp}
+   233→        transition={{ duration: 0.5 }}
+   234→        aria-label="Saudacao"
+   235→      >
+   236→        <div className="flex items-start gap-4">
+   237→          {/* Avatar */}
+   238→          <div
+   239→            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full font-serif-jp text-lg font-bold text-[var(--ws-text-on-dark)]"
+   240→            style={{
+   241→              background: `linear-gradient(135deg, var(--ws-accent), color-mix(in srgb, var(--ws-accent) 70%, var(--ws-gold)))`,
+   242→            }}
+   243→          >
+   244→            {initials}
+   245→          </div>
+   246→
+   247→          <div className="min-w-0 flex-1">
+   248→            <div className="flex flex-wrap items-center gap-3">
+   249→              <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
+   250→                {getGreeting()}, {firstName}!
+   251→              </h1>
+   252→              <Badge
+   253→                className="gap-1 rounded-ws-button border-0 px-2.5 py-0.5 text-xs font-semibold"
+   254→                style={{
+   255→                  backgroundColor: 'color-mix(in srgb, var(--ws-accent) 15%, transparent)',
+   256→                  color: 'var(--ws-accent)',
+   257→                }}
+   258→              >
+   259→                <Trophy size={12} />
+   260→                Nivel {user.level} · {levelName}
+   261→              </Badge>
+   262→            </div>
+   263→            <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">
+   264→              {getGreetingSubtext()}
+   265→            </p>
+   266→
+   267→            {/* XP Progress Bar */}
+   268→            <div className="mt-3 flex items-center gap-3">
+   269→              <div className="relative h-2.5 flex-1 overflow-hidden rounded-full"
+   270→                style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}
+   271→              >
+   272→                <motion.div
+   273→                  className="absolute inset-y-0 left-0 rounded-full"
+   274→                  style={{
+   275→                    background: `linear-gradient(90deg, var(--ws-accent), color-mix(in srgb, var(--ws-accent) 65%, var(--ws-gold)))`,
+   276→                  }}
+   277→                  initial={{ width: 0 }}
+   278→                  animate={{ width: `${xpProgress}%` }}
+   279→                  transition={{ duration: 1, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
+   280→                />
+   281→              </div>
+   282→              <span className="shrink-0 text-xs font-medium text-[var(--ws-text-tertiary)]">
+   283→                {xpInCurrentLevel}/{xpNeededForNext} XP
+   284→              </span>
+   285→            </div>
+   286→          </div>
+   287→        </div>
+   288→      </motion.section>
+   289→
+   290→      {/* ===== 2. STUDY PLAN CARD ===== */}
+   291→      <motion.section
+   292→        className="mb-8"
+   293→        {...fadeInUp}
+   294→        transition={{ duration: 0.5, delay: 0.08 }}
+   295→        aria-label="Plano de estudo"
+   296→      >
+   297→        <WabiSabiCard hover={false}>
+   298→          <div className="flex items-center gap-2.5 mb-4">
+   299→            <div
+   300→              className="flex h-9 w-9 items-center justify-center rounded-ws-button"
+   301→              style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}
+   302→            >
+   303→              <Sparkles size={16} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
+   304→            </div>
+   305→            <div>
+   306→              <h2 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">
+   307→                O que estudar agora?
+   308→              </h2>
+   309→              <p className="text-xs text-[var(--ws-text-tertiary)]">
+   310→                Plano sugerido pela sua StudyAI
+   311→              </p>
+   312→            </div>
+   313→          </div>
+   314→
+   315→          {studyPlanSlots.length > 0 ? (
+   316→            <div className="space-y-2.5">
+   317→              {studyPlanSlots.map((slot, i) => (
+   318→                <motion.button
+   319→                  key={i}
+   320→                  className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_4%,transparent)]"
+   321→                  initial={{ opacity: 0, x: -10 }}
+   322→                  animate={{ opacity: 1, x: 0 }}
+   323→                  transition={{ delay: 0.2 + i * 0.08 }}
+   324→                  onClick={() => {
+   325→                    if (slot.icon === Brain) onNavigate('flashcards');
+   326→                    else if (slot.icon === BookOpen) onNavigate('notebooks');
+   327→                    else if (slot.icon === Clock) onNavigate('timer');
+   328→                  }}
+   329→                >
+   330→                  <span className="shrink-0 text-xs font-bold text-[var(--ws-text-tertiary)] w-12">
+   331→                    {slot.time}
+   332→                  </span>
+   333→                  <div
+   334→                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ws-button"
+   335→                    style={{ backgroundColor: 'color-mix(in srgb, var(--ws-gold) 15%, transparent)' }}
+   336→                  >
+   337→                    <slot.icon size={14} className="text-[var(--ws-gold)]" strokeWidth={1.5} />
+   338→                  </div>
+   339→                  <div className="flex-1 min-w-0">
+   340→                    <p className="text-sm font-medium text-[var(--ws-text-primary)] truncate">
+   341→                      {slot.activity}
+   342→                    </p>
+   343→                  </div>
+   344→                  <span className="shrink-0 text-xs text-[var(--ws-text-tertiary)]">
+   345→                    {slot.duration}
+   346→                  </span>
+   347→                  <ChevronRight size={14} className="shrink-0 text-[var(--ws-text-tertiary)]" />
+   348→                </motion.button>
+   349→              ))}
+   350→            </div>
+   351→          ) : (
+   352→            <div className="py-6 text-center">
+   353→              <div
+   354→                className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+   355→                style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' }}
+   356→              >
+   357→                <FolderOpen size={24} className="text-[var(--ws-accent)]" strokeWidth={1} />
+   358→              </div>
+   359→              <p className="text-sm font-medium text-[var(--ws-text-secondary)]">
+   360→                Nenhuma materia cadastrada ainda
+   361→              </p>
+   362→              <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">
+   363→                Adicione suas materias para receber planos de estudo personalizados
+   364→              </p>
+   365→              <button
+   366→                onClick={() => onNavigate('notebooks')}
+   367→                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--ws-accent)] transition-colors hover:text-[var(--ws-accent-hover)]"
+   368→              >
+   369→                <Plus size={14} />
+   370→                Adicionar materia
+   371→              </button>
+   372→            </div>
+   373→          )}
+   374→        </WabiSabiCard>
+   375→      </motion.section>
+   376→
+   377→      {/* ===== 3. STATS GRID ===== */}
+   378→      <motion.section
+   379→        className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2"
+   380→        variants={staggerContainer}
+   381→        initial="initial"
+   382→        animate="animate"
+   383→        aria-label="Estatisticas do dia"
+   384→      >
+   385→        <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
+   386→          <WabiSabiCard>
+   387→            <div className="flex items-start justify-between">
+   388→              <div
+   389→                className="flex h-11 w-11 items-center justify-center rounded-ws-button"
+   390→                style={{ backgroundColor: 'color-mix(in srgb, #F97316 15%, transparent)' }}
+   391→              >
+   392→                <Flame size={20} className="text-[#F97316]" strokeWidth={1.5} />
+   393→              </div>
+   394→              {user.longestStreak > 0 && user.longestStreak > user.currentStreak && (
+   395→                <span className="text-[10px] text-[var(--ws-text-tertiary)]">
+   396→                  Recorde: {user.longestStreak} dias
+   397→                </span>
+   398→              )}
+   399→            </div>
+   400→            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+   401→              {user.currentStreak}
+   402→            </p>
+   403→            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+   404→              Sequencia
+   405→            </p>
+   406→            <p className="text-xs text-[var(--ws-text-tertiary)]">dias seguidos</p>
+   407→          </WabiSabiCard>
+   408→        </motion.div>
+   409→
+   410→        <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
+   411→          <WabiSabiCard>
+   412→            <div
+   413→              className="flex h-11 w-11 items-center justify-center rounded-ws-button"
+   414→              style={{ backgroundColor: 'color-mix(in srgb, var(--ws-gold) 15%, transparent)' }}
+   415→            >
+   416→              <Clock size={20} className="text-[var(--ws-gold)]" strokeWidth={1.5} />
+   417→            </div>
+   418→            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+   419→              {stats?.minutesToday ?? 0}
+   420→            </p>
+   421→            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+   422→              Hoje
+   423→            </p>
+   424→            <p className="text-xs text-[var(--ws-text-tertiary)]">minutos de estudo</p>
+   425→          </WabiSabiCard>
+   426→        </motion.div>
+   427→
+   428→        <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
+   429→          <WabiSabiCard>
+   430→            <div
+   431→              className="flex h-11 w-11 items-center justify-center rounded-ws-button"
+   432→              style={{ backgroundColor: 'color-mix(in srgb, var(--ws-verdigris) 15%, transparent)' }}
+   433→            >
+   434→              <ClipboardList size={20} className="text-[var(--ws-verdigris)]" strokeWidth={1.5} />
+   435→            </div>
+   436→            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+   437→              {stats?.completedToday ?? 0}
+   438→              <span className="ml-1 text-lg font-normal text-[var(--ws-text-tertiary)]">
+   439→                /{stats?.pendingTasks ?? 0}
+   440→              </span>
+   441→            </p>
+   442→            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+   443→              Tarefas
+   444→            </p>
+   445→            <p className="text-xs text-[var(--ws-text-tertiary)]">concluidas hoje</p>
+   446→          </WabiSabiCard>
+   447→        </motion.div>
+   448→
+   449→        <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
+   450→          <WabiSabiCard>
+   451→            <div
+   452→              className="flex h-11 w-11 items-center justify-center rounded-ws-button"
+   453→              style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}
+   454→            >
+   455→              <Brain size={20} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
+   456→            </div>
+   457→            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+   458→              {stats?.dueFlashcards ?? 0}
+   459→            </p>
+   460→            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+   461→              Flashcards
+   462→            </p>
+   463→            <p className="text-xs text-[var(--ws-text-tertiary)]">para revisar agora</p>
+   464→            {(stats?.dueFlashcards ?? 0) > 0 && (
+   465→              <button
+   466→                onClick={() => onNavigate('flashcards')}
+   467→                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--ws-accent)] hover:underline"
+   468→              >
+   469→                Revisar agora <ArrowRight size={12} />
+   470→              </button>
+   471→            )}
+   472→          </WabiSabiCard>
+   473→        </motion.div>
+   474→      </motion.section>
+   475→
+   476→      {/* ===== 4. XP & LEVEL CARD ===== */}
+   477→      <motion.section
+   478→        className="mb-8"
+   479→        {...fadeInUp}
+   480→        transition={{ duration: 0.5, delay: 0.25 }}
+   481→        aria-label="Nivel e XP"
+   482→      >
+   483→        <WabiSabiCard hover={false}>
+   484→          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+   485→            {/* Circular progress */}
+   486→            <div className="relative mx-auto shrink-0 sm:mx-0">
+   487→              <svg width="100" height="100" viewBox="0 0 100 100" className="-rotate-90">
+   488→                {/* Background circle */}
+   489→                <circle
+   490→                  cx="50" cy="50" r="42"
+   491→                  fill="none"
+   492→                  stroke="color-mix(in srgb, var(--ws-accent) 12%, transparent)"
+   493→                  strokeWidth="6"
+   494→                />
+   495→                {/* Progress circle */}
+   496→                <motion.circle
+   497→                  cx="50" cy="50" r="42"
+   498→                  fill="none"
+   499→                  stroke="var(--ws-accent)"
+   500→                  strokeWidth="6"
+   501→                  strokeLinecap="round"
+   502→                  strokeDasharray={`${2 * Math.PI * 42}`}
+   503→                  initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
+   504→                  animate={{ strokeDashoffset: 2 * Math.PI * 42 * (1 - xpProgress / 100) }}
+   505→                  transition={{ duration: 1.2, delay: 0.4, ease: [0.4, 0, 0.2, 1] }}
+   506→                />
+   507→              </svg>
+   508→              <div className="absolute inset-0 flex flex-col items-center justify-center">
+   509→                <span className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)]">
+   510→                  {user.level}
+   511→                </span>
+   512→                <span className="text-[10px] font-medium text-[var(--ws-text-tertiary)]">NIVEL</span>
+   513→              </div>
+   514→            </div>
+   515→
+   516→            {/* Level info */}
+   517→            <div className="flex-1 text-center sm:text-left">
+   518→              <div className="flex items-center justify-center gap-2 sm:justify-start">
+   519→                <h2 className="font-serif-jp text-lg font-bold text-[var(--ws-text-primary)]">
+   520→                  {levelName}
+   521→                </h2>
+   522→                <Zap size={16} className="text-amber-500" />
+   523→              </div>
+   524→              <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">
+   525→                Total de <span className="font-semibold text-[var(--ws-text-secondary)]">{user.xp} XP</span> acumulados
+   526→              </p>
+   527→              <div className="mt-3 flex items-center gap-3">
+   528→                <div className="relative h-2 flex-1 overflow-hidden rounded-full"
+   529→                  style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}
+   530→                >
+   531→                  <motion.div
+   532→                    className="absolute inset-y-0 left-0 rounded-full"
+   533→                    style={{
+   534→                      background: `linear-gradient(90deg, var(--ws-accent), color-mix(in srgb, var(--ws-accent) 60%, var(--ws-gold)))`,
+   535→                    }}
+   536→                    initial={{ width: 0 }}
+   537→                    animate={{ width: `${xpProgress}%` }}
+   538→                    transition={{ duration: 1, delay: 0.5, ease: [0.4, 0, 0.2, 1] }}
+   539→                  />
+   540→                </div>
+   541→                <span className="shrink-0 text-xs text-[var(--ws-text-tertiary)]">
+   542→                  {xpNeededForNext - xpInCurrentLevel} XP para o proximo nivel
+   543→                </span>
+   544→              </div>
+   545→              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[var(--ws-text-tertiary)] sm:justify-start">
+   546→                <span className="flex items-center gap-1">
+   547→                  <Flame size={12} className="text-[#F97316]" />
+   548→                  {user.totalSessions} sessoes
+   549→                </span>
+   550→                <span className="flex items-center gap-1">
+   551→                  <Clock size={12} className="text-[var(--ws-gold)]" />
+   552→                  {user.totalStudyMinutes} min totais
+   553→                </span>
+   554→              </div>
+   555→            </div>
+   556→          </div>
+   557→        </WabiSabiCard>
+   558→      </motion.section>
+   559→
+   560→      {/* ===== 5. QUICK ACTIONS ===== */}
+   561→      <motion.section
+   562→        className="mb-8"
+   563→        {...fadeInUp}
+   564→        transition={{ duration: 0.5, delay: 0.3 }}
+   565→        aria-label="Acoes rapidas"
+   566→      >
+   567→        <div className="flex flex-wrap gap-2.5">
+   568→          {[
+   569→            { icon: BookPlus, label: 'Adicionar materia', action: () => onNavigate('notebooks') },
+   570→            { icon: ClipboardList, label: 'Nova tarefa', action: () => onNavigate('tasks') },
+   571→            { icon: Play, label: 'Iniciar sessao', action: () => onNavigate('timer') },
+   572→            { icon: RotateCcw, label: 'Revisar flashcards', action: () => onNavigate('flashcards') },
+   573→          ].map((btn) => (
+   574→            <motion.button
+   575→              key={btn.label}
+   576→              whileHover={{ y: -2 }}
+   577→              whileTap={{ scale: 0.97 }}
+   578→              onClick={btn.action}
+   579→              className="flex items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-2.5 text-sm font-medium text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/20 hover:text-[var(--ws-accent)]"
+   580→            >
+   581→              <btn.icon size={15} strokeWidth={1.5} />
+   582→              <span className="hidden sm:inline">{btn.label}</span>
+   583→              <span className="sm:hidden text-xs">{btn.label}</span>
+   584→            </motion.button>
+   585→          ))}
+   586→        </div>
+   587→      </motion.section>
+   588→
+   589→      {/* ===== 6 + 7: EVENTS & TASKS (side by side on desktop) ===== */}
+   590→      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+   591→        {/* 6. PROXIMOS EVENTOS */}
+   592→        <motion.section
+   593→          {...fadeInUp}
+   594→          transition={{ duration: 0.5, delay: 0.35 }}
+   595→          aria-label="Proximos eventos"
+   596→        >
+   597→          <div className="mb-3 flex items-center justify-between">
+   598→            <h2 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">
+   599→              Proximos Eventos
+   600→            </h2>
+   601→            <button
+   602→              onClick={() => onNavigate('calendar')}
+   603→              className="text-xs font-medium text-[var(--ws-accent)] hover:underline"
+   604→            >
+   605→              Ver calendario
+   606→            </button>
+   607→          </div>
+   608→
+   609→          {upcomingEvents.length > 0 ? (
+   610→            <WabiSabiCard hover={false} className="p-0 overflow-hidden">
+   611→              <div className="max-h-80 overflow-y-auto divide-y divide-[var(--ws-glass-border)]">
+   612→                {upcomingEvents.map((event, i) => {
+   613→                  const eventColor = getEventColor(event.color, event.type);
+   614→                  return (
+   615→                    <motion.div
+   616→                      key={event.id}
+   617→                      className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_3%,transparent)]"
+   618→                      initial={{ opacity: 0, x: -8 }}
+   619→                      animate={{ opacity: 1, x: 0 }}
+   620→                      transition={{ delay: 0.4 + i * 0.06 }}
+   621→                    >
+   622→                      <div
+   623→                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+   624→                        style={{ backgroundColor: eventColor }}
+   625→                      />
+   626→                      <div className="min-w-0 flex-1">
+   627→                        <p className="truncate text-sm font-medium text-[var(--ws-text-primary)]">
+   628→                          {event.title}
+   629→                        </p>
+   630→                        <p className="text-xs text-[var(--ws-text-tertiary)]">
+   631→                          {getEventTypeLabel(event.type)} · {format(parseISO(event.date), "d 'de' MMM, yyyy", { locale: ptBR })}
+   632→                        </p>
+   633→                      </div>
+   634→                    </motion.div>
+   635→                  );
+   636→                })}
+   637→              </div>
+   638→            </WabiSabiCard>
+   639→          ) : (
+   640→            <WabiSabiCard hover={false}>
+   641→              <div className="py-4 text-center">
+   642→                <Calendar size={28} className="mx-auto mb-2 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   643→                <p className="text-sm text-[var(--ws-text-tertiary)]">
+   644→                  Nenhum evento proximo
+   645→                </p>
+   646→              </div>
+   647→            </WabiSabiCard>
+   648→          )}
+   649→        </motion.section>
+   650→
+   651→        {/* 7. TAREFAS DE HOJE */}
+   652→        <motion.section
+   653→          {...fadeInUp}
+   654→          transition={{ duration: 0.5, delay: 0.4 }}
+   655→          aria-label="Tarefas de hoje"
+   656→        >
+   657→          <div className="mb-3 flex items-center justify-between">
+   658→            <h2 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">
+   659→              Tarefas de Hoje
+   660→            </h2>
+   661→            <button
+   662→              onClick={() => onNavigate('tasks')}
+   663→              className="text-xs font-medium text-[var(--ws-accent)] hover:underline"
+   664→            >
+   665→              Ver todas
+   666→            </button>
+   667→          </div>
+   668→
+   669→          {todayTasks.length > 0 ? (
+   670→            <WabiSabiCard hover={false} className="p-0 overflow-hidden">
+   671→              <div className="max-h-80 overflow-y-auto divide-y divide-[var(--ws-glass-border)]">
+   672→                {todayTasks.map((task, i) => {
+   673→                  const priority = getPriorityIndicator(task.priority);
+   674→                  return (
+   675→                    <motion.div
+   676→                      key={task.id}
+   677→                      className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_3%,transparent)]"
+   678→                      initial={{ opacity: 0, x: -8 }}
+   679→                      animate={{ opacity: 1, x: 0 }}
+   680→                      transition={{ delay: 0.45 + i * 0.06 }}
+   681→                    >
+   682→                      <span className="shrink-0 text-xs" role="img" aria-label={priority.label}>
+   683→                        {priority.emoji}
+   684→                      </span>
+   685→                      <div className="min-w-0 flex-1">
+   686→                        <p className="truncate text-sm font-medium text-[var(--ws-text-primary)]">
+   687→                          {task.title}
+   688→                        </p>
+   689→                        {task.subjectName && (
+   690→                          <p className="text-xs text-[var(--ws-text-tertiary)]">
+   691→                            {task.subjectName}
+   692→                          </p>
+   693→                        )}
+   694→                      </div>
+   695→                      <Badge
+   696→                        variant="outline"
+   697→                        className="shrink-0 rounded-ws-button border-[var(--ws-glass-border)] px-1.5 py-0 text-[10px] font-normal text-[var(--ws-text-tertiary)]"
+   698→                      >
+   699→                        {priority.label}
+   700→                      </Badge>
+   701→                    </motion.div>
+   702→                  );
+   703→                })}
+   704→              </div>
+   705→            </WabiSabiCard>
+   706→          ) : (
+   707→            <WabiSabiCard hover={false}>
+   708→              <div className="py-4 text-center">
+   709→                <Target size={28} className="mx-auto mb-2 text-[var(--ws-text-tertiary)]" strokeWidth={1} />
+   710→                <p className="text-sm text-[var(--ws-text-tertiary)]">
+   711→                  Nenhuma tarefa pendente para hoje
+   712→                </p>
+   713→                <button
+   714→                  onClick={() => onNavigate('tasks')}
+   715→                  className="mt-2 text-xs font-medium text-[var(--ws-accent)] hover:underline"
+   716→                >
+   717→                  Criar tarefa
+   718→                </button>
+   719→              </div>
+   720→            </WabiSabiCard>
+   721→          )}
+   722→        </motion.section>
+   723→      </div>
+   724→
+   725→      {/* ===== 8. METAS DO DIA ===== */}
+   726→      {dailyGoals.length > 0 && (
+   727→        <motion.section
+   728→          className="mb-8"
+   729→          {...fadeInUp}
+   730→          transition={{ duration: 0.5, delay: 0.45 }}
+   731→          aria-label="Metas do dia"
+   732→        >
+   733→          <div className="mb-3 flex items-center gap-2">
+   734→            <Target size={16} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
+   735→          <h2 className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)]">
+   736→            Metas do Dia
+   737→          </h2>
+   738→          </div>
+   739→
+   740→          <WabiSabiCard hover={false}>
+   741→            <div className="space-y-4">
+   742→              {dailyGoals.map((goal, i) => {
+   743→                const progress = goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0;
+   744→                const isComplete = progress >= 100;
+   745→                return (
+   746→                  <motion.div
+   747→                    key={goal.id}
+   748→                    initial={{ opacity: 0, y: 6 }}
+   749→                    animate={{ opacity: 1, y: 0 }}
+   750→                    transition={{ delay: 0.5 + i * 0.06 }}
+   751→                >
+   752→                    <div className="mb-1.5 flex items-center justify-between">
+   753→                      <p className="text-sm font-medium text-[var(--ws-text-primary)]">
+   754→                        {goal.title}
+   755→                      </p>
+   756→                      <span className={`text-xs font-medium ${isComplete ? 'text-[var(--ws-verdigris)]' : 'text-[var(--ws-text-tertiary)]'}`}>
+   757→                        {goal.current}/{goal.target} {goal.unit}
+   758→                        {isComplete && ' ✓'}
+   759→                      </span>
+   760→                    </div>
+   761→                    <Progress
+   762→                      value={progress}
+   763→                      className="h-2"
+   764→                      style={{
+   765→                        // @ts-expect-error CSS custom properties for styling
+   766→                        '--progress-color': isComplete
+   767→                          ? 'var(--ws-verdigris)'
+   768→                          : 'var(--ws-accent)',
+   769→                      }}
+   770→                    />
+   771→                  </motion.div>
+   772→                );
+   773→              })}
+   774→            </div>
+   775→          </WabiSabiCard>
+   776→        </motion.section>
+   777→      )}
+   778→    </motion.div>
+   779→  );
+   780→}
+   781→

@@ -1,0 +1,1186 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { formatDistanceToNow, parseISO, isPast, isToday } from 'date-fns';
+     6→import { ptBR } from 'date-fns/locale';
+     7→import {
+     8→  CheckCircle2,
+     9→  Circle,
+    10→  Clock,
+    11→  AlertTriangle,
+    12→  Flag,
+    13→  Plus,
+    14→  Filter,
+    15→  Loader2,
+    16→  Pencil,
+    17→  Trash2,
+    18→  X,
+    19→  Calendar,
+    20→  Sparkles,
+    21→  ListTodo,
+    22→  ChevronDown,
+    23→  ChevronUp,
+    24→  Play,
+    25→  Zap,
+    26→} from 'lucide-react';
+    27→import { Button } from '@/components/ui/button';
+    28→import { Input } from '@/components/ui/input';
+    29→import { Label } from '@/components/ui/label';
+    30→import { Badge } from '@/components/ui/badge';
+    31→import { Skeleton } from '@/components/ui/skeleton';
+    32→import {
+    33→  Select,
+    34→  SelectContent,
+    35→  SelectItem,
+    36→  SelectTrigger,
+    37→  SelectValue,
+    38→} from '@/components/ui/select';
+    39→import {
+    40→  Dialog,
+    41→  DialogContent,
+    42→  DialogHeader,
+    43→  DialogTitle,
+    44→  DialogDescription,
+    45→  DialogFooter,
+    46→} from '@/components/ui/dialog';
+    47→import {
+    48→  AlertDialog,
+    49→  AlertDialogAction,
+    50→  AlertDialogCancel,
+    51→  AlertDialogContent,
+    52→  AlertDialogDescription,
+    53→  AlertDialogFooter,
+    54→  AlertDialogHeader,
+    55→  AlertDialogTitle,
+    56→} from '@/components/ui/alert-dialog';
+    57→import { Textarea } from '@/components/ui/textarea';
+    58→import { toast } from '@/hooks/use-toast';
+    59→
+    60→// ===== TYPES =====
+    61→interface TasksViewProps {
+    62→  onNavigate: (tab: string, data?: any) => void;
+    63→}
+    64→
+    65→interface TaskSubject {
+    66→  id: string;
+    67→  name: string;
+    68→  color: string;
+    69→  icon: string;
+    70→}
+    71→
+    72→interface Task {
+    73→  id: string;
+    74→  title: string;
+    75→  description?: string | null;
+    76→  subjectId?: string | null;
+    77→  subject?: TaskSubject | null;
+    78→  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    79→  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    80→  dueDate?: string | null;
+    81→  estimatedMinutes?: number | null;
+    82→  actualMinutes?: number | null;
+    83→  sortOrder: number;
+    84→  completedAt?: string | null;
+    85→  createdAt: string;
+    86→  updatedAt: string;
+    87→}
+    88→
+    89→interface SubjectOption {
+    90→  id: string;
+    91→  name: string;
+    92→  color: string;
+    93→  icon: string;
+    94→}
+    95→
+    96→type FilterTab = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+    97→type SortKey = 'dueDate' | 'priority' | 'createdAt' | 'title';
+    98→type SortDir = 'asc' | 'desc';
+    99→
+   100→// ===== CONSTANTS =====
+   101→const FILTER_TABS: { key: FilterTab; label: string }[] = [
+   102→  { key: 'ALL', label: 'Todas' },
+   103→  { key: 'PENDING', label: 'Pendentes' },
+   104→  { key: 'IN_PROGRESS', label: 'Em andamento' },
+   105→  { key: 'COMPLETED', label: 'Concluidas' },
+   106→];
+   107→
+   108→const PRIORITY_CONFIG: Record<string, { label: string; colorClass: string; bgClass: string; weight: number }> = {
+   109→  LOW: { label: 'Baixa', colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200', weight: 0 },
+   110→  MEDIUM: { label: 'Media', colorClass: 'text-amber-700', bgClass: 'bg-amber-50 border-amber-200', weight: 1 },
+   111→  HIGH: { label: 'Alta', colorClass: 'text-red-700', bgClass: 'bg-red-50 border-red-200', weight: 2 },
+   112→  URGENT: { label: 'Urgente', colorClass: 'text-orange-700', bgClass: 'bg-orange-50 border-orange-200', weight: 3 },
+   113→};
+   114→
+   115→const PRIORITY_OPTIONS = [
+   116→  { value: 'LOW', label: 'Baixa' },
+   117→  { value: 'MEDIUM', label: 'Media' },
+   118→  { value: 'HIGH', label: 'Alta' },
+   119→  { value: 'URGENT', label: 'Urgente' },
+   120→];
+   121→
+   122→const STATUS_OPTIONS = [
+   123→  { value: 'PENDING', label: 'Pendente' },
+   124→  { value: 'IN_PROGRESS', label: 'Em andamento' },
+   125→  { value: 'COMPLETED', label: 'Concluida' },
+   126→  { value: 'CANCELLED', label: 'Cancelada' },
+   127→];
+   128→
+   129→const PRIORITY_EMOJI: Record<string, string> = {
+   130→  LOW: '🟢',
+   131→  MEDIUM: '🟡',
+   132→  HIGH: '🔴',
+   133→  URGENT: '⚡',
+   134→};
+   135→
+   136→// ===== ANIMATION VARIANTS =====
+   137→const containerVariants = {
+   138→  hidden: { opacity: 0 },
+   139→  visible: {
+   140→    opacity: 1,
+   141→    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+   142→  },
+   143→};
+   144→
+   145→const itemVariants = {
+   146→  hidden: { opacity: 0, y: 16 },
+   147→  visible: {
+   148→    opacity: 1,
+   149→    y: 0,
+   150→    transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+   151→  },
+   152→  exit: {
+   153→    opacity: 0,
+   154→    x: -30,
+   155→    transition: { duration: 0.25 },
+   156→  },
+   157→};
+   158→
+   159→const fadeInUp = {
+   160→  hidden: { opacity: 0, y: 20 },
+   161→  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } },
+   162→};
+   163→
+   164→// ===== XP CELEBRATION COMPONENT =====
+   165→function XPCelebration({ show, taskId }: { show: boolean; taskId: string }) {
+   166→  return (
+   167→    <AnimatePresence>
+   168→      {show && (
+   169→        <motion.div
+   170→          key={taskId}
+   171→          initial={{ opacity: 0, y: 0, scale: 0.5 }}
+   172→          animate={{
+   173→            opacity: [0, 1, 1, 0],
+   174→            y: [0, -10, -40, -80],
+   175→            scale: [0.5, 1.2, 1, 0.8],
+   176→          }}
+   177→          exit={{ opacity: 0 }}
+   178→          transition={{ duration: 1.5, ease: 'easeOut' }}
+   179→          className="pointer-events-none absolute -top-2 left-8 z-50 flex items-center gap-1"
+   180→        >
+   181→          <motion.span
+   182→            initial={{ rotate: -20 }}
+   183→            animate={{ rotate: [0, 10, -10, 0] }}
+   184→            transition={{ duration: 0.6, repeat: 2 }}
+   185→            className="text-xl font-bold"
+   186→            style={{ color: 'var(--ws-accent)' }}
+   187→          >
+   188→            +30 XP
+   189→          </motion.span>
+   190→          <motion.span
+   191→            initial={{ scale: 0 }}
+   192→            animate={{ scale: [0, 1.5, 1] }}
+   193→            transition={{ duration: 0.4, delay: 0.1 }}
+   194→          >
+   195→            <Sparkles className="h-5 w-5" style={{ color: 'var(--ws-gold)' }} />
+   196→          </motion.span>
+   197→        </motion.div>
+   198→      )}
+   199→    </AnimatePresence>
+   200→  );
+   201→}
+   202→
+   203→// ===== TASK FORM DIALOG =====
+   204→function TaskFormDialog({
+   205→  open,
+   206→  onOpenChange,
+   207→  subjects,
+   208→  title,
+   209→  setTitle,
+   210→  description,
+   211→  setDescription,
+   212→  subjectId,
+   213→  setSubjectId,
+   214→  priority,
+   215→  setPriority,
+   216→  dueDate,
+   217→  setDueDate,
+   218→  estimatedMinutes,
+   219→  setEstimatedMinutes,
+   220→  status,
+   221→  setStatus,
+   222→  titleError,
+   223→  submitting,
+   224→  onSubmit,
+   225→  isEdit,
+   226→}: {
+   227→  open: boolean;
+   228→  onOpenChange: (open: boolean) => void;
+   229→  subjects: SubjectOption[];
+   230→  title: string;
+   231→  setTitle: (v: string) => void;
+   232→  description: string;
+   233→  setDescription: (v: string) => void;
+   234→  subjectId: string;
+   235→  setSubjectId: (v: string) => void;
+   236→  priority: string;
+   237→  setPriority: (v: string) => void;
+   238→  dueDate: string;
+   239→  setDueDate: (v: string) => void;
+   240→  estimatedMinutes: string;
+   241→  setEstimatedMinutes: (v: string) => void;
+   242→  status?: string;
+   243→  setStatus?: (v: string) => void;
+   244→  titleError: string;
+   245→  submitting: boolean;
+   246→  onSubmit: () => void;
+   247→  isEdit: boolean;
+   248→}) {
+   249→  return (
+   250→    <Dialog open={open} onOpenChange={onOpenChange}>
+   251→      <DialogContent
+   252→        className="sm:max-w-md"
+   253→        style={{ borderRadius: 'var(--ws-radius-card)' }}
+   254→      >
+   255→        <DialogHeader>
+   256→          <DialogTitle style={{ color: 'var(--ws-text-primary)' }}>
+   257→            {isEdit ? 'Editar tarefa' : 'Nova tarefa'}
+   258→          </DialogTitle>
+   259→          <DialogDescription style={{ color: 'var(--ws-text-tertiary)' }}>
+   260→            {isEdit ? 'Altere os dados da tarefa abaixo.' : 'Preencha os dados para criar sua tarefa.'}
+   261→          </DialogDescription>
+   262→        </DialogHeader>
+   263→
+   264→        <div className="space-y-4 py-2">
+   265→          {/* Titulo */}
+   266→          <div className="space-y-2">
+   267→            <Label htmlFor="task-title" style={{ color: 'var(--ws-text-secondary)' }}>
+   268→              Titulo <span style={{ color: 'var(--ws-accent)' }}>*</span>
+   269→            </Label>
+   270→            <Input
+   271→              id="task-title"
+   272→              placeholder="Ex: Resumir capitulo 5 de Historia"
+   273→              value={title}
+   274→              onChange={(e) => { setTitle(e.target.value); titleError && setTitle(''); }}
+   275→              style={{ borderRadius: 'var(--ws-radius-button)' }}
+   276→              autoFocus
+   277→            />
+   278→            {titleError && (
+   279→              <p className="text-xs" style={{ color: 'var(--ws-accent)' }}>{titleError}</p>
+   280→            )}
+   281→          </div>
+   282→
+   283→          {/* Descricao */}
+   284→          <div className="space-y-2">
+   285→            <Label htmlFor="task-desc" style={{ color: 'var(--ws-text-secondary)' }}>
+   286→              Descricao
+   287→            </Label>
+   288→            <Textarea
+   289→              id="task-desc"
+   290→              placeholder="Detalhes sobre a tarefa (opcional)..."
+   291→              value={description}
+   292→              onChange={(e) => setDescription(e.target.value)}
+   293→              rows={3}
+   294→              style={{ borderRadius: 'var(--ws-radius-button)' }}
+   295→            />
+   296→          </div>
+   297→
+   298→          {/* Materia */}
+   299→          <div className="space-y-2">
+   300→            <Label style={{ color: 'var(--ws-text-secondary)' }}>Materia</Label>
+   301→            <Select value={subjectId} onValueChange={setSubjectId}>
+   302→              <SelectTrigger
+   303→                className="w-full"
+   304→                style={{ borderRadius: 'var(--ws-radius-button)' }}
+   305→              >
+   306→                <SelectValue placeholder="Selecionar materia (opcional)" />
+   307→              </SelectTrigger>
+   308→              <SelectContent>
+   309→                {subjects.length === 0 && (
+   310→                  <SelectItem value="_none" disabled>
+   311→                    Nenhuma materia cadastrada
+   312→                  </SelectItem>
+   313→                )}
+   314→                {subjects.map((s) => (
+   315→                  <SelectItem key={s.id} value={s.id}>
+   316→                    <span className="flex items-center gap-2">
+   317→                      <span
+   318→                        className="inline-block h-2.5 w-2.5 rounded-full"
+   319→                        style={{ background: s.color }}
+   320→                      />
+   321→                      {s.name}
+   322→                    </span>
+   323→                  </SelectItem>
+   324→                ))}
+   325→              </SelectContent>
+   326→            </Select>
+   327→          </div>
+   328→
+   329→          {/* Prioridade + Status (edit only) */}
+   330→          <div className="grid grid-cols-2 gap-3">
+   331→            <div className="space-y-2">
+   332→              <Label style={{ color: 'var(--ws-text-secondary)' }}>Prioridade</Label>
+   333→              <Select value={priority} onValueChange={setPriority}>
+   334→                <SelectTrigger style={{ borderRadius: 'var(--ws-radius-button)' }}>
+   335→                  <SelectValue />
+   336→                </SelectTrigger>
+   337→                <SelectContent>
+   338→                  {PRIORITY_OPTIONS.map((p) => (
+   339→                    <SelectItem key={p.value} value={p.value}>
+   340→                      {PRIORITY_EMOJI[p.value]} {p.label}
+   341→                    </SelectItem>
+   342→                  ))}
+   343→                </SelectContent>
+   344→              </Select>
+   345→            </div>
+   346→            {isEdit && setStatus && status !== undefined && (
+   347→              <div className="space-y-2">
+   348→                <Label style={{ color: 'var(--ws-text-secondary)' }}>Status</Label>
+   349→                <Select value={status} onValueChange={setStatus}>
+   350→                  <SelectTrigger style={{ borderRadius: 'var(--ws-radius-button)' }}>
+   351→                    <SelectValue />
+   352→                  </SelectTrigger>
+   353→                  <SelectContent>
+   354→                    {STATUS_OPTIONS.map((s) => (
+   355→                      <SelectItem key={s.value} value={s.value}>
+   356→                        {s.label}
+   357→                      </SelectItem>
+   358→                    ))}
+   359→                  </SelectContent>
+   360→                </Select>
+   361→              </div>
+   362→            )}
+   363→          </div>
+   364→
+   365→          {/* Data de entrega + Tempo estimado */}
+   366→          <div className="grid grid-cols-2 gap-3">
+   367→            <div className="space-y-2">
+   368→              <Label htmlFor="task-due" style={{ color: 'var(--ws-text-secondary)' }}>
+   369→                Data de entrega
+   370→              </Label>
+   371→              <Input
+   372→                id="task-due"
+   373→                type="date"
+   374→                value={dueDate}
+   375→                onChange={(e) => setDueDate(e.target.value)}
+   376→                style={{ borderRadius: 'var(--ws-radius-button)' }}
+   377→              />
+   378→            </div>
+   379→            <div className="space-y-2">
+   380→              <Label htmlFor="task-time" style={{ color: 'var(--ws-text-secondary)' }}>
+   381→                Tempo estimado (min)
+   382→              </Label>
+   383→              <Input
+   384→                id="task-time"
+   385→                type="number"
+   386→                min={1}
+   387→                placeholder="Ex: 45"
+   388→                value={estimatedMinutes}
+   389→                onChange={(e) => setEstimatedMinutes(e.target.value)}
+   390→                style={{ borderRadius: 'var(--ws-radius-button)' }}
+   391→              />
+   392→            </div>
+   393→          </div>
+   394→        </div>
+   395→
+   396→        <DialogFooter className="gap-2 sm:gap-0">
+   397→          <Button
+   398→            variant="outline"
+   399→            onClick={() => onOpenChange(false)}
+   400→            disabled={submitting}
+   401→            style={{ borderRadius: 'var(--ws-radius-button)' }}
+   402→          >
+   403→            Cancelar
+   404→          </Button>
+   405→          <Button
+   406→            onClick={onSubmit}
+   407→            disabled={submitting}
+   408→            style={{
+   409→              background: 'var(--ws-accent)',
+   410→              color: 'var(--ws-text-on-dark)',
+   411→              borderRadius: 'var(--ws-radius-button)',
+   412→            }}
+   413→          >
+   414→            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   415→            {isEdit ? 'Salvar alteracoes' : 'Criar tarefa'}
+   416→          </Button>
+   417→        </DialogFooter>
+   418→      </DialogContent>
+   419→    </Dialog>
+   420→  );
+   421→}
+   422→
+   423→// ===== MAIN COMPONENT =====
+   424→export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
+   425→  // State
+   426→  const [tasks, setTasks] = useState<Task[]>([]);
+   427→  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+   428→  const [loading, setLoading] = useState(true);
+   429→  const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
+   430→  const [sortKey, setSortKey] = useState<SortKey>('dueDate');
+   431→  const [sortDir, setSortDir] = useState<SortDir>('asc');
+   432→  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+   433→  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+   434→  const [xpCelebrationTaskId, setXpCelebrationTaskId] = useState<string | null>(null);
+   435→
+   436→  // Dialog states
+   437→  const [addDialogOpen, setAddDialogOpen] = useState(false);
+   438→  const [editDialogOpen, setEditDialogOpen] = useState(false);
+   439→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   440→  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+   441→  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+   442→  const [submitting, setSubmitting] = useState(false);
+   443→
+   444→  // Form states
+   445→  const [formTitle, setFormTitle] = useState('');
+   446→  const [formDescription, setFormDescription] = useState('');
+   447→  const [formSubjectId, setFormSubjectId] = useState('');
+   448→  const [formPriority, setFormPriority] = useState('MEDIUM');
+   449→  const [formDueDate, setFormDueDate] = useState('');
+   450→  const [formEstimatedMinutes, setFormEstimatedMinutes] = useState('');
+   451→  const [formStatus, setFormStatus] = useState('PENDING');
+   452→  const [formTitleError, setFormTitleError] = useState('');
+   453→
+   454→  // ===== FETCH =====
+   455→  const fetchTasks = useCallback(async () => {
+   456→    try {
+   457→      const params = new URLSearchParams();
+   458→      if (activeFilter !== 'ALL') {
+   459→        params.set('status', activeFilter);
+   460→      }
+   461→      const res = await fetch(`/api/tasks?${params.toString()}`);
+   462→      if (!res.ok) throw new Error('Erro ao buscar tarefas');
+   463→      const data = await res.json();
+   464→      setTasks(data.tasks || []);
+   465→    } catch {
+   466→      toast({ title: 'Erro', description: 'Nao foi possivel carregar as tarefas.', variant: 'destructive' });
+   467→    } finally {
+   468→      setLoading(false);
+   469→    }
+   470→  }, [activeFilter]);
+   471→
+   472→  const fetchSubjects = useCallback(async () => {
+   473→    try {
+   474→      const res = await fetch('/api/subjects');
+   475→      if (!res.ok) return;
+   476→      const data = await res.json();
+   477→      setSubjects(
+   478→        (data.subjects || []).map((s: any) => ({
+   479→          id: s.id,
+   480→          name: s.name,
+   481→          color: s.color,
+   482→          icon: s.icon,
+   483→        }))
+   484→      );
+   485→    } catch {
+   486→      // subjects are optional
+   487→    }
+   488→  }, []);
+   489→
+   490→  useEffect(() => {
+   491→    setLoading(true);
+   492→    fetchTasks();
+   493→  }, [fetchTasks]);
+   494→
+   495→  useEffect(() => {
+   496→    fetchSubjects();
+   497→  }, [fetchSubjects]);
+   498→
+   499→  // ===== HELPERS =====
+   500→  const resetForm = useCallback(() => {
+   501→    setFormTitle('');
+   502→    setFormDescription('');
+   503→    setFormSubjectId('');
+   504→    setFormPriority('MEDIUM');
+   505→    setFormDueDate('');
+   506→    setFormEstimatedMinutes('');
+   507→    setFormStatus('PENDING');
+   508→    setFormTitleError('');
+   509→  }, []);
+   510→
+   511→  const openEditDialog = useCallback((task: Task) => {
+   512→    setTaskToEdit(task);
+   513→    setFormTitle(task.title);
+   514→    setFormDescription(task.description || '');
+   515→    setFormSubjectId(task.subjectId || '');
+   516→    setFormPriority(task.priority);
+   517→    setFormDueDate(task.dueDate ? task.dueDate.split('T')[0] : '');
+   518→    setFormEstimatedMinutes(task.estimatedMinutes?.toString() || '');
+   519→    setFormStatus(task.status);
+   520→    setFormTitleError('');
+   521→    setEditDialogOpen(true);
+   522→  }, []);
+   523→
+   524→  const formatDueDate = (dateStr: string) => {
+   525→    try {
+   526→      const date = parseISO(dateStr);
+   527→      if (isToday(date)) return 'Hoje';
+   528→      if (isPast(date)) return 'Atrasada';
+   529→      return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+   530→    } catch {
+   531→      return '';
+   532→    }
+   533→  };
+   534→
+   535→  const isOverdue = (dateStr: string) => {
+   536→    try {
+   537→      const date = parseISO(dateStr);
+   538→      return isPast(date) && !isToday(date);
+   539→    } catch {
+   540→      return false;
+   541→    }
+   542→  };
+   543→
+   544→  const formatMinutes = (mins: number) => {
+   545→    if (mins < 60) return `${mins}min`;
+   546→    const h = Math.floor(mins / 60);
+   547→    const m = mins % 60;
+   548→    return m > 0 ? `${h}h${m}min` : `${h}h`;
+   549→  };
+   550→
+   551→  // ===== SORT & FILTER =====
+   552→  const filteredAndSorted = tasks
+   553→    .filter((t) => {
+   554→      if (activeFilter === 'ALL') return true;
+   555→      return t.status === activeFilter;
+   556→    })
+   557→    .sort((a, b) => {
+   558→      let cmp = 0;
+   559→      switch (sortKey) {
+   560→        case 'dueDate': {
+   561→          const aD = a.dueDate ? parseISO(a.dueDate).getTime() : Infinity;
+   562→          const bD = b.dueDate ? parseISO(b.dueDate).getTime() : Infinity;
+   563→          cmp = aD - bD;
+   564→          break;
+   565→        }
+   566→        case 'priority':
+   567→          cmp = (PRIORITY_CONFIG[a.priority]?.weight || 0) - (PRIORITY_CONFIG[b.priority]?.weight || 0);
+   568→          break;
+   569→        case 'createdAt':
+   570→          cmp = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+   571→          break;
+   572→        case 'title':
+   573→          cmp = a.title.localeCompare(b.title, 'pt-BR');
+   574→          break;
+   575→      }
+   576→      return sortDir === 'asc' ? cmp : -cmp;
+   577→    });
+   578→
+   579→  const taskCounts = {
+   580→    ALL: tasks.length,
+   581→    PENDING: tasks.filter((t) => t.status === 'PENDING').length,
+   582→    IN_PROGRESS: tasks.filter((t) => t.status === 'IN_PROGRESS').length,
+   583→    COMPLETED: tasks.filter((t) => t.status === 'COMPLETED').length,
+   584→  };
+   585→
+   586→  // ===== HANDLERS =====
+   587→  const handleToggleComplete = async (task: Task) => {
+   588→    const newStatus: Task['status'] = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+   589→    const isCompleting = newStatus === 'COMPLETED';
+   590→    if (isCompleting) setCompletingTaskId(task.id);
+   591→
+   592→    try {
+   593→      const res = await fetch(`/api/tasks/${task.id}`, {
+   594→        method: 'PATCH',
+   595→        headers: { 'Content-Type': 'application/json' },
+   596→        body: JSON.stringify({ status: newStatus }),
+   597→      });
+   598→      if (!res.ok) throw new Error();
+   599→      const data = await res.json();
+   600→      setTasks((prev) => prev.map((t) => (t.id === task.id ? data.task : t)));
+   601→
+   602→      if (isCompleting && data.xpAwarded) {
+   603→        setXpCelebrationTaskId(task.id);
+   604→        toast({ title: 'Tarefa concluida!', description: '+30 XP ganhos. Parabens pelo foco!' });
+   605→        setTimeout(() => setXpCelebrationTaskId(null), 2000);
+   606→      }
+   607→    } catch {
+   608→      toast({ title: 'Erro', description: 'Nao foi possivel atualizar a tarefa.', variant: 'destructive' });
+   609→    } finally {
+   610→      setCompletingTaskId(null);
+   611→    }
+   612→  };
+   613→
+   614→  const handleStartTask = async (task: Task) => {
+   615→    try {
+   616→      const res = await fetch(`/api/tasks/${task.id}`, {
+   617→        method: 'PATCH',
+   618→        headers: { 'Content-Type': 'application/json' },
+   619→        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+   620→      });
+   621→      if (!res.ok) throw new Error();
+   622→      const data = await res.json();
+   623→      setTasks((prev) => prev.map((t) => (t.id === task.id ? data.task : t)));
+   624→      toast({ title: 'Tarefa iniciada', description: 'Bom trabalho! Foco total.' });
+   625→    } catch {
+   626→      toast({ title: 'Erro', description: 'Nao foi possivel iniciar a tarefa.', variant: 'destructive' });
+   627→    }
+   628→  };
+   629→
+   630→  const handleAddTask = async () => {
+   631→    if (!formTitle.trim()) {
+   632→      setFormTitleError('O titulo e obrigatorio');
+   633→      return;
+   634→    }
+   635→    setSubmitting(true);
+   636→    try {
+   637→      const body: any = { title: formTitle.trim(), priority: formPriority };
+   638→      if (formDescription.trim()) body.description = formDescription.trim();
+   639→      if (formSubjectId) body.subjectId = formSubjectId;
+   640→      if (formDueDate) body.dueDate = formDueDate;
+   641→      if (formEstimatedMinutes) body.estimatedMinutes = parseInt(formEstimatedMinutes, 10);
+   642→
+   643→      const res = await fetch('/api/tasks', {
+   644→        method: 'POST',
+   645→        headers: { 'Content-Type': 'application/json' },
+   646→        body: JSON.stringify(body),
+   647→      });
+   648→      if (!res.ok) throw new Error();
+   649→      const data = await res.json();
+   650→      setTasks((prev) => [data.task, ...prev]);
+   651→      setAddDialogOpen(false);
+   652→      resetForm();
+   653→      toast({ title: 'Tarefa criada', description: 'Sua tarefa foi adicionada com sucesso.' });
+   654→    } catch {
+   655→      toast({ title: 'Erro', description: 'Nao foi possivel criar a tarefa.', variant: 'destructive' });
+   656→    } finally {
+   657→      setSubmitting(false);
+   658→    }
+   659→  };
+   660→
+   661→  const handleEditTask = async () => {
+   662→    if (!taskToEdit || !formTitle.trim()) {
+   663→      setFormTitleError('O titulo e obrigatorio');
+   664→      return;
+   665→    }
+   666→    setSubmitting(true);
+   667→    try {
+   668→      const body: any = { title: formTitle.trim(), priority: formPriority, status: formStatus };
+   669→      body.description = formDescription.trim() || null;
+   670→      body.subjectId = formSubjectId || null;
+   671→      body.dueDate = formDueDate || null;
+   672→      body.estimatedMinutes = formEstimatedMinutes ? parseInt(formEstimatedMinutes, 10) : null;
+   673→
+   674→      const res = await fetch(`/api/tasks/${taskToEdit.id}`, {
+   675→        method: 'PATCH',
+   676→        headers: { 'Content-Type': 'application/json' },
+   677→        body: JSON.stringify(body),
+   678→      });
+   679→      if (!res.ok) throw new Error();
+   680→      const data = await res.json();
+   681→      setTasks((prev) => prev.map((t) => (t.id === taskToEdit.id ? data.task : t)));
+   682→      setEditDialogOpen(false);
+   683→      setTaskToEdit(null);
+   684→      resetForm();
+   685→      toast({ title: 'Tarefa atualizada', description: 'Alteracoes salvas com sucesso.' });
+   686→    } catch {
+   687→      toast({ title: 'Erro', description: 'Nao foi possivel atualizar a tarefa.', variant: 'destructive' });
+   688→    } finally {
+   689→      setSubmitting(false);
+   690→    }
+   691→  };
+   692→
+   693→  const handleDeleteTask = async () => {
+   694→    if (!taskToDelete) return;
+   695→    setSubmitting(true);
+   696→    try {
+   697→      const res = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
+   698→      if (!res.ok) throw new Error();
+   699→      setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+   700→      setDeleteDialogOpen(false);
+   701→      setTaskToDelete(null);
+   702→      if (expandedTaskId === taskToDelete.id) setExpandedTaskId(null);
+   703→      toast({ title: 'Tarefa excluida', description: 'A tarefa foi removida.' });
+   704→    } catch {
+   705→      toast({ title: 'Erro', description: 'Nao foi possivel excluir a tarefa.', variant: 'destructive' });
+   706→    } finally {
+   707→      setSubmitting(false);
+   708→    }
+   709→  };
+   710→
+   711→  const toggleSort = (key: SortKey) => {
+   712→    if (sortKey === key) setSortDir((p) => (p === 'asc' ? 'desc' : 'asc'));
+   713→    else { setSortKey(key); setSortDir('asc'); }
+   714→  };
+   715→
+   716→  // ===== RENDER =====
+   717→  return (
+   718→    <section className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+   719→      {/* Header */}
+   720→      <motion.div
+   721→        initial={{ opacity: 0, y: -10 }}
+   722→        animate={{ opacity: 1, y: 0 }}
+   723→        transition={{ duration: 0.4 }}
+   724→        className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+   725→      >
+   726→        <div>
+   727→          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: 'var(--ws-text-primary)' }}>
+   728→            Tarefas
+   729→          </h2>
+   730→          <p className="mt-1 text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   731→            Organize seus estudos e conquiste seus objetivos
+   732→          </p>
+   733→        </div>
+   734→        <Button
+   735→          onClick={() => { resetForm(); setAddDialogOpen(true); }}
+   736→          className="flex items-center gap-2 self-start"
+   737→          style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)', borderRadius: 'var(--ws-radius-button)' }}
+   738→        >
+   739→          <Plus className="h-4 w-4" />
+   740→          Nova tarefa
+   741→        </Button>
+   742→      </motion.div>
+   743→
+   744→      {/* Filter Tabs */}
+   745→      <motion.div
+   746→        initial={{ opacity: 0, y: 10 }}
+   747→        animate={{ opacity: 1, y: 0 }}
+   748→        transition={{ duration: 0.4, delay: 0.1 }}
+   749→        className="mb-4"
+   750→      >
+   751→        <div
+   752→          className="flex items-center gap-1 overflow-x-auto rounded-xl p-1"
+   753→          style={{ background: 'var(--ws-bg-dark)', borderRadius: 'var(--ws-radius-card)' }}
+   754→        >
+   755→          {FILTER_TABS.map((tab) => (
+   756→            <button
+   757→              key={tab.key}
+   758→              onClick={() => setActiveFilter(tab.key)}
+   759→              className="relative flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+   760→              style={{ color: activeFilter === tab.key ? 'var(--ws-text-primary)' : 'var(--ws-text-tertiary)' }}
+   761→            >
+   762→              {activeFilter === tab.key && (
+   763→                <motion.div
+   764→                  layoutId="activeTaskTab"
+   765→                  className="absolute inset-0 rounded-lg"
+   766→                  style={{ background: 'var(--ws-glass)', boxShadow: 'var(--ws-shadow-soft)', border: '1px solid var(--ws-glass-border)' }}
+   767→                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+   768→                />
+   769→              )}
+   770→              <span className="relative z-10">{tab.label}</span>
+   771→              <span
+   772→                className="relative z-10 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs"
+   773→                style={{ background: activeFilter === tab.key ? 'var(--ws-accent)' : 'var(--ws-glass-border)', color: activeFilter === tab.key ? 'white' : 'var(--ws-text-tertiary)' }}
+   774→              >
+   775→                {taskCounts[tab.key]}
+   776→              </span>
+   777→            </button>
+   778→          ))}
+   779→        </div>
+   780→      </motion.div>
+   781→
+   782→      {/* Sort Controls */}
+   783→      <motion.div
+   784→        initial={{ opacity: 0 }}
+   785→        animate={{ opacity: 1 }}
+   786→        transition={{ duration: 0.4, delay: 0.15 }}
+   787→        className="mb-4 flex flex-wrap items-center gap-2"
+   788→      >
+   789→        <Filter className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   790→        <span className="text-xs font-medium" style={{ color: 'var(--ws-text-tertiary)' }}>Ordenar:</span>
+   791→        {(
+   792→          [
+   793→            { key: 'dueDate' as SortKey, label: 'Data de entrega' },
+   794→            { key: 'priority' as SortKey, label: 'Prioridade' },
+   795→            { key: 'createdAt' as SortKey, label: 'Criacao' },
+   796→            { key: 'title' as SortKey, label: 'Titulo' },
+   797→          ] as const
+   798→        ).map((opt) => (
+   799→          <button
+   800→            key={opt.key}
+   801→            onClick={() => toggleSort(opt.key)}
+   802→            className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+   803→            style={{
+   804→              background: sortKey === opt.key ? 'var(--ws-accent)' : 'transparent',
+   805→              color: sortKey === opt.key ? 'white' : 'var(--ws-text-tertiary)',
+   806→              border: `1px solid ${sortKey === opt.key ? 'var(--ws-accent)' : 'var(--ws-glass-border)'}`,
+   807→            }}
+   808→          >
+   809→            {opt.label}
+   810→            {sortKey === opt.key && <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+   811→          </button>
+   812→        ))}
+   813→      </motion.div>
+   814→
+   815→      {/* Task List */}
+   816→      {loading ? (
+   817→        <div className="space-y-3">
+   818→          {Array.from({ length: 4 }).map((_, i) => (
+   819→            <div
+   820→              key={i}
+   821→              className="rounded-xl border p-4"
+   822→              style={{ borderColor: 'var(--ws-glass-border)', background: 'var(--ws-glass)', borderRadius: 'var(--ws-radius-card)' }}
+   823→            >
+   824→              <div className="flex items-start gap-3">
+   825→                <Skeleton className="h-5 w-5 rounded-full" />
+   826→                <div className="flex-1 space-y-2">
+   827→                  <Skeleton className="h-5 w-3/4" />
+   828→                  <Skeleton className="h-4 w-1/2" />
+   829→                </div>
+   830→              </div>
+   831→            </div>
+   832→          ))}
+   833→        </div>
+   834→      ) : filteredAndSorted.length === 0 ? (
+   835→        <motion.div
+   836→          variants={fadeInUp}
+   837→          initial="hidden"
+   838→          animate="visible"
+   839→          className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-16"
+   840→          style={{ borderColor: 'var(--ws-glass-border)', background: 'var(--ws-glass)' }}
+   841→        >
+   842→          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: 'var(--ws-bg-dark)' }}>
+   843→            <ListTodo className="h-8 w-8" style={{ color: 'var(--ws-text-tertiary)' }} />
+   844→          </div>
+   845→          <h3 className="mb-1 text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>
+   846→            {activeFilter === 'ALL'
+   847→              ? 'Nenhuma tarefa ainda'
+   848→              : activeFilter === 'COMPLETED'
+   849→                ? 'Nenhuma tarefa concluida'
+   850→                : activeFilter === 'PENDING'
+   851→                  ? 'Nenhuma tarefa pendente'
+   852→                  : 'Nenhuma tarefa em andamento'}
+   853→          </h3>
+   854→          <p className="mb-6 max-w-sm text-center text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   855→            {activeFilter === 'ALL'
+   856→              ? 'Comece adicionando sua primeira tarefa para organizar seus estudos.'
+   857→              : 'Mude o filtro ou adicione novas tarefas.'}
+   858→          </p>
+   859→          {activeFilter === 'ALL' && (
+   860→            <Button
+   861→              onClick={() => { resetForm(); setAddDialogOpen(true); }}
+   862→              variant="outline"
+   863→              className="gap-2"
+   864→              style={{ borderRadius: 'var(--ws-radius-button)' }}
+   865→            >
+   866→              <Plus className="h-4 w-4" />
+   867→              Criar primeira tarefa
+   868→            </Button>
+   869→          )}
+   870→        </motion.div>
+   871→      ) : (
+   872→        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-3">
+   873→          <AnimatePresence mode="popLayout">
+   874→            {filteredAndSorted.map((task) => {
+   875→              const isExpanded = expandedTaskId === task.id;
+   876→              const isCompleted = task.status === 'COMPLETED';
+   877→              const isInProgress = task.status === 'IN_PROGRESS';
+   878→              const isPending = task.status === 'PENDING';
+   879→              const pCfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
+   880→              const overdue = task.dueDate && isOverdue(task.dueDate) && !isCompleted;
+   881→
+   882→              return (
+   883→                <motion.div key={task.id} variants={itemVariants} layout className="relative">
+   884→                  <XPCelebration show={xpCelebrationTaskId === task.id} taskId={task.id} />
+   885→                  <div
+   886→                    className="group overflow-hidden border p-4 transition-all"
+   887→                    style={{
+   888→                      borderColor: isExpanded ? 'var(--ws-accent)' : 'var(--ws-glass-border)',
+   889→                      background: 'var(--ws-glass)',
+   890→                      borderRadius: 'var(--ws-radius-card)',
+   891→                      opacity: isCompleted ? 0.7 : 1,
+   892→                      boxShadow: isExpanded ? 'var(--ws-shadow-soft)' : 'none',
+   893→                    }}
+   894→                  >
+   895→                    <div className="flex items-start gap-3">
+   896→                      {/* Checkbox */}
+   897→                      <button
+   898→                        onClick={() => handleToggleComplete(task)}
+   899→                        disabled={completingTaskId === task.id}
+   900→                        className="mt-0.5 shrink-0 transition-transform hover:scale-110 disabled:opacity-50"
+   901→                        aria-label={isCompleted ? 'Desmarcar tarefa' : 'Concluir tarefa'}
+   902→                      >
+   903→                        {completingTaskId === task.id ? (
+   904→                          <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--ws-accent)' }} />
+   905→                        ) : isCompleted ? (
+   906→                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
+   907→                            <CheckCircle2 className="h-5 w-5" style={{ color: 'var(--ws-verdigris)' }} />
+   908→                          </motion.div>
+   909→                        ) : (
+   910→                          <Circle className="h-5 w-5" style={{ color: 'var(--ws-text-tertiary)' }} />
+   911→                        )}
+   912→                      </button>
+   913→
+   914→                      {/* Content */}
+   915→                      <div className="min-w-0 flex-1">
+   916→                        <div className="flex items-start justify-between gap-2">
+   917→                          <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}>
+   918→                            <div className="flex flex-wrap items-center gap-2">
+   919→                              <h3
+   920→                                className={`text-sm font-semibold leading-tight ${isCompleted ? 'line-through' : ''}`}
+   921→                                style={{ color: 'var(--ws-text-primary)' }}
+   922→                              >
+   923→                                {task.title}
+   924→                              </h3>
+   925→                              {/* Priority Badge */}
+   926→                              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium ${pCfg.bgClass} ${pCfg.colorClass}`}>
+   927→                                {task.priority === 'URGENT' ? <Zap className="h-3 w-3" /> : <Flag className="h-3 w-3" />}
+   928→                                {pCfg.label}
+   929→                              </span>
+   930→                            </div>
+   931→                            {task.description && !isExpanded && (
+   932→                              <p className="mt-1 line-clamp-1 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   933→                                {task.description}
+   934→                              </p>
+   935→                            )}
+   936→                          </div>
+   937→
+   938→                          {/* Expand/Collapse */}
+   939→                          <button
+   940→                            onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+   941→                            className="shrink-0 rounded-md p-1 transition-colors hover:bg-[var(--ws-bg-dark)]"
+   942→                            aria-label={isExpanded ? 'Recolher' : 'Expandir'}
+   943→                          >
+   944→                            {isExpanded
+   945→                              ? <ChevronUp className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   946→                              : <ChevronDown className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />}
+   947→                          </button>
+   948→                        </div>
+   949→
+   950→                        {/* Meta row */}
+   951→                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+   952→                          {/* Subject */}
+   953→                          {task.subject && (
+   954→                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ws-text-secondary)' }}>
+   955→                              <span className="inline-block h-2 w-2 rounded-full" style={{ background: task.subject.color }} />
+   956→                              {task.subject.name}
+   957→                            </span>
+   958→                          )}
+   959→
+   960→                          {/* Due date */}
+   961→                          {task.dueDate && (
+   962→                            <span
+   963→                              className={`flex items-center gap-1 text-xs ${overdue ? 'font-medium' : ''}`}
+   964→                              style={{ color: overdue ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }}
+   965→                            >
+   966→                              {overdue ? <AlertTriangle className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+   967→                              {formatDueDate(task.dueDate)}
+   968→                            </span>
+   969→                          )}
+   970→
+   971→                          {/* Estimated time */}
+   972→                          {task.estimatedMinutes && (
+   973→                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   974→                              <Clock className="h-3 w-3" />
+   975→                              {formatMinutes(task.estimatedMinutes)}
+   976→                            </span>
+   977→                          )}
+   978→
+   979→                          {/* Status badge */}
+   980→                          {isInProgress && (
+   981→                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+   982→                              <Play className="h-3 w-3" />
+   983→                              Em andamento
+   984→                            </span>
+   985→                          )}
+   986→
+   987→                          {/* Completed time */}
+   988→                          {isCompleted && task.completedAt && (
+   989→                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ws-verdigris)' }}>
+   990→                              <CheckCircle2 className="h-3 w-3" />
+   991→                              {formatDistanceToNow(parseISO(task.completedAt), { addSuffix: true, locale: ptBR })}
+   992→                            </span>
+   993→                          )}
+   994→                        </div>
+   995→
+   996→                        {/* Expanded Detail */}
+   997→                        <AnimatePresence>
+   998→                          {isExpanded && (
+   999→                            <motion.div
+  1000→                              initial={{ height: 0, opacity: 0 }}
+  1001→                              animate={{ height: 'auto', opacity: 1 }}
+  1002→                              exit={{ height: 0, opacity: 0 }}
+  1003→                              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+  1004→                              className="overflow-hidden"
+  1005→                            >
+  1006→                              <div className="mt-3 space-y-3 border-t pt-3" style={{ borderColor: 'var(--ws-glass-border)' }}>
+  1007→                                {/* Full description */}
+  1008→                                {task.description && (
+  1009→                                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ws-text-secondary)' }}>
+  1010→                                    {task.description}
+  1011→                                  </p>
+  1012→                                )}
+  1013→
+  1014→                                {/* Details grid */}
+  1015→                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1016→                                  <div className="rounded-lg p-2" style={{ background: 'var(--ws-bg-dark)' }}>
+  1017→                                    <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>Prioridade</p>
+  1018→                                    <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--ws-text-primary)' }}>
+  1019→                                      {PRIORITY_EMOJI[task.priority]} {pCfg.label}
+  1020→                                    </p>
+  1021→                                  </div>
+  1022→                                  <div className="rounded-lg p-2" style={{ background: 'var(--ws-bg-dark)' }}>
+  1023→                                    <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>Entrega</p>
+  1024→                                    <p className={`mt-0.5 text-xs font-medium ${overdue ? '' : ''}`} style={{ color: overdue ? 'var(--ws-accent)' : 'var(--ws-text-primary)' }}>
+  1025→                                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('pt-BR') : 'Sem prazo'}
+  1026→                                    </p>
+  1027→                                  </div>
+  1028→                                  <div className="rounded-lg p-2" style={{ background: 'var(--ws-bg-dark)' }}>
+  1029→                                    <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>Tempo</p>
+  1030→                                    <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--ws-text-primary)' }}>
+  1031→                                      {task.estimatedMinutes ? formatMinutes(task.estimatedMinutes) : '-'}
+  1032→                                    </p>
+  1033→                                  </div>
+  1034→                                  <div className="rounded-lg p-2" style={{ background: 'var(--ws-bg-dark)' }}>
+  1035→                                    <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>Criada</p>
+  1036→                                    <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--ws-text-primary)' }}>
+  1037→                                      {formatDistanceToNow(parseISO(task.createdAt), { addSuffix: true, locale: ptBR })}
+  1038→                                    </p>
+  1039→                                  </div>
+  1040→                                </div>
+  1041→
+  1042→                                {/* Action buttons */}
+  1043→                                <div className="flex flex-wrap gap-2 pt-1">
+  1044→                                  {isPending && (
+  1045→                                    <Button
+  1046→                                      size="sm"
+  1047→                                      variant="outline"
+  1048→                                      className="gap-1.5 text-xs"
+  1049→                                      onClick={(e) => { e.stopPropagation(); handleStartTask(task); }}
+  1050→                                      style={{ borderRadius: 'var(--ws-radius-button)' }}
+  1051→                                    >
+  1052→                                      <Play className="h-3 w-3" />
+  1053→                                      Iniciar
+  1054→                                    </Button>
+  1055→                                  )}
+  1056→                                  {!isCompleted && !isPending && (
+  1057→                                    <Button
+  1058→                                      size="sm"
+  1059→                                      variant="outline"
+  1060→                                      className="gap-1.5 text-xs"
+  1061→                                      onClick={(e) => {
+  1062→                                        e.stopPropagation();
+  1063→                                        handleToggleComplete(task);
+  1064→                                      }}
+  1065→                                      style={{ borderRadius: 'var(--ws-radius-button)' }}
+  1066→                                    >
+  1067→                                      <CheckCircle2 className="h-3 w-3" />
+  1068→                                      Concluir
+  1069→                                    </Button>
+  1070→                                  )}
+  1071→                                  <Button
+  1072→                                    size="sm"
+  1073→                                    variant="outline"
+  1074→                                    className="gap-1.5 text-xs"
+  1075→                                    onClick={(e) => { e.stopPropagation(); openEditDialog(task); }}
+  1076→                                    style={{ borderRadius: 'var(--ws-radius-button)' }}
+  1077→                                  >
+  1078→                                    <Pencil className="h-3 w-3" />
+  1079→                                    Editar
+  1080→                                  </Button>
+  1081→                                  <Button
+  1082→                                    size="sm"
+  1083→                                    variant="outline"
+  1084→                                    className="gap-1.5 text-xs"
+  1085→                                    onClick={(e) => { e.stopPropagation(); setTaskToDelete(task); setDeleteDialogOpen(true); }}
+  1086→                                    style={{ borderRadius: 'var(--ws-radius-button)', color: 'var(--ws-accent)' }}
+  1087→                                  >
+  1088→                                    <Trash2 className="h-3 w-3" />
+  1089→                                    Excluir
+  1090→                                  </Button>
+  1091→                                </div>
+  1092→                              </div>
+  1093→                            </motion.div>
+  1094→                          )}
+  1095→                        </AnimatePresence>
+  1096→                      </div>
+  1097→                    </div>
+  1098→                  </div>
+  1099→                </motion.div>
+  1100→              );
+  1101→            })}
+  1102→          </AnimatePresence>
+  1103→        </motion.div>
+  1104→      )}
+  1105→
+  1106→      {/* Add Task Dialog */}
+  1107→      <TaskFormDialog
+  1108→        open={addDialogOpen}
+  1109→        onOpenChange={setAddDialogOpen}
+  1110→        subjects={subjects}
+  1111→        title={formTitle}
+  1112→        setTitle={setFormTitle}
+  1113→        description={formDescription}
+  1114→        setDescription={setFormDescription}
+  1115→        subjectId={formSubjectId}
+  1116→        setSubjectId={setFormSubjectId}
+  1117→        priority={formPriority}
+  1118→        setPriority={setFormPriority}
+  1119→        dueDate={formDueDate}
+  1120→        setDueDate={setFormDueDate}
+  1121→        estimatedMinutes={formEstimatedMinutes}
+  1122→        setEstimatedMinutes={setFormEstimatedMinutes}
+  1123→        titleError={formTitleError}
+  1124→        setTitleError={setFormTitleError}
+  1125→        submitting={submitting}
+  1126→        onSubmit={handleAddTask}
+  1127→        isEdit={false}
+  1128→      />
+  1129→
+  1130→      {/* Edit Task Dialog */}
+  1131→      <TaskFormDialog
+  1132→        open={editDialogOpen}
+  1133→        onOpenChange={(open) => { if (!open) { setEditDialogOpen(false); setTaskToEdit(null); } }}
+  1134→        subjects={subjects}
+  1135→        title={formTitle}
+  1136→        setTitle={setFormTitle}
+  1137→        description={formDescription}
+  1138→        setDescription={setFormDescription}
+  1139→        subjectId={formSubjectId}
+  1140→        setSubjectId={setFormSubjectId}
+  1141→        priority={formPriority}
+  1142→        setPriority={setFormPriority}
+  1143→        dueDate={formDueDate}
+  1144→        setDueDate={setFormDueDate}
+  1145→        estimatedMinutes={formEstimatedMinutes}
+  1146→        setEstimatedMinutes={setFormEstimatedMinutes}
+  1147→        status={formStatus}
+  1148→        setStatus={setFormStatus}
+  1149→        titleError={formTitleError}
+  1150→        setTitleError={setFormTitleError}
+  1151→        submitting={submitting}
+  1152→        onSubmit={handleEditTask}
+  1153→        isEdit
+  1154→      />
+  1155→
+  1156→      {/* Delete Confirmation Dialog */}
+  1157→      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1158→        <AlertDialogContent style={{ borderRadius: 'var(--ws-radius-card)' }}>
+  1159→          <AlertDialogHeader>
+  1160→            <AlertDialogTitle style={{ color: 'var(--ws-text-primary)' }}>
+  1161→              Excluir tarefa?
+  1162→            </AlertDialogTitle>
+  1163→            <AlertDialogDescription style={{ color: 'var(--ws-text-tertiary)' }}>
+  1164→              Tem certeza que deseja excluir &quot;{taskToDelete?.title}&quot;? Esta acao nao pode ser desfeita.
+  1165→            </AlertDialogDescription>
+  1166→          </AlertDialogHeader>
+  1167→          <AlertDialogFooter className="gap-2 sm:gap-0">
+  1168→            <AlertDialogCancel disabled={submitting} style={{ borderRadius: 'var(--ws-radius-button)' }}>
+  1169→              Cancelar
+  1170→            </AlertDialogCancel>
+  1171→            <AlertDialogAction
+  1172→              onClick={handleDeleteTask}
+  1173→              disabled={submitting}
+  1174→              className="gap-2"
+  1175→              style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)', borderRadius: 'var(--ws-radius-button)' }}
+  1176→            >
+  1177→              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+  1178→              Excluir
+  1179→            </AlertDialogAction>
+  1180→          </AlertDialogFooter>
+  1181→        </AlertDialogContent>
+  1182→      </AlertDialog>
+  1183→    </section>
+  1184→  );
+  1185→}
+  1186→

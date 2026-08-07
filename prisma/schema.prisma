@@ -19,6 +19,61 @@ enum Plan {
   ADMIN_PLAN
 }
 
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum GoalType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  SUBJECT
+  EXAM
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum EventType {
+  EXAM
+  HOMEWORK
+  SEMINAR
+  DELIVERY
+  CLASS
+  REVIEW
+  STUDY_SESSION
+  OTHER
+}
+
+enum XPSource {
+  STUDY_SESSION
+  TASK_COMPLETED
+  GOAL_COMPLETED
+  FLASHCARD_REVIEW
+  QUIZ_COMPLETED
+  SIMULADO_COMPLETED
+  STREAK_BONUS
+  DAILY_LOGIN
+  MANUAL
+}
+
+// ============================================================
+// USER
+// ============================================================
+
 model User {
   id                    String   @id @default(cuid())
   name                  String
@@ -30,15 +85,211 @@ model User {
   stripeSubscriptionId  String?
   stripePriceId         String?
   stripeCurrentPeriodEnd DateTime?
+  avatar                String?  // URL ou emoji
+  bio                   String?
+  xp                    Int      @default(0)
+  level                 Int      @default(1)
+  currentStreak         Int      @default(0)
+  longestStreak         Int      @default(0)
+  lastStudyDate         DateTime?
+  totalStudyMinutes     Int      @default(0)
+  totalSessions         Int      @default(0)
+  totalTasksCompleted   Int      @default(0)
+  totalFlashcardsReviewed Int   @default(0)
+  totalQuestionsAnswered Int    @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  notebooks      Notebook[]
-  studySessions  StudySession[]
-  chatMessages   ChatMessage[]
-  memories       UserMemory[]
-  dailyUsages    DailyUsage[]
+  // Relations
+  notebooks            Notebook[]
+  studySessions        StudySession[]
+  chatMessages         ChatMessage[]
+  memories             UserMemory[]
+  dailyUsages          DailyUsage[]
+  subjects             Subject[]
+  tasks                Task[]
+  goals                Goal[]
+  calendarEvents       CalendarEvent[]
+  xpTransactions       XPTransaction[]
+  achievements          UserAchievement[]
+  streakRecords        StreakRecord[]
 }
+
+// ============================================================
+// SUBJECTS & TOPICS
+// ============================================================
+
+model Subject {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  color       String   @default("#6366f1")
+  icon        String   @default("book")
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  topics      Topic[]
+  tasks       Task[]
+  goals       Goal[]
+  sessions    StudySession[]
+  calendarEvents CalendarEvent[]
+}
+
+model Topic {
+  id          String   @id @default(cuid())
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  mastery     Float    @default(0) // 0-100 percentage
+  totalQuestions Int    @default(0)
+  correctAnswers Int   @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([subjectId])
+}
+
+// ============================================================
+// TASKS
+// ============================================================
+
+model Task {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  subjectId   String?
+  subject     Subject?    @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(PENDING)
+  dueDate     DateTime?
+  estimatedMinutes Int?
+  actualMinutes    Int?
+  sortOrder   Int      @default(0)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================================
+// GOALS
+// ============================================================
+
+model Goal {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          GoalType  @default(DAILY)
+  status        GoalStatus @default(IN_PROGRESS)
+  targetValue   Int?       // e.g. 30 (minutes), 10 (tasks), etc.
+  currentValue  Int        @default(0)
+  unit          String?    // "minutes", "tasks", "questions"
+  subjectId     String?
+  subject       Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  startDate     DateTime   @default(now())
+  targetDate    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================================
+// CALENDAR EVENTS
+// ============================================================
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        EventType @default(STUDY_SESSION)
+  date        DateTime
+  endDate     DateTime?
+  subjectId   String?
+  subject     Subject?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  isAllDay    Boolean   @default(false)
+  color       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+// ============================================================
+// XP & GAMIFICATION
+// ============================================================
+
+model XPTransaction {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int       // positive = gain, negative = loss
+  source      XPSource
+  description String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Predefined achievements
+model Achievement {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g. "first_session", "streak_7"
+  title       String
+  description String
+  icon        String   @default("trophy")
+  xpReward    Int      @default(0)
+  category    String   @default("general") // general, streak, study, social
+  sortOrder   Int      @default(0)
+  users       UserAchievement[]
+  createdAt   DateTime @default(now())
+}
+
+model UserAchievement {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime   @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+model StreakRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  streak    Int      // current streak count on that date
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// ============================================================
+// EXISTING MODELS (preserved)
+// ============================================================
 
 model Notebook {
   id          String        @id @default(cuid())
@@ -60,14 +311,14 @@ model NotebookPage {
   notebookId String
   notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
   pageNumber Int      @default(1)
-  canvasData String?  // JSON fabric.js state
-  textContent String   @default("") // Fallback text
-  paperStyle String   @default("blank") // blank, lined, grid, dotted
+  canvasData String?
+  textContent String   @default("")
+  paperStyle String   @default("blank")
   paperColor String   @default("#ffffff")
   lineColor  String   @default("#d1d5db")
   width      Int      @default(1200)
   height     Int      @default(1600)
-  layers     String?  // JSON array of layer configs
+  layers     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -88,27 +339,35 @@ model NotebookTag {
 }
 
 model Flashcard {
-  id         String   @id @default(cuid())
-  front      String
-  back       String
-  notebookId String?
-  notebook   Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
-  userId     String
-  easeFactor Float    @default(2.5)
-  interval   Int      @default(0)
-  repetitions Int     @default(0)
-  nextReview DateTime @default(now())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  front        String
+  back         String
+  notebookId   String?
+  notebook     Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+  userId       String
+  easeFactor   Float    @default(2.5)
+  interval     Int      @default(0)
+  repetitions  Int      @default(0)
+  nextReview   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
 }
 
 model StudySession {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  duration  Int
-  type      String   @default("pomodoro")
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId    String?
+  subject      Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  duration     Int      // seconds
+  type         String   @default("pomodoro")
+  objective    String?  // what the user wanted to accomplish
+  rating       Int?     // 1-4: easy, normal, hard, very hard
+  notes        String?
+  xpEarned     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
 }
 
 model ChatMessage {
