@@ -106,10 +106,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const validPlans: ('FREE' | 'PREMIUM')[] = ['FREE', 'PREMIUM'];
-    const userPlan = typeof plan === 'string' && validPlans.includes(plan as 'FREE' | 'PREMIUM')
-      ? (plan as 'FREE' | 'PREMIUM')
-      : 'FREE' as const;
+    // Always create as FREE - premium is handled via Stripe, not registration
+    const userPlan = 'FREE' as const;
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
