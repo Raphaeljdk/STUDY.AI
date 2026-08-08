@@ -34,34 +34,20 @@ const CanvasNotebookView = dynamic(
   )},
 );
 
-// @ts-expect-error dynamic import
-const HomeDashboard = dynamic(() => import('./HomeDashboard'), { ssr: false });
-// @ts-expect-error dynamic import
-const SubjectsView = dynamic(() => import('./SubjectsView'), { ssr: false });
-// @ts-expect-error dynamic import
-const TasksView = dynamic(() => import('./TasksView'), { ssr: false });
-// @ts-expect-error dynamic import
-const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false });
-// @ts-expect-error dynamic import
-const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false });
-// @ts-expect-error dynamic import
-const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false });
-// @ts-expect-error dynamic import
-const DiscoverView = dynamic(() => import('./DiscoverView'), { ssr: false });
-// @ts-expect-error dynamic import
-const BattleView = dynamic(() => import('./BattleView'), { ssr: false });
-// @ts-expect-error dynamic import
-const MicroLessonView = dynamic(() => import('./MicroLessonView'), { ssr: false });
-// @ts-expect-error dynamic import
-const MissionsView = dynamic(() => import('./MissionsView'), { ssr: false });
-// @ts-expect-error dynamic import
-const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
-// @ts-expect-error dynamic import
-const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
-// @ts-expect-error dynamic import
-const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
-// @ts-expect-error dynamic import
-const TeachView = dynamic(() => import('./TeachView'), { ssr: false });
+const HomeDashboard = dynamic(() => import('./HomeDashboard').then(m => ({ default: m.HomeDashboard })), { ssr: false });
+const SubjectsView = dynamic(() => import('./SubjectsView').then(m => ({ default: m.SubjectsView })), { ssr: false });
+const TasksView = dynamic(() => import('./TasksView').then(m => ({ default: m.TasksView })), { ssr: false });
+const GoalsView = dynamic(() => import('./GoalsView').then(m => ({ default: m.GoalsView })), { ssr: false });
+const CalendarView = dynamic(() => import('./CalendarView').then(m => ({ default: m.CalendarView })), { ssr: false });
+const ProgressView = dynamic(() => import('./ProgressView').then(m => ({ default: m.ProgressView })), { ssr: false });
+const DiscoverView = dynamic(() => import('./DiscoverView').then(m => ({ default: m.DiscoverView })), { ssr: false });
+const BattleView = dynamic(() => import('./BattleView').then(m => ({ default: m.BattleView })), { ssr: false });
+const MicroLessonView = dynamic(() => import('./MicroLessonView').then(m => ({ default: m.MicroLessonView })), { ssr: false });
+const MissionsView = dynamic(() => import('./MissionsView').then(m => ({ default: m.MissionsView })), { ssr: false });
+const BrainView = dynamic(() => import('./BrainView').then(m => ({ default: m.BrainView })), { ssr: false });
+const RoadmapView = dynamic(() => import('./RoadmapView').then(m => ({ default: m.RoadmapView })), { ssr: false });
+const EmergencyView = dynamic(() => import('./EmergencyView').then(m => ({ default: m.EmergencyView })), { ssr: false });
+const TeachView = dynamic(() => import('./TeachView').then(m => ({ default: m.TeachView })), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
