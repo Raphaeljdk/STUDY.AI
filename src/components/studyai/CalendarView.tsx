@@ -1146,3 +1146,5 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
     </section>
   );
 }
+
+export default CalendarView;

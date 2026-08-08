@@ -23,7 +23,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 
 const CanvasNotebookView = dynamic(
-  () => import('@/components/notebook/CanvasNotebookView').then(m => ({ default: m.CanvasNotebookView })),
+  () => import('@/components/notebook/CanvasNotebookView'),
   { ssr: false, loading: () => (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="text-center">
@@ -34,20 +34,20 @@ const CanvasNotebookView = dynamic(
   )},
 );
 
-const HomeDashboard = dynamic(() => import('./HomeDashboard').then(m => ({ default: m.HomeDashboard })), { ssr: false });
-const SubjectsView = dynamic(() => import('./SubjectsView').then(m => ({ default: m.SubjectsView })), { ssr: false });
-const TasksView = dynamic(() => import('./TasksView').then(m => ({ default: m.TasksView })), { ssr: false });
-const GoalsView = dynamic(() => import('./GoalsView').then(m => ({ default: m.GoalsView })), { ssr: false });
-const CalendarView = dynamic(() => import('./CalendarView').then(m => ({ default: m.CalendarView })), { ssr: false });
-const ProgressView = dynamic(() => import('./ProgressView').then(m => ({ default: m.ProgressView })), { ssr: false });
-const DiscoverView = dynamic(() => import('./DiscoverView').then(m => ({ default: m.DiscoverView })), { ssr: false });
-const BattleView = dynamic(() => import('./BattleView').then(m => ({ default: m.BattleView })), { ssr: false });
-const MicroLessonView = dynamic(() => import('./MicroLessonView').then(m => ({ default: m.MicroLessonView })), { ssr: false });
-const MissionsView = dynamic(() => import('./MissionsView').then(m => ({ default: m.MissionsView })), { ssr: false });
-const BrainView = dynamic(() => import('./BrainView').then(m => ({ default: m.BrainView })), { ssr: false });
-const RoadmapView = dynamic(() => import('./RoadmapView').then(m => ({ default: m.RoadmapView })), { ssr: false });
-const EmergencyView = dynamic(() => import('./EmergencyView').then(m => ({ default: m.EmergencyView })), { ssr: false });
-const TeachView = dynamic(() => import('./TeachView').then(m => ({ default: m.TeachView })), { ssr: false });
+const HomeDashboard = dynamic(() => import('./HomeDashboard'), { ssr: false });
+const SubjectsView = dynamic(() => import('./SubjectsView'), { ssr: false });
+const TasksView = dynamic(() => import('./TasksView'), { ssr: false });
+const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false });
+const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false });
+const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false });
+const DiscoverView = dynamic(() => import('./DiscoverView'), { ssr: false });
+const BattleView = dynamic(() => import('./BattleView'), { ssr: false });
+const MicroLessonView = dynamic(() => import('./MicroLessonView'), { ssr: false });
+const MissionsView = dynamic(() => import('./MissionsView'), { ssr: false });
+const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
+const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
+const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
+const TeachView = dynamic(() => import('./TeachView'), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -68,7 +68,7 @@ class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: R
         <div className="flex min-h-[300px] items-center justify-center rounded-lg border border-dashed border-[var(--ws-glass-border)] p-6">
           <div className="text-center">
             <AlertCircle size={24} className="mx-auto mb-3 text-[var(--ws-accent)]" />
-            <p className="text-sm font-medium text-[var(--ws-text-primary)]">Erro ao carregar esta secao</p>
+            <p className="text-sm font-medium text-[var(--ws-text-primary)]">Erro ao carregar{this.props.name ? ` ${this.props.name}` : ' esta secao'}</p>
             <p className="mt-1 text-xs text-[var(--ws-text-tertiary)]">{this.state.error?.message || 'Erro desconhecido'}</p>
             <button
               onClick={() => { this.setState({ hasError: false, error: null }); }}

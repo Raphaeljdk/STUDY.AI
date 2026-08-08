@@ -891,3 +891,5 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     </div>
   );
 }
+
+export default DiscoverView;

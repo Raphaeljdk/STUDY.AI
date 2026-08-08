@@ -778,3 +778,5 @@ export function HomeDashboard({
     </motion.div>
   );
 }
+
+export default HomeDashboard;

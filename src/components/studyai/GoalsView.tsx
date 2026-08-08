@@ -1189,3 +1189,5 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
     </section>
   );
 }
+
+export default GoalsView;

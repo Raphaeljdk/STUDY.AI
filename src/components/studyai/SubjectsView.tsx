@@ -1230,3 +1230,5 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
     </section>
   );
 }
+
+export default SubjectsView;

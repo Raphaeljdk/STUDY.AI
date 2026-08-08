@@ -324,3 +324,5 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     </div>
   );
 }
+
+export default CanvasNotebookView;

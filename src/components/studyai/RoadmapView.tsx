@@ -710,3 +710,5 @@ function generateDefaultSteps(topic: string): RoadmapStep[] {
     { name: 'Revisao e certificacao', description: 'Revise todo o conteudo e prepare-se para uma certificacao ou avaliacao final.', estimatedHours: 5, difficulty: 'Avancado' },
   ];
 }
+
+export default RoadmapView;

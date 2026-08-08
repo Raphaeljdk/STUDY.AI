@@ -865,3 +865,5 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
     </div>
   );
 }
+
+export default MissionsView;

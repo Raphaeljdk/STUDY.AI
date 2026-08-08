@@ -905,3 +905,5 @@ export function BrainView({ onNavigate }: BrainViewProps) {
     </motion.div>
   );
 }
+
+export default BrainView;

@@ -922,3 +922,5 @@ export function BattleView() {
     </div>
   );
 }
+
+export default BattleView;

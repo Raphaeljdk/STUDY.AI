@@ -737,3 +737,5 @@ export function MicroLessonView() {
     </div>
   );
 }
+
+export default MicroLessonView;

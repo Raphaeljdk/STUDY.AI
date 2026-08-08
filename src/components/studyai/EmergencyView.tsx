@@ -677,3 +677,5 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
     </motion.div>
   );
 }
+
+export default EmergencyView;

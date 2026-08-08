@@ -958,3 +958,5 @@ export function ProgressView({ user }: ProgressViewProps) {
     </motion.div>
   );
 }
+
+export default ProgressView;
