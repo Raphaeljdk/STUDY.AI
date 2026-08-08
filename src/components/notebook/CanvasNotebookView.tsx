@@ -2,12 +2,13 @@
 
 import { useState, useRef, useCallback } from 'react';
 import CanvasEditor from './CanvasEditor';
+import DocumentEditor from './DocumentEditor';
 import PagePanel from './PagePanel';
 import PDFImporter from './PDFImporter';
 import AudioRecorder from './AudioRecorder';
 import {
   ArrowLeft, BookOpen, MessageCircle, FileText,
-  Columns2, Rows2, CalendarDays,
+  Columns2, Rows2, CalendarDays, PenLine, FileEdit, Columns3,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -29,6 +30,7 @@ interface CanvasNotebookViewProps {
 }
 
 type SplitMode = 'none' | 'vertical' | 'horizontal';
+type EditorMode = 'canvas' | 'document';
 
 export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewProps) {
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
   const [showPagePanel, setShowPagePanel] = useState(false);
   const [splitMode, setSplitMode] = useState<SplitMode>('none');
   const [showPlanner, setShowPlanner] = useState(false);
+  const [editorMode, setEditorMode] = useState<EditorMode>('document');
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchedRef = useRef<boolean | null>(null);
@@ -80,8 +83,8 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     loadPages();
   }
 
-  // --- Save page ---
-  const savePage = useCallback(async (canvasJson: string) => {
+  // --- Save canvas page ---
+  const saveCanvasPage = useCallback(async (canvasJson: string) => {
     if (!activePage) return;
     setSaving(true);
     try {
@@ -96,11 +99,30 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     setSaving(false);
   }, [activePage]);
 
+  // --- Save document page ---
+  const saveDocumentPage = useCallback(async (html: string) => {
+    if (!activePage) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await fetch(`/api/notebooks/pages/${activePage.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ textContent: html }),
+        });
+      } catch (err) {
+        console.error('[CanvasNotebookView] save doc error:', err);
+      }
+      setSaving(false);
+    }, 1000);
+  }, [activePage]);
+
   // --- Handle canvas change (auto-save) ---
   const handleCanvasChange = useCallback((json: string) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => savePage(json), 1500);
-  }, [savePage]);
+    saveTimerRef.current = setTimeout(() => saveCanvasPage(json), 1500);
+  }, [saveCanvasPage]);
 
   // --- Page management ---
   const handleAddPage = async () => {
@@ -156,7 +178,7 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
-      {/* Top Bar */}
+      {/* ====== Top Bar ====== */}
       <div className="flex items-center gap-2 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/80 px-3 py-2 backdrop-blur-sm">
         <button onClick={onBack} className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[var(--ws-ink)]/5 hover:text-[var(--ws-text-primary)]" aria-label="Voltar">
           <ArrowLeft size={18} />
@@ -166,6 +188,36 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
 
         {saving && <span className="text-[10px] text-[var(--ws-text-tertiary)]">Salvando...</span>}
 
+        {/* ====== EDITOR MODE TOGGLE ====== */}
+        <div className="flex items-center rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/60 p-0.5">
+          <button
+            onClick={() => setEditorMode('document')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+              editorMode === 'document'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'
+            }`}
+            title="Modo Documento (digitacao como Word)"
+          >
+            <FileEdit size={14} />
+            <span className="hidden sm:inline">Documento</span>
+          </button>
+          <button
+            onClick={() => setEditorMode('canvas')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+              editorMode === 'canvas'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'
+            }`}
+            title="Modo Canvas (desenho e formas)"
+          >
+            <PenLine size={14} />
+            <span className="hidden sm:inline">Canvas</span>
+          </button>
+        </div>
+
+        <div className="mx-1 h-5 w-px bg-[var(--ws-glass-border)]" />
+
         <button
           onClick={() => setSplitMode(m => m === 'vertical' ? 'none' : 'vertical')}
           className={`rounded-ws-button p-2 transition-colors ${splitMode === 'vertical' ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
@@ -173,14 +225,6 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
         >
           <Columns2 size={16} />
         </button>
-        <button
-          onClick={() => setSplitMode(m => m === 'horizontal' ? 'none' : 'horizontal')}
-          className={`rounded-ws-button p-2 transition-colors ${splitMode === 'horizontal' ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
-          title="Divisao horizontal"
-        >
-          <Rows2 size={16} />
-        </button>
-
         <button
           onClick={() => setShowPagePanel(p => !p)}
           className={`rounded-ws-button p-2 transition-colors ${showPagePanel ? 'bg-[var(--ws-accent)]/15 text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-primary)]'}`}
@@ -198,7 +242,7 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
         </button>
       </div>
 
-      {/* Main content */}
+      {/* ====== Main content ====== */}
       <div className="relative flex flex-1 overflow-hidden">
         {/* Page Panel (left sidebar) */}
         {showPagePanel && (
@@ -216,11 +260,20 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
           </div>
         )}
 
-        {/* Canvas Area - toolbar is inside CanvasEditor */}
-        <div className="relative flex-1 overflow-hidden bg-gray-100">
-          {activePage && (
+        {/* ====== Editor Area ====== */}
+        <div className="relative flex-1 overflow-hidden">
+          {activePage && editorMode === 'document' && (
+            <DocumentEditor
+              key={`doc-${activePage.id}`}
+              content={activePage.textContent || ''}
+              paperStyle={(activePage.paperStyle as any) || 'grid'}
+              paperColor={activePage.paperColor || '#ffffff'}
+              onChange={saveDocumentPage}
+            />
+          )}
+          {activePage && editorMode === 'canvas' && (
             <CanvasEditor
-              key={activePage.id}
+              key={`canvas-${activePage.id}`}
               initialData={activePage.canvasData}
               paperStyle={(activePage.paperStyle as any) || 'grid'}
               paperColor={activePage.paperColor || '#ffffff'}
@@ -254,10 +307,14 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
         )}
       </div>
 
-      {/* Bottom Bar */}
+      {/* ====== Bottom Bar ====== */}
       <div className="flex items-center gap-2 border-t border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/80 px-3 py-1.5 backdrop-blur-sm">
         <span className="text-[10px] text-[var(--ws-text-tertiary)]">
           Pagina {activePageIdx + 1} de {pages.length}
+        </span>
+        <div className="mx-2 h-3 w-px bg-[var(--ws-glass-border)]" />
+        <span className={`text-[10px] font-medium ${editorMode === 'document' ? 'text-amber-600' : 'text-[var(--ws-text-tertiary)]'}`}>
+          {editorMode === 'document' ? 'Modo Documento' : 'Modo Canvas'}
         </span>
         <div className="mx-2 h-3 w-px bg-[var(--ws-glass-border)]" />
         <PDFImporter onPDFImported={handlePDFImported} />

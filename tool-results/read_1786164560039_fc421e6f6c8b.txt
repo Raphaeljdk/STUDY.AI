@@ -1,0 +1,791 @@
+     1→'use client';
+     2→
+     3→import React, { useCallback, useEffect, useRef, useState } from 'react';
+     4→import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+     5→import StarterKit from '@tiptap/starter-kit';
+     6→import Underline from '@tiptap/extension-underline';
+     7→import TextAlign from '@tiptap/extension-text-align';
+     8→import Highlight from '@tiptap/extension-highlight';
+     9→import Placeholder from '@tiptap/extension-placeholder';
+    10→import TaskList from '@tiptap/extension-task-list';
+    11→import TaskItem from '@tiptap/extension-task-item';
+    12→import Color from '@tiptap/extension-color';
+    13→import TextStyle from '@tiptap/extension-text-style';
+    14→import {
+    15→  Bold, Italic, Underline as UnderlineIcon, Strikethrough,
+    16→  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+    17→  List, ListOrdered, CheckSquare, Type,
+    18→  ChevronDown, Undo2, Redo2, Heading1, Heading2, Heading3, Pilcrow,
+    19→  Paintbrush, Palette, Highlighter, Code, Minus, Quote, RemoveFormatting,
+    20→  FileText, Printer,
+    21→} from 'lucide-react';
+    22→
+    23→/* ========================================================================
+    24→   Types
+    25→   ======================================================================== */
+    26→
+    27→interface DocumentEditorProps {
+    28→  content?: string;
+    29→  paperStyle?: 'blank' | 'lined' | 'grid' | 'dotted';
+    30→  paperColor?: string;
+    31→  onChange?: (html: string) => void;
+    32→}
+    33→
+    34→/* ========================================================================
+    35→   Constants
+    36→   ======================================================================== */
+    37→
+    38→const FONT_FAMILIES = [
+    39→  { label: 'Inter', value: 'Inter, sans-serif' },
+    40→  { label: 'Arial', value: 'Arial, sans-serif' },
+    41→  { label: 'Georgia', value: 'Georgia, serif' },
+    42→  { label: 'Courier New', value: 'Courier New, monospace' },
+    43→  { label: 'Times New Roman', value: 'Times New Roman, serif' },
+    44→  { label: 'Verdana', value: 'Verdana, sans-serif' },
+    45→  { label: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
+    46→  { label: 'Comic Sans MS', value: 'Comic Sans MS, cursive' },
+    47→  { label: 'Impact', value: 'Impact, sans-serif' },
+    48→];
+    49→
+    50→const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48, 56, 64, 72, 96];
+    51→
+    52→const TEXT_COLORS = [
+    53→  '#000000', '#374151', '#6b7280', '#ef4444', '#f97316', '#eab308',
+    54→  '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff',
+    55→];
+    56→
+    57→const HIGHLIGHT_COLORS = [
+    58→  'transparent', '#fef08a', '#bbf7d0', '#bfdbfe', '#e9d5ff',
+    59→  '#fecaca', '#fed7aa', '#fbcfe8', '#a5f3fc', '#d9f99d',
+    60→];
+    61→
+    62→const LINE_HEIGHTS = [1.0, 1.15, 1.3, 1.5, 1.8, 2.0, 2.5, 3.0];
+    63→
+    64→/* ========================================================================
+    65→   Toolbar Button Component (outside render to avoid re-creation)
+    66→   ======================================================================== */
+    67→
+    68→function TBtn({
+    69→  title, active, onClick, disabled, children, className = '',
+    70→}: {
+    71→  title: string;
+    72→  active?: boolean;
+    73→  onClick: () => void;
+    74→  disabled?: boolean;
+    75→  children: React.ReactNode;
+    76→  className?: string;
+    77→}) {
+    78→  return (
+    79→    <button
+    80→      title={title}
+    81→      onClick={onClick}
+    82→      disabled={disabled}
+    83→      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+    84→        active
+    85→          ? 'bg-amber-500 text-white shadow-sm'
+    86→          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+    87→      } ${disabled ? 'opacity-30 cursor-not-allowed' : ''} ${className}`}
+    88→    >
+    89→      {children}
+    90→    </button>
+    91→  );
+    92→}
+    93→}
+    94→
+    95→function Divider() {
+    96→  return <div className="mx-1 h-6 w-px bg-gray-200" />;
+    97→}
+    98→
+    99→function Dropdown({
+   100→  label, icon, items, value,
+   101→}: {
+   102→  label: string;
+   103→  icon: React.ReactNode;
+   104→  items: { value: string; label: string }[];
+   105→  value?: string;
+   106→}) {
+   107→  const [open, setOpen] = useState(false);
+   108→  const ref = useRef<HTMLDivElement>(null);
+   109→
+   110→  useEffect(() => {
+   111→    if (!open) return;
+   112→    const handler = (e: MouseEvent) => {
+   113→      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+   114→    };
+   115→    document.addEventListener('mousedown', handler);
+   116→    return () => document.removeEventListener('mousedown', handler);
+   117→  }, [open]);
+   118→
+   119→  return (
+   120→    <div ref={ref} className="relative">
+   121→      <button
+   122→        onClick={() => setOpen(!open)}
+   123→        className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+   124→        title={label}
+   125→      >
+   126→        {icon}
+   127→        <ChevronDown size={10} className="text-gray-400" />
+   128→      </button>
+   129→      {open && (
+   130→        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+   131→          {items.map((item) => (
+   132→            <button
+   133→              key={item.value}
+   134→              onClick={() => { setOpen(false); }}
+   135→              className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 transition-colors ${
+   136→                value === item.value ? 'bg-amber-50 font-semibold text-amber-700' : 'text-gray-700'
+   137→              }`}
+   138→            >
+   139→              {item.label}
+   140→            </button>
+   141→          ))}
+   142→        </div>
+   143→      )}
+   144→    </div>
+   145→  );
+   146→}
+   147→
+   148→/* ========================================================================
+   149→   Main DocumentEditor Component
+   150→   ======================================================================== */
+   151→
+   152→export default function DocumentEditor({
+   153→  content = '',
+   154→  paperStyle = 'blank',
+   155→  paperColor = '#ffffff',
+   156→  onChange,
+   157→}: DocumentEditorProps) {
+   158→  const editorRef = useRef<any>(null);
+   159→  const [wordCount, setWordCount] = useState(0);
+   160→  const [charCount, setCharCount] = useState(0);
+   161→  const [showFontPicker, setShowFontPicker] = useState(false);
+   162→  const [showSizePicker, setShowSizePicker] = useState(false);
+   163→  const [showColorPicker, setShowColorPicker] = useState(false);
+   164→  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+   165→  const fontRef = useRef<HTMLDivElement>(null);
+   166→  const sizeRef = useRef<HTMLDivElement>(null);
+   167→  const colorRef = useRef<HTMLDivElement>(null);
+   168→  const highlightRef = useRef<HTMLDivElement>(null);
+   169→
+   170→  const editor = useEditor({
+   171→    extensions: [
+   172→      StarterKit.configure({
+   173→        heading: { levels: [1, 2, 3, 4, 5, 6] },
+   174→      }),
+   175→      Underline,
+   176→      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+   177→      Highlight.configure({ multicolor: true }),
+   178→      Placeholder.configure({ placeholder: 'Comece a digitar seu texto aqui...' }),
+   179→      TaskList,
+   180→      TaskItem.configure({ nested: true }),
+   181→      Color,
+   182→      TextStyle,
+   183→    ],
+   184→    content: content || '',
+   185→    editorProps: {
+   186→      attributes: {
+   187→        class: 'document-editor-content',
+   188→      },
+   189→    },
+   190→    onUpdate: ({ editor }) => {
+   191→      const html = editor.getHTML();
+   192→      onChange?.(html);
+   193→      updateCounts(editor);
+   194→    },
+   195→    immediatelyRender: false,
+   196→  });
+   197→
+   198→  editorRef.current = editor;
+   199→
+   200→  /* ---- Close dropdowns on outside click ---- */
+   201→  useEffect(() => {
+   202→    const handler = (e: MouseEvent) => {
+   203→      if (fontRef.current && !fontRef.current.contains(e.target as Node)) setShowFontPicker(false);
+   204→      if (sizeRef.current && !sizeRef.current.contains(e.target as Node)) setShowSizePicker(false);
+   205→      if (colorRef.current && !colorRef.current.contains(e.target as Node)) setShowColorPicker(false);
+   206→      if (highlightRef.current && !highlightRef.current.contains(e.target as Node)) setShowHighlightPicker(false);
+   207→    };
+   208→    document.addEventListener('mousedown', handler);
+   209→    return () => document.removeEventListener('mousedown', handler);
+   210→  }, []);
+   211→
+   212→  /* ---- Word/char count ---- */
+   213→  const updateCounts = useCallback((ed: any) => {
+   214→    const text = ed?.getText() || '';
+   215→    setCharCount(text.length);
+   216→    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+   217→  }, []);
+   218→
+   219→  useEffect(() => {
+   220→    if (editor) updateCounts(editor);
+   221→  }, [editor, updateCounts]);
+   222→
+   223→  /* ---- Font family ---- */
+   224→  const applyFontFamily = useCallback((font: string) => {
+   225→    if (!editor) return;
+   226→    editor.chain().focus().setMark('textStyle', { fontFamily: font }).run();
+   227→    setShowFontPicker(false);
+   228→  }, [editor]);
+   229→
+   230→  /* ---- Font size via style attribute ---- */
+   231→  const applyFontSize = useCallback((size: number) => {
+   232→    if (!editor) return;
+   233→    editor.chain().focus().setMark('textStyle', { fontSize: `${size}px` }).run();
+   234→    setShowSizePicker(false);
+   235→  }, [editor]);
+   236→
+   237→  /* ---- Heading ---- */
+   238→  const applyHeading = useCallback((level: number | null) => {
+   239→    if (!editor) return;
+   240→    if (level) {
+   241→      editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
+   242→    } else {
+   243→      editor.chain().focus().setParagraph().run();
+   244→    }
+   245→  }, [editor]);
+   246→
+   247→  /* ---- Line height ---- */
+   248→  const applyLineHeight = useCallback((lh: number) => {
+   249→    if (!editor) return;
+   250→    editor.chain().focus().setMark('textStyle', { lineHeight: lh }).run();
+   251→  }, [editor]);
+   252→
+   253→  /* ---- Print ---- */
+   254→  const handlePrint = useCallback(() => {
+   255→    if (!editor) return;
+   256→    const printWindow = window.open('', '_blank');
+   257→    if (!printWindow) return;
+   258→    printWindow.document.write(`
+   259→      <html><head><title>Documento</title>
+   260→      <style>body{font-family:Inter,sans-serif;padding:40px;max-width:800px;margin:auto;line-height:1.6;color:#111}
+   261→      h1{font-size:28px;font-weight:700;margin:20px 0 10px}h2{font-size:22px;font-weight:600;margin:18px 0 8px}h3{font-size:18px;font-weight:600;margin:16px 0 6px}
+   262→      p{margin:8px 0}ul,ol{padding-left:24px;margin:8px 0}li{margin:4px 0}blockquote{border-left:3px solid #ddd;padding-left:16px;color:#555;margin:12px 0}
+   263→      code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:14px}pre{background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;overflow-x:auto}
+   264→      mark{background:#fef08a;padding:1px 3px;border-radius:2px}.task-list{list-style:none;padding:0}.task-list li{display:flex;align-items:center;gap:8px}
+   265→      hr{border:none;border-top:1px solid #e5e7eb;margin:16px 0}</style></head>
+   266→      <body>${editor.getHTML()}</body></html>
+   267→    `);
+   268→    printWindow.document.close();
+   269→    printWindow.print();
+   270→  }, [editor]);
+   271→
+   272→  /* ---- Indent/Outdent ---- */
+   273→  const handleIndent = useCallback(() => {
+   274→    if (!editor) return;
+   275→    // For list items, sink them
+   276→    if (editor.isActive('listItem')) {
+   277→      editor.chain().focus().sinkListItem('listItem').run();
+   278→    }
+   279→  }, [editor]);
+   280→
+   281→  const handleOutdent = useCallback(() => {
+   282→    if (!editor) return;
+   283→    if (editor.isActive('listItem')) {
+   284→      editor.chain().focus().liftListItem('listItem').run();
+   285→    }
+   286→  }, [editor]);
+   287→
+   288→  if (!editor) {
+   289→    return (
+   290→      <div className="flex h-full items-center justify-center">
+   291→        <div className="text-center">
+   292→          <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-amber-500" />
+   293→          <p className="text-sm text-gray-400">Carregando editor...</p>
+   294→        </div>
+   295→      </div>
+   296→    );
+   297→  }
+   298→
+   299→  const currentFont = 'Inter';
+   300→  const currentSize = 16;
+   301→
+   302→  /* ---- Paper styles ---- */
+   303→  const paperBg = paperColor || '#ffffff';
+   304→  let contentClass = 'prose prose-sm sm:prose-base max-w-none';
+   305→  if (paperStyle === 'lined') {
+   306→    contentClass += ' lined-paper';
+   307→  } else if (paperStyle === 'grid') {
+   308→    contentClass += ' grid-paper';
+   309→  } else if (paperStyle === 'dotted') {
+   310→    contentClass += ' dotted-paper';
+   311→  }
+   312→
+   313→  return (
+   314→    <div className="flex h-full w-full flex-col" style={{ backgroundColor: '#f3f4f6' }}>
+   315→      {/* ====== WORD-LIKE RIBBON TOOLBAR ====== */}
+   316→      <div className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur-md">
+   317→        {/* Row 1: Main formatting */}
+   318→        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5">
+   319→          {/* Undo/Redo */}
+   320→          <TBtn title="Desfazer (Ctrl+Z)" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
+   321→            <Undo2 size={15} />
+   322→          </TBtn>
+   323→          <TBtn title="Refazer (Ctrl+Shift+Z)" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
+   324→            <Redo2 size={15} />
+   325→          </TBtn>
+   326→
+   327→          <Divider />
+   328→
+   329→          {/* Font Family */}
+   330→          <div ref={fontRef} className="relative">
+   331→            <button
+   332→              onClick={() => { setShowFontPicker(!showFontPicker); setShowSizePicker(false); }}
+   333→              className="flex h-8 max-w-[130px] items-center gap-1 truncate rounded-lg border border-gray-200 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+   334→              title="Fonte"
+   335→            >
+   336→              <Type size={12} className="shrink-0" />
+   337→              <span className="truncate">{currentFont}</span>
+   338→              <ChevronDown size={10} className="shrink-0 text-gray-400" />
+   339→            </button>
+   340→            {showFontPicker && (
+   341→              <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+   342→                {FONT_FAMILIES.map((f) => (
+   343→                  <button
+   344→                    key={f.value}
+   345→                    onClick={() => applyFontFamily(f.value)}
+   346→                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${currentFont === f.label ? 'bg-amber-50 font-semibold text-amber-700' : 'text-gray-700'}`}
+   347→                    style={{ fontFamily: f.value }}
+   348→                  >
+   349→                    {f.label}
+   350→                  </button>
+   351→                ))}
+   352→              </div>
+   353→            )}
+   354→          </div>
+   355→
+   356→          {/* Font Size */}
+   357→          <div ref={sizeRef} className="relative">
+   358→            <button
+   359→              onClick={() => { setShowSizePicker(!showSizePicker); setShowFontPicker(false); }}
+   360→              className="flex h-8 w-14 items-center justify-center gap-1 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+   361→              title="Tamanho da fonte"
+   362→            >
+   363→              {currentSize}
+   364→              <ChevronDown size={10} className="text-gray-400" />
+   365→            </button>
+   366→            {showSizePicker && (
+   367→              <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-16 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+   368→                {FONT_SIZES.map((s) => (
+   369→                  <button
+   370→                    key={s}
+   371→                    onClick={() => applyFontSize(s)}
+   372→                    className={`w-full px-2 py-1 text-center text-sm hover:bg-gray-100 transition-colors ${currentSize === s ? 'bg-amber-50 font-bold text-amber-700' : 'text-gray-700'}`}
+   373→                  >
+   374→                    {s}
+   375→                  </button>
+   376→                ))}
+   377→              </div>
+   378→            )}
+   379→          </div>
+   380→
+   381→          <Divider />
+   382→
+   383→          {/* Heading Styles */}
+   384→          <TBtn title="Titulo 1" active={editor.isActive('heading', { level: 1 })} onClick={() => applyHeading(1)}>
+   385→            <Heading1 size={15} />
+   386→          </TBtn>
+   387→          <TBtn title="Titulo 2" active={editor.isActive('heading', { level: 2 })} onClick={() => applyHeading(2)}>
+   388→            <Heading2 size={15} />
+   389→          </TBtn>
+   390→          <TBtn title="Titulo 3" active={editor.isActive('heading', { level: 3 })} onClick={() => applyHeading(3)}>
+   391→            <Heading3 size={15} />
+   392→          </TBtn>
+   393→          <TBtn title="Corpo de texto" active={!editor.isActive('heading')} onClick={() => applyHeading(null)}>
+   394→            <Pilcrow size={15} />
+   395→          </TBtn>
+   396→
+   397→          <Divider />
+   398→
+   399→          {/* Text Formatting */}
+   400→          <TBtn title="Negrito (Ctrl+B)" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+   401→            <Bold size={15} />
+   402→          </TBtn>
+   403→          <TBtn title="Italico (Ctrl+I)" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+   404→            <Italic size={15} />
+   405→          </TBtn>
+   406→          <TBtn title="Sublinhado (Ctrl+U)" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+   407→            <UnderlineIcon size={15} />
+   408→          </TBtn>
+   409→          <TBtn title="Tachado" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+   410→            <Strikethrough size={15} />
+   411→          </TBtn>
+   412→          <TBtn title="Codigo" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+   413→            <Code size={15} />
+   414→          </TBtn>
+   415→
+   416→          <Divider />
+   417→
+   418→          {/* Text Color */}
+   419→          <div ref={colorRef} className="relative">
+   420→            <TBtn title="Cor do texto" onClick={() => { setShowColorPicker(!showColorPicker); setShowHighlightPicker(false); }}>
+   421→              <div className="relative">
+   422→                <Palette size={15} />
+   423→                <div className="absolute -bottom-0.5 left-0 right-0 h-1 rounded-full bg-black" />
+   424→              </div>
+   425→            </TBtn>
+   426→            {showColorPicker && (
+   427→              <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-xl">
+   428→                <p className="mb-1.5 text-[10px] font-medium text-gray-400 uppercase">Cor do texto</p>
+   429→                <div className="grid grid-cols-6 gap-1">
+   430→                  {TEXT_COLORS.map((c) => (
+   431→                    <button
+   432→                      key={c}
+   433→                      onClick={() => { editor.chain().focus().setColor(c).run(); setShowColorPicker(false); }}
+   434→                      className={`h-6 w-6 rounded-md border transition-transform hover:scale-110 ${c === '#ffffff' ? 'border-gray-300' : 'border-transparent'}`}
+   435→                      style={{ backgroundColor: c }}
+   436→                      title={c}
+   437→                    />
+   438→                  ))}
+   439→                </div>
+   440→              </div>
+   441→            )}
+   442→          </div>
+   443→
+   444→          {/* Highlight Color */}
+   445→          <div ref={highlightRef} className="relative">
+   446→            <TBtn title="Realce" onClick={() => { setShowHighlightPicker(!showHighlightPicker); setShowColorPicker(false); }}>
+   447→              <Highlighter size={15} />
+   448→            </TBtn>
+   449→            {showHighlightPicker && (
+   450→              <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-xl">
+   451→                <p className="mb-1.5 text-[10px] font-medium text-gray-400 uppercase">Cor de realce</p>
+   452→                <div className="grid grid-cols-5 gap-1">
+   453→                  {HIGHLIGHT_COLORS.map((c) => (
+   454→                    <button
+   455→                      key={c}
+   456→                      onClick={() => { 
+   457→                        if (c === 'transparent') {
+   458→                          editor.chain().focus().unsetHighlight().run();
+   459→                        } else {
+   460→                          editor.chain().focus().toggleHighlight({ color: c }).run();
+   461→                        }
+   462→                        setShowHighlightPicker(false);
+   463→                      }}
+   464→                      className={`h-6 w-6 rounded-md border border-gray-200 transition-transform hover:scale-110 ${c === 'transparent' ? 'bg-white' : ''}`}
+   465→                      style={c !== 'transparent' ? { backgroundColor: c } : {}}
+   466→                      title={c === 'transparent' ? 'Sem realce' : c}
+   467→                    />
+   468→                  ))}
+   469→                </div>
+   470→              </div>
+   471→            )}
+   472→          </div>
+   473→
+   474→          <Divider />
+   475→
+   476→          {/* Alignment */}
+   477→          <TBtn title="Alinhar a esquerda" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+   478→            <AlignLeft size={15} />
+   479→          </TBtn>
+   480→          <TBtn title="Centralizar" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+   481→            <AlignCenter size={15} />
+   482→          </TBtn>
+   483→          <TBtn title="Alinhar a direita" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>
+   484→            <AlignRight size={15} />
+   485→          </TBtn>
+   486→          <TBtn title="Justificar" active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
+   487→            <AlignJustify size={15} />
+   488→          </TBtn>
+   489→
+   490→          <Divider />
+   491→
+   492→          {/* Lists */}
+   493→          <TBtn title="Lista com marcadores" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+   494→            <List size={15} />
+   495→          </TBtn>
+   496→          <TBtn title="Lista numerada" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+   497→            <ListOrdered size={15} />
+   498→          </TBtn>
+   499→          <TBtn title="Lista de tarefas" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+   500→            <CheckSquare size={15} />
+   501→          </TBtn>
+   502→
+   503→          <Divider />
+   504→
+   505→          {/* Block elements */}
+   506→          <TBtn title="Citacao" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+   507→            <Quote size={15} />
+   508→          </TBtn>
+   509→          <TBtn title="Linha horizontal" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+   510→            <Minus size={15} />
+   511→          </TBtn>
+   512→
+   513→          <Divider />
+   514→
+   515→          {/* Clear formatting */}
+   516→          <TBtn title="Limpar formatacao" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}>
+   517→            <RemoveFormatting size={15} />
+   518→          </TBtn>
+   519→
+   520→          {/* Print */}
+   521→          <TBtn title="Imprimir" onClick={handlePrint} className="ml-auto">
+   522→            <Printer size={15} />
+   523→          </TBtn>
+   524→        </div>
+   525→
+   526→        {/* Row 2: Paragraph & spacing controls */}
+   527→        <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-3 py-1">
+   528→          <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Paragrafo</span>
+   529→          
+   530→          {/* Line height */}
+   531→          <select
+   532→            onChange={(e) => applyLineHeight(Number(e.target.value))}
+   533→            className="h-7 rounded-md border border-gray-200 px-1.5 text-xs text-gray-600 hover:bg-gray-50"
+   534→            title="Espacamento entre linhas"
+   535→          >
+   536→            {LINE_HEIGHTS.map((lh) => (
+   537→              <option key={lh} value={lh}>{lh.toFixed(1)}</option>
+   538→            ))}
+   539→          </select>
+   540→
+   541→          <div className="mx-1 h-4 w-px bg-gray-200" />
+   542→
+   543→          {/* Indent / Outdent */}
+   544→          <TBtn title="Aumentar recuo" onClick={handleIndent}>
+   545→            <div className="flex flex-col items-center leading-none">
+   546→              <div className="border-l-2 border-t-2 border-gray-600 h-2 w-2" />
+   547→            </div>
+   548→          </TBtn>
+   549→          <TBtn title="Diminuir recuo" onClick={handleOutdent}>
+   550→            <div className="flex flex-col items-center leading-none">
+   551→              <div className="border-l-2 border-b-2 border-gray-600 h-2 w-2" />
+   552→            </div>
+   553→          </TBtn>
+   554→
+   555→          <div className="mx-1 h-4 w-px bg-gray-200" />
+   556→
+   557→          {/* Word & char count */}
+   558→          <span className="text-[11px] text-gray-400">
+   559→            {wordCount} palavras · {charCount} caracteres
+   560→          </span>
+   561→        </div>
+   562→      </div>
+   563→
+   564→      {/* ====== BUBBLE MENU (floating toolbar on text selection) ====== */}
+   565→      <BubbleMenu editor={editor} tippyOptions={{ duration: 150 }}>
+   566→        <div className="flex items-center gap-0.5 rounded-xl border border-gray-200 bg-white px-1.5 py-1 shadow-xl">
+   567→          <TBtn title="Negrito" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+   568→            <Bold size={13} />
+   569→          </TBtn>
+   570→          <TBtn title="Italico" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+   571→            <Italic size={13} />
+   572→          </TBtn>
+   573→          <TBtn title="Sublinhado" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+   574→            <UnderlineIcon size={13} />
+   575→          </TBtn>
+   576→          <TBtn title="Tachado" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+   577→            <Strikethrough size={13} />
+   578→          </TBtn>
+   579→          <Divider />
+   580→          <TBtn title="Realce" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+   581→            <Highlighter size={13} />
+   582→          </TBtn>
+   583→          <TBtn title="Cor" onClick={() => editor.chain().focus().setColor('#ef4444').run()}>
+   584→            <Palette size={13} />
+   585→          </TBtn>
+   586→        </div>
+   587→      </BubbleMenu>
+   588→
+   589→      {/* ====== DOCUMENT CONTENT AREA ====== */}
+   590→      <div className="flex-1 overflow-auto flex justify-center p-4 sm:p-8">
+   591→        <div
+   592→          className="w-full max-w-[816px] min-h-[1056px] rounded-sm shadow-xl"
+   593→          style={{
+   594→            backgroundColor: paperBg,
+   595→            backgroundImage: paperStyle === 'lined'
+   596→              ? 'repeating-linear-gradient(transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)'
+   597→              : paperStyle === 'grid'
+   598→                ? 'repeating-linear-gradient(0deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)'
+   599→                : paperStyle === 'dotted'
+   600→                  ? 'radial-gradient(circle, #d1d5db 1px, transparent 1px)'
+   601→                  : 'none',
+   602→            backgroundSize: paperStyle === 'dotted' ? '32px 32px' : 'auto',
+   603→          }}
+   604→        >
+   605→          <div
+   606→            className={`${contentClass} p-8 sm:p-12 document-editor-content`}
+   607→            style={{
+   608→              minHeight: '1056px',
+   609→              fontFamily: 'Inter, sans-serif',
+   610→              fontSize: '16px',
+   611→              lineHeight: '1.6',
+   612→              color: '#111827',
+   613→              outline: 'none',
+   614→            }}
+   615→          >
+   616→            <EditorContent editor={editor} />
+   617→          </div>
+   618→        </div>
+   619→      </div>
+   620→
+   621→      {/* ====== STATUS BAR (like Word) ====== */}
+   622→      <div className="sticky bottom-0 flex items-center justify-between border-t border-gray-200 bg-white/95 px-4 py-1.5 backdrop-blur-md text-[11px] text-gray-400">
+   623→        <div className="flex items-center gap-4">
+   624→          <span className="flex items-center gap-1">
+   625→            <FileText size={12} />
+   626→            Documento
+   627→          </span>
+   628→          <span>{wordCount} palavras</span>
+   629→          <span>{charCount} caracteres</span>
+   630→        </div>
+   631→        <div className="flex items-center gap-4">
+   632→          <span>Portugues (Brasil)</span>
+   633→          <span>100%</span>
+   634→        </div>
+   635→      </div>
+   636→
+   637→      {/* ====== GLOBAL STYLES FOR TIPTAP ====== */}
+   638→      <style jsx global>{`
+   639→        /* Base editor styles - Word-like */
+   640→        .document-editor-content {
+   641→          outline: none;
+   642→          caret-color: #000;
+   643→        }
+   644→        .document-editor-content:focus {
+   645→          outline: none;
+   646→        }
+   647→        .document-editor-content .tiptap {
+   648→          outline: none;
+   649→          min-height: 900px;
+   650→        }
+   651→        .document-editor-content .tiptap:focus {
+   652→          outline: none;
+   653→        }
+   654→        /* Headings */
+   655→        .document-editor-content h1 {
+   656→          font-size: 2em;
+   657→          font-weight: 700;
+   658→          margin: 0.8em 0 0.4em;
+   659→          line-height: 1.2;
+   660→          color: #111;
+   661→        }
+   662→        .document-editor-content h2 {
+   663→          font-size: 1.5em;
+   664→          font-weight: 600;
+   665→          margin: 0.7em 0 0.3em;
+   666→          line-height: 1.25;
+   667→          color: #1f2937;
+   668→        }
+   669→        .document-editor-content h3 {
+   670→          font-size: 1.25em;
+   671→          font-weight: 600;
+   672→          margin: 0.6em 0 0.3em;
+   673→          line-height: 1.3;
+   674→          color: #374151;
+   675→        }
+   676→        .document-editor-content h4 {
+   677→          font-size: 1.1em;
+   678→          font-weight: 600;
+   679→          margin: 0.5em 0 0.25em;
+   680→          color: #4b5563;
+   681→        }
+   682→        /* Paragraphs */
+   683→        .document-editor-content p {
+   684→          margin: 0.4em 0;
+   685→          line-height: 1.6;
+   686→        }
+   687→        /* Lists */
+   688→        .document-editor-content ul {
+   689→          list-style-type: disc;
+   690→          padding-left: 1.5em;
+   691→          margin: 0.5em 0;
+   692→        }
+   693→        .document-editor-content ol {
+   694→          list-style-type: decimal;
+   695→          padding-left: 1.5em;
+   696→          margin: 0.5em 0;
+   697→        }
+   698→        .document-editor-content li {
+   699→          margin: 0.2em 0;
+   700→        }
+   701→        .document-editor-content li p {
+   702→          margin: 0;
+   703→        }
+   704→        /* Task list */
+   705→        .document-editor-content ul[data-type="taskList"] {
+   706→          list-style: none;
+   707→          padding-left: 0;
+   708→        }
+   709→        .document-editor-content ul[data-type="taskList"] li {
+   710→          display: flex;
+   711→          align-items: flex-start;
+   712→          gap: 0.5em;
+   713→          margin: 0.3em 0;
+   714→        }
+   715→        .document-editor-content ul[data-type="taskList"] li > label {
+   716→          flex-shrink: 0;
+   717→          margin-top: 0.15em;
+   718→        }
+   719→        .document-editor-content ul[data-type="taskList"] li > label input[type="checkbox"] {
+   720→          width: 16px;
+   721→          height: 16px;
+   722→          cursor: pointer;
+   723→          accent-color: #f59e0b;
+   724→        }
+   725→        .document-editor-content ul[data-type="taskList"] li > div {
+   726→          flex: 1;
+   727→        }
+   728→        /* Blockquote */
+   729→        .document-editor-content blockquote {
+   730→          border-left: 4px solid #f59e0b;
+   731→          padding-left: 1em;
+   732→          margin: 0.8em 0;
+   733→          color: #6b7280;
+   734→          font-style: italic;
+   735→        }
+   736→        /* Code */
+   737→        .document-editor-content code {
+   738→          background: #f3f4f6;
+   739→          padding: 0.15em 0.4em;
+   740→          border-radius: 4px;
+   741→          font-size: 0.9em;
+   742→          font-family: 'Courier New', monospace;
+   743→          color: #dc2626;
+   744→        }
+   745→        .document-editor-content pre {
+   746→          background: #1e1e1e;
+   747→          color: #d4d4d4;
+   748→          padding: 1em;
+   749→          border-radius: 8px;
+   750→          overflow-x: auto;
+   751→          margin: 0.8em 0;
+   752→          font-family: 'Courier New', monospace;
+   753→          font-size: 0.875em;
+   754→          line-height: 1.5;
+   755→        }
+   756→        .document-editor-content pre code {
+   757→          background: none;
+   758→          color: inherit;
+   759→          padding: 0;
+   760→          border-radius: 0;
+   761→          font-size: inherit;
+   762→        }
+   763→        /* Horizontal rule */
+   764→        .document-editor-content hr {
+   765→          border: none;
+   766→          border-top: 1px solid #e5e7eb;
+   767→          margin: 1.5em 0;
+   768→        }
+   769→        /* Mark/Highlight */
+   770→        .document-editor-content mark {
+   771→          background: #fef08a;
+   772→          padding: 0.1em 0.2em;
+   773→          border-radius: 2px;
+   774→        }
+   775→        /* Placeholder */
+   776→        .document-editor-content p.is-editor-empty:first-child::before {
+   777→          content: attr(data-placeholder);
+   778→          float: left;
+   779→          color: #9ca3af;
+   780→          pointer-events: none;
+   781→          height: 0;
+   782→        }
+   783→        /* Selection */
+   784→        .document-editor-content ::selection {
+   785→          background: #bfdbfe;
+   786→        }
+   787→      `}</style>
+   788→    </div>
+   789→  );
+   790→}
+   791→

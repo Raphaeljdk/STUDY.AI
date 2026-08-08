@@ -10,7 +10,7 @@ import {
   Plus, Trash2, Edit3, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
   Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown,
-  ListTodo, Flag, Trophy, CalendarDays, Compass, Swords, Rocket, Route, Siren, Dna
+  ListTodo, Flag, Trophy, CalendarDays, Compass, Swords, Rocket, Route, Siren, Dna, GraduationCap
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
@@ -60,6 +60,8 @@ const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
 const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
 // @ts-expect-error dynamic import
 const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
+// @ts-expect-error dynamic import
+const TeachView = dynamic(() => import('./TeachView'), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -152,7 +154,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
+type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -206,7 +208,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
 
 export function DashboardView() {
   const { data: session } = useSession();
@@ -254,6 +256,7 @@ export function DashboardView() {
             <TabBtn icon={Swords} label="Batalha" tooltip="Duelo de conhecimento" active={activeTab === 'battle'} onClick={() => setActiveTab('battle')} />
             <TabBtn icon={Zap} label="60s" tooltip="Aprenda em 60 segundos" active={activeTab === 'microlesson'} onClick={() => setActiveTab('microlesson')} />
             <TabBtn icon={Rocket} label="Missoes" tooltip="Missoes de estudo" active={activeTab === 'missions'} onClick={() => setActiveTab('missions')} />
+            <TabBtn icon={GraduationCap} label="Ensinar" tooltip="Ensinar para IA" active={activeTab === 'teach'} onClick={() => setActiveTab('teach')} />
             <TabBtn icon={BookOpen} label="Materias" tooltip="Suas materias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
             <TabBtn icon={ListTodo} label="Tarefas" tooltip="Suas tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
             <TabBtn icon={FolderOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
@@ -289,6 +292,7 @@ export function DashboardView() {
           <TabBtn icon={Dna} label="Brain" active={activeTab === 'brain'} onClick={() => setActiveTab('brain')} />
           <TabBtn icon={Route} label="Trilhas" active={activeTab === 'roadmap'} onClick={() => setActiveTab('roadmap')} />
           <TabBtn icon={Siren} label="Emerg." active={activeTab === 'emergency'} onClick={() => setActiveTab('emergency')} />
+          <TabBtn icon={GraduationCap} label="Ensinar" active={activeTab === 'teach'} onClick={() => setActiveTab('teach')} />
           <TabBtn icon={FolderOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
           <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
           <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
@@ -331,6 +335,11 @@ export function DashboardView() {
         {activeTab === 'missions' && (
           <SectionErrorBoundary name="MissionsView">
             <MissionsView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'teach' && (
+          <SectionErrorBoundary name="TeachView">
+            <TeachView onNavigate={navigateTo} />
           </SectionErrorBoundary>
         )}
         {activeTab === 'subjects' && (

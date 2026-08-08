@@ -1,0 +1,1068 @@
+     1→    50→    50→    50→    } else {
+     2→    51→    51→    51→      super.onPointerMove(pointer);
+     3→    52→    52→    52→    }
+     4→    53→    53→    53→  }
+     5→    54→    54→    54→}
+     6→    55→    55→    55→
+     7→    56→    56→    56→/* ========================================================================
+     8→    57→    57→    57→   Tipos
+     9→    58→    58→    58→   ======================================================================== */
+    10→    59→    59→    59→
+    11→    60→    60→    60→interface CanvasEditorProps {
+    12→    61→    61→    61→  initialData?: string | null;
+    13→    62→    62→    62→  paperStyle?: 'blank' | 'lined' | 'grid' | 'dotted';
+    14→    63→    63→    63→  paperColor?: string;
+    15→    64→    64→    64→  lineColor?: string;
+    16→    65→    65→    65→  onChange?: (json: string) => void;
+    17→    66→    66→    66→}
+    18→    67→    67→    67→
+    19→    68→    68→    68→interface PageData {
+    20→    69→    69→    69→  id: string;
+    21→    70→    70→    70→  pageNumber: number;
+    22→    71→    71→    71→  paperStyle: string;
+    23→    72→    72→    72→  paperColor: string;
+    24→    73→    73→    73→  canvasJSON?: string;
+    25→    74→    74→    74→}
+    26→    75→    75→    75→
+    27→    76→    76→    76→/* ========================================================================
+    28→    77→    77→    77→   Constantes
+    29→    78→    78→    78→   ======================================================================== */
+    30→    79→    79→    79→
+    31→    80→    80→    80→const CANVAS_W = 1200;
+    32→    81→    81→    81→const CANVAS_H = 1600;
+    33→    82→    82→    82→const LINE_SPACING = 32;
+    34→    83→    83→    83→const MAX_UNDO = 50;
+    35→    84→    84→    84→const SAVE_DEBOUNCE_MS = 800;
+    36→    85→    85→    85→
+    37→    86→    86→    86→const DEFAULT_TEXT_FORMAT: TextFormat = {
+    38→    87→    87→    87→  fontFamily: 'Inter, sans-serif',
+    39→    88→    88→    88→  fontSize: 24,
+    40→    89→    89→    89→  fontWeight: 'normal',
+    41→    90→    90→    90→  fontStyle: 'normal',
+    42→    91→    91→    91→  underline: false,
+    43→    92→    92→    92→  linethrough: false,
+    44→    93→    93→    93→  textAlign: 'left',
+    45→    94→    94→    94→  fill: '#000000',
+    46→    95→    95→    95→  lineHeight: 1.3,
+    47→    96→    96→    96→  charSpacing: 0,
+    48→    97→    97→    97→};
+    49→    98→    98→    98→
+    50→    99→    99→    99→/* ========================================================================
+    51→   100→   100→   100→   Componente principal
+    52→   101→   101→   101→   ======================================================================== */
+    53→   102→   102→   102→
+    54→   103→   103→   103→export default function CanvasEditor({
+    55→   104→   104→   104→  initialData,
+    56→   105→   105→   105→  paperStyle: initPaperStyle = 'blank',
+    57→   106→   106→   106→  paperColor: initPaperColor = '#ffffff',
+    58→   107→   107→   107→  lineColor: initLineColor = '#e0e0e0',
+    59→   108→   108→   108→  onChange,
+    60→   109→   109→   109→}: CanvasEditorProps) {
+    61→   110→   110→   110→  /* ----- refs ----- */
+    62→   111→   111→   111→  const canvasElRef = useRef<HTMLCanvasElement>(null);
+    63→   112→   112→   112→  const fcRef = useRef<Canvas | null>(null);
+    64→   113→   113→   113→  const containerRef = useRef<HTMLDivElement>(null);
+    65→   114→   114→   114→  const fileInputRef = useRef<HTMLInputElement>(null);
+    66→   115→   115→   115→  const activeToolRef = useRef('select');
+    67→   116→   116→   116→
+    68→   117→   117→   117→  /* ----- estado da ferramenta ----- */
+    69→   118→   118→   118→  const [activeTool, setActiveTool] = useState('select');
+    70→   119→   119→   119→  const [strokeColor, setStrokeColor] = useState('#000000');
+    71→   120→   120→   120→  const [strokeWidth, setStrokeWidth] = useState(2);
+    72→   121→   121→   121→  const [zoom, setZoom] = useState(1);
+    73→   122→   122→   122→  const [paperStyle, setPaperStyle] = useState(initPaperStyle);
+    74→   123→   123→   123→  const [paperColor, setPaperColor] = useState(initPaperColor);
+    75→   124→   124→   124→  const [lineColor] = useState(initLineColor);
+    76→   125→   125→   125→  const [tapeMode, setTapeMode] = useState(false);
+    77→   126→   126→   126→  const [tapeColor, setTapeColor] = useState(getTapeColors()[0]);
+    78→   127→   127→   127→
+    79→   128→   128→   128→  /* ----- texto format (Canva-like) ----- */
+    80→   129→   129→   129→  const [textFormat, setTextFormat] = useState<TextFormat>({ ...DEFAULT_TEXT_FORMAT, fill: strokeColor });
+    81→   130→   130→   130→  const [showTextBar, setShowTextBar] = useState(false);
+    82→   131→   131→   131→  const [textBarPos, setTextBarPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    83→   132→   132→   132→
+    84→   133→   133→   133→  /* ----- undo/redo ----- */
+    85→   134→   134→   134→  const undoStackRef = useRef<string[]>([]);
+    86→   135→   135→   135→  const redoStackRef = useRef<string[]>([]);
+    87→   136→   136→   136→  const [canUndo, setCanUndo] = useState(false);
+    88→   137→   137→   137→  const [canRedo, setCanRedo] = useState(false);
+    89→   138→   138→   138→  const skipUndoRef = useRef(false);
+    90→   139→   139→   139→
+    91→   140→   140→   140→  /* ----- paginas ----- */
+    92→   141→   141→   141→  const [pages, setPages] = useState<PageData[]>([
+    93→   142→   142→   142→    { id: 'page-1', pageNumber: 1, paperStyle: initPaperStyle, paperColor: initPaperColor },
+    94→   143→   143→   143→  ]);
+    95→   144→   144→   144→  const [activePageId, setActivePageId] = useState('page-1');
+    96→   145→   145→   145→
+    97→   146→   146→   146→  /* ----- desenho de formas (temporarios) ----- */
+    98→   147→   147→   147→  const isDrawingShape = useRef(false);
+    99→   148→   148→   148→  const shapeOriginRef = useRef({ x: 0, y: 0 });
+   100→   149→   149→   149→  const tempShapeRef = useRef<Rect | Circle | Line | null>(null);
+   101→   150→   150→   150→
+   102→   151→   151→   151→  /* ----- auto-save debounced ----- */
+   103→   152→   152→   152→  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   104→   153→   153→   153→  const lastSavedJSON = useRef<string>('');
+   105→   154→   154→   154→
+   106→   155→   155→   155→  /* ----- space pan ----- */
+   107→   156→   156→   156→  const spaceHeld = useRef(false);
+   108→   157→   157→   157→  const isPanning = useRef(false);
+   109→   158→   158→   158→  const panStart = useRef({ x: 0, y: 0 });
+   110→   159→   159→   159→  const viewportOffset = useRef({ left: 0, top: 0 });
+   111→   160→   160→   160→
+   112→   161→   161→   161→  /* ===== propriedades especiais para serializacao ===== */
+   113→   162→   162→   162→  const SERIALIZE_PROPS = ['__isPaperBg', '__isTape', '__tapeColor'];
+   114→   163→   163→   163→
+   115→   164→   164→   164→  /* ========================================================================
+   116→   165→   165→   165→     Gerador de fundo de papel
+   117→   166→   166→   166→   ======================================================================== */
+   118→   167→   167→   167→
+   119→   168→   168→   168→  const buildPaperBackground = useCallback(
+   120→   169→   169→   169→    (fc: Canvas): void => {
+   121→   170→   170→   170→      const existing = fc.getObjects().find((o) => (o as any).__isPaperBg);
+   122→   171→   171→   171→      if (existing) fc.remove(existing);
+   123→   172→   172→   172→
+   124→   173→   173→   173→      if (paperStyle === 'blank') return;
+   125→   174→   174→   174→
+   126→   175→   175→   175→      const objs: any[] = [];
+   127→   176→   176→   176→
+   128→   177→   177→   177→      if (paperStyle === 'lined') {
+   129→   178→   178→   178→        for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   130→   179→   179→   179→          objs.push(
+   131→   180→   180→   180→            new Line([0, y, CANVAS_W, y], {
+   132→   181→   181→   181→              stroke: lineColor,
+   133→   182→   182→   182→              strokeWidth: 1,
+   134→   183→   183→   183→              selectable: false,
+   135→   184→   184→   184→              evented: false,
+   136→   185→   185→   185→            } as any),
+   137→   186→   186→   186→          );
+   138→   187→   187→   187→        }
+   139→   188→   188→   188→      } else if (paperStyle === 'grid') {
+   140→   189→   189→   189→        for (let x = LINE_SPACING; x < CANVAS_W; x += LINE_SPACING) {
+   141→   190→   190→   190→          objs.push(
+   142→   191→   191→   191→            new Line([x, 0, x, CANVAS_H], {
+   143→   192→   192→   192→              stroke: lineColor,
+   144→   193→   193→   193→              strokeWidth: 0.5,
+   145→   194→   194→   194→              selectable: false,
+   146→   195→   195→   195→              evented: false,
+   147→   196→   196→   196→            } as any),
+   148→   197→   197→   197→          );
+   149→   198→   198→   198→        }
+   150→   199→   199→   199→        for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   151→   200→   200→   200→          objs.push(
+   152→   201→   201→   201→            new Line([0, y, CANVAS_W, y], {
+   153→   202→   202→   202→              stroke: lineColor,
+   154→   203→   203→   203→              strokeWidth: 0.5,
+   155→   204→   204→   204→              selectable: false,
+   156→   205→   205→   205→              evented: false,
+   157→   206→   206→   206→            } as any),
+   158→   207→   207→   207→          );
+   159→   208→   208→   208→        }
+   160→   209→   209→   209→      } else if (paperStyle === 'dotted') {
+   161→   210→   210→   210→        for (let x = LINE_SPACING; x < CANVAS_W; x += LINE_SPACING) {
+   162→   211→   211→   211→          for (let y = LINE_SPACING; y < CANVAS_H; y += LINE_SPACING) {
+   163→   212→   212→   212→            objs.push(
+   164→   213→   213→   213→              new Circle(
+   165→   214→   214→   214→                { left: x, top: y, radius: 1.2, fill: lineColor, originX: 'center', originY: 'center' } as any,
+   166→   215→   215→   215→              ),
+   167→   216→   216→   216→            );
+   168→   217→   217→   217→          }
+   169→   218→   218→   218→        }
+   170→   219→   219→   219→      }
+   171→   220→   220→   220→
+   172→   221→   221→   221→      if (objs.length === 0) return;
+   173→   222→   222→   222→
+   174→   223→   223→   223→      const group = new Group(objs, {
+   175→   224→   224→   224→        selectable: false,
+   176→   225→   225→   225→        evented: false,
+   177→   226→   226→   226→      } as any);
+   178→   227→   227→   227→      (group as any).__isPaperBg = true;
+   179→   228→   228→   228→
+   180→   229→   229→   229→      fc.add(group);
+   181→   230→   230→   230→      fc.sendObjectToBack(group);
+   182→   231→   231→   231→    },
+   183→   232→   232→   232→    [paperStyle, lineColor],
+   184→   233→   233→   233→  );
+   185→   234→   234→   234→
+   186→   235→   235→   235→  /* ========================================================================
+   187→   236→   236→   236→     Undo / Redo
+   188→   237→   237→   237→   ======================================================================== */
+   189→   238→   238→   238→
+   190→   239→   239→   239→  const saveUndoState = useCallback((fc: Canvas) => {
+   191→   240→   240→   240→    if (skipUndoRef.current) {
+   192→   241→   241→   241→      skipUndoRef.current = false;
+   193→   242→   242→   242→      return;
+   194→   243→   243→   243→    }
+   195→   244→   244→   244→    const json = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   196→   245→   245→   245→    undoStackRef.current.push(json);
+   197→   246→   246→   246→    if (undoStackRef.current.length > MAX_UNDO) undoStackRef.current.shift();
+   198→   247→   247→   247→    redoStackRef.current = [];
+   199→   248→   248→   248→    setCanUndo(undoStackRef.current.length > 0);
+   200→   249→   249→   249→    setCanRedo(false);
+   201→   250→   250→   250→  }, []);
+   202→   251→   251→   251→
+   203→   252→   252→   252→  const handleUndo = useCallback(() => {
+   204→   253→   253→   253→    const fc = fcRef.current;
+   205→   254→   254→   254→    if (!fc || undoStackRef.current.length === 0) return;
+   206→   255→   255→   255→    const currentJSON = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   207→   256→   256→   256→    redoStackRef.current.push(currentJSON);
+   208→   257→   257→   257→    const prevJSON = undoStackRef.current.pop()!;
+   209→   258→   258→   258→    skipUndoRef.current = true;
+   210→   259→   259→   259→    fc.loadFromJSON(prevJSON).then(() => {
+   211→   260→   260→   260→      fc.renderAll();
+   212→   261→   261→   261→      setCanUndo(undoStackRef.current.length > 0);
+   213→   262→   262→   262→      setCanRedo(true);
+   214→   263→   263→   263→    });
+   215→   264→   264→   264→  }, []);
+   216→   265→   265→   265→
+   217→   266→   266→   266→  const handleRedo = useCallback(() => {
+   218→   267→   267→   267→    const fc = fcRef.current;
+   219→   268→   268→   268→    if (!fc || redoStackRef.current.length === 0) return;
+   220→   269→   269→   269→    const currentJSON = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   221→   270→   270→   270→    undoStackRef.current.push(currentJSON);
+   222→   271→   271→   271→    const nextJSON = redoStackRef.current.pop()!;
+   223→   272→   272→   272→    skipUndoRef.current = true;
+   224→   273→   273→   273→    fc.loadFromJSON(nextJSON).then(() => {
+   225→   274→   274→   274→      fc.renderAll();
+   226→   275→   275→   275→      setCanUndo(true);
+   227→   276→   276→   276→      setCanRedo(redoStackRef.current.length > 0);
+   228→   277→   277→   277→    });
+   229→   278→   278→   278→  }, []);
+   230→   279→   279→   279→
+   231→   280→   280→   280→  /* ========================================================================
+   232→   281→   281→   281→     Auto-save debounced
+   233→   282→   282→   282→   ======================================================================== */
+   234→   283→   283→   283→
+   235→   284→   284→   284→  const scheduleAutoSave = useCallback((fc: Canvas) => {
+   236→   285→   285→   285→    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+   237→   286→   286→   286→    debounceTimerRef.current = setTimeout(() => {
+   238→   287→   287→   287→      const json = JSON.stringify(fc.toJSON(SERIALIZE_PROPS));
+   239→   288→   288→   288→      if (json !== lastSavedJSON.current) {
+   240→   289→   289→   289→        lastSavedJSON.current = json;
+   241→   290→   290→   290→        onChange?.(json);
+   242→   291→   291→   291→      }
+   243→   292→   292→   292→    }, SAVE_DEBOUNCE_MS);
+   244→   293→   293→   293→  }, [onChange]);
+   245→   294→   294→   294→
+   246→   295→   295→   295→  /* ========================================================================
+   247→   296→   296→   296→     Atualizar brush/ferramenta
+   248→   297→   297→   297→   ======================================================================== */
+   249→   298→   298→   298→
+   250→   299→   299→   299→  const applyTool = useCallback(
+   251→   300→   300→   300→    (fc: Canvas, tool: string) => {
+   252→   301→   301→   301→      fc.isDrawingMode = false;
+   253→   302→   302→   302→      fc.selection = tool === 'select';
+   254→   303→   303→   303→      activeToolRef.current = tool;
+   255→   304→   304→   304→
+   256→   305→   305→   305→      switch (tool) {
+   257→   306→   306→   306→        case 'pen': {
+   258→   307→   307→   307→          fc.isDrawingMode = true;
+   259→   308→   308→   308→          const brush = new SmoothBrush(fc);
+   260→   309→   309→   309→          brush.color = strokeColor;
+   261→   310→   310→   310→          brush.width = 1.5;
+   262→   311→   311→   311→          fc.freeDrawingBrush = brush;
+   263→   312→   312→   312→          break;
+   264→   313→   313→   313→        }
+   265→   314→   314→   314→        case 'pencil': {
+   266→   315→   315→   315→          fc.isDrawingMode = true;
+   267→   316→   316→   316→          const brush = new SmoothBrush(fc);
+   268→   317→   317→   317→          brush.color = strokeColor;
+   269→   318→   318→   318→          brush.width = 3;
+   270→   319→   319→   319→          fc.freeDrawingBrush = brush;
+   271→   320→   320→   320→          break;
+   272→   321→   321→   321→        }
+   273→   322→   322→   322→        case 'highlighter': {
+   274→   323→   323→   323→          fc.isDrawingMode = true;
+   275→   324→   324→   324→          const brush = new PencilBrush(fc);
+   276→   325→   325→   325→          brush.color = strokeColor;
+   277→   326→   326→   326→          brush.width = 20;
+   278→   327→   327→   327→          (brush as any).globalCompositeOperation = 'multiply';
+   279→   328→   328→   328→          fc.freeDrawingBrush = brush;
+   280→   329→   329→   329→          break;
+   281→   330→   330→   330→        }
+   282→   331→   331→   331→        case 'eraser': {
+   283→   332→   332→   332→          fc.isDrawingMode = true;
+   284→   333→   333→   333→          const brush = new PencilBrush(fc);
+   285→   334→   334→   334→          brush.color = paperColor;
+   286→   335→   335→   335→          brush.width = 20;
+   287→   336→   336→   336→          fc.freeDrawingBrush = brush;
+   288→   337→   337→   337→          break;
+   289→   338→   338→   338→        }
+   290→   339→   339→   339→        case 'text':
+   291→   340→   340→   340→        case 'rectangle':
+   292→   341→   341→   341→        case 'circle':
+   293→   342→   342→   342→        case 'line':
+   294→   343→   343→   343→        case 'select':
+   295→   344→   344→   344→          break;
+   296→   345→   345→   345→      }
+   297→   346→   346→   346→
+   298→   347→   347→   347→      // Cursor
+   299→   348→   348→   348→      if (tool === 'text') {
+   300→   349→   349→   349→        fc.defaultCursor = 'text';
+   301→   350→   350→   350→        fc.hoverCursor = 'text';
+   302→   351→   351→   351→      } else if (tool === 'select') {
+   303→   352→   352→   352→        fc.defaultCursor = 'default';
+   304→   353→   353→   353→        fc.hoverCursor = 'move';
+   305→   354→   354→   354→      } else {
+   306→   355→   355→   355→        fc.defaultCursor = 'crosshair';
+   307→   356→   356→   356→        fc.hoverCursor = 'crosshair';
+   308→   357→   357→   357→      }
+   309→   358→   358→   358→    },
+   310→   359→   359→   359→    [strokeColor, paperColor],
+   311→   360→   360→   360→  );
+   312→   361→   361→   361→
+   313→   362→   362→   362→  /* ========================================================================
+   314→   363→   363→   363→     Text helpers
+   315→   364→   364→   364→   ======================================================================== */
+   316→   365→   365→   365→
+   317→   366→   366→   366→  const syncFormatFromText = useCallback((obj: any) => {
+   318→   367→   367→   367→    if (!obj || obj.type !== 'textbox') return;
+   319→   368→   368→   368→    setTextFormat({
+   320→   369→   369→   369→      fontFamily: obj.fontFamily || DEFAULT_TEXT_FORMAT.fontFamily,
+   321→   370→   370→   370→      fontSize: obj.fontSize || DEFAULT_TEXT_FORMAT.fontSize,
+   322→   371→   371→   371→      fontWeight: obj.fontWeight || 'normal',
+   323→   372→   372→   372→      fontStyle: obj.fontStyle || 'normal',
+   324→   373→   373→   373→      underline: !!obj.underline,
+   325→   374→   374→   374→      linethrough: !!obj.linethrough,
+   326→   375→   375→   375→      textAlign: obj.textAlign || 'left',
+   327→   376→   376→   376→      fill: obj.fill || '#000000',
+   328→   377→   377→   377→      lineHeight: obj.lineHeight || 1.3,
+   329→   378→   378→   378→      charSpacing: obj.charSpacing || 0,
+   330→   379→   379→   379→    });
+   331→   380→   380→   380→  }, []);
+   332→   381→   381→   381→
+   333→   382→   382→   382→  const applyFormatToActiveText = useCallback(
+   334→   383→   383→   383→    (patch: Partial<TextFormat>) => {
+   335→   384→   384→   384→      const fc = fcRef.current;
+   336→   385→   385→   385→      if (!fc) return;
+   337→   386→   386→   386→      const obj = fc.getActiveObject() as any;
+   338→   387→   387→   387→      if (!obj || obj.type !== 'textbox') return;
+   339→   388→   388→   388→
+   340→   389→   389→   389→      setTextFormat((prev) => {
+   341→   390→   390→   390→        const next = { ...prev, ...patch };
+   342→   391→   391→   391→        obj.set({
+   343→   392→   392→   392→          fontFamily: next.fontFamily,
+   344→   393→   393→   393→          fontSize: next.fontSize,
+   345→   394→   394→   394→          fontWeight: next.fontWeight,
+   346→   395→   395→   395→          fontStyle: next.fontStyle,
+   347→   396→   396→   396→          underline: next.underline,
+   348→   397→   397→   397→          linethrough: next.linethrough,
+   349→   398→   398→   398→          textAlign: next.textAlign,
+   350→   399→   399→   399→          fill: next.fill,
+   351→   400→   400→   400→          lineHeight: next.lineHeight,
+   352→   401→   401→   401→          charSpacing: next.charSpacing,
+   353→   402→   402→   402→        });
+   354→   403→   403→   403→        fc.renderAll();
+   355→   404→   404→   404→        scheduleAutoSave(fc);
+   356→   405→   405→   405→        return next;
+   357→   406→   406→   406→      });
+   358→   407→   407→   407→    },
+   359→   408→   408→   408→    [scheduleAutoSave],
+   360→   409→   409→   409→  );
+   361→   410→   410→   410→
+   362→   411→   411→   411→  const updateTextBarPosition = useCallback(() => {
+   363→   412→   412→   412→    const fc = fcRef.current;
+   364→   413→   413→   413→    if (!fc) return;
+   365→   414→   414→   414→    const obj = fc.getActiveObject() as any;
+   366→   415→   415→   415→    if (!obj || obj.type !== 'textbox') {
+   367→   416→   416→   416→      setShowTextBar(false);
+   368→   417→   417→   417→      return;
+   369→   418→   418→   418→    }
+   370→   419→   419→   419→
+   371→   420→   420→   420→    const canvasRect = containerRef.current?.querySelector('canvas')?.getBoundingClientRect();
+   372→   421→   421→   421→    if (!canvasRect) return;
+   373→   422→   422→   422→
+   374→   423→   423→   423→    // Get the bounding rect of the text object in viewport coordinates
+   375→   424→   424→   424→    const objBound = obj.getBoundingRect(true, true);
+   376→   425→   425→   425→    const vpt = fc.viewportTransform!;
+   377→   426→   426→   426→    const scaleX = vpt[0];
+   378→   427→   427→   427→    const scaleY = vpt[3];
+   379→   428→   428→   428→
+   380→   429→   429→   429→    const barLeft = canvasRect.left + objBound.left * scaleX;
+   381→   430→   430→   430→    const barTop = canvasRect.top + objBound.top * scaleY - 44;
+   382→   431→   431→   431→
+   383→   432→   432→   432→    setTextBarPos({ top: Math.max(4, barTop), left: barLeft });
+   384→   433→   433→   433→    setShowTextBar(true);
+   385→   434→   434→   434→  }, []);
+   386→   435→   435→   435→
+   387→   436→   436→   436→  /* ========================================================================
+   388→   437→   437→   437→     Inicializacao do canvas
+   389→   438→   438→   438→   ======================================================================== */
+   390→   439→   439→   439→
+   391→   440→   440→   440→  useEffect(() => {
+   392→   441→   441→   441→    const el = canvasElRef.current;
+   393→   442→   442→   442→    if (!el) return;
+   394→   443→   443→   443→
+   395→   444→   444→   444→    const fc = new Canvas(el, {
+   396→   445→   445→   445→      width: CANVAS_W,
+   397→   446→   446→   446→      height: CANVAS_H,
+   398→   447→   447→   447→      backgroundColor: paperColor,
+   399→   448→   448→   448→      selection: true,
+   400→   449→   449→   449→      preserveObjectStacking: true,
+   401→   450→   450→   450→    });
+   402→   451→   451→   451→    fcRef.current = fc;
+   403→   452→   452→   452→
+   404→   453→   453→   453→    // Fundo do papel
+   405→   454→   454→   454→    buildPaperBackground(fc);
+   406→   455→   455→   455→    fc.renderAll();
+   407→   456→   456→   456→
+   408→   457→   457→   457→    // Carregar estado inicial se existir
+   409→   458→   458→   458→    if (initialData) {
+   410→   459→   459→   459→      try {
+   411→   460→   460→   460→        fc.loadFromJSON(initialData).then(() => {
+   412→   461→   461→   461→          fc.renderAll();
+   413→   462→   462→   462→          saveUndoState(fc);
+   414→   463→   463→   463→        });
+   415→   464→   464→   464→      } catch {
+   416→   465→   465→   465→        saveUndoState(fc);
+   417→   466→   466→   466→      }
+   418→   467→   467→   467→    } else {
+   419→   468→   468→   468→      saveUndoState(fc);
+   420→   469→   469→   469→    }
+   421→   470→   470→   470→
+   422→   471→   471→   471→    /* ---------- eventos de ferramenta ---------- */
+   423→   472→   472→   472→
+   424→   473→   473→   473→    fc.on('mouse:down', (opt) => {
+   425→   474→   474→   474→      const e = opt.e as MouseEvent;
+   426→   475→   475→   475→      const pointer = fc.getScenePoint(e);
+   427→   476→   476→   476→      const currentTool = activeToolRef.current;
+   428→   477→   477→   477→
+   429→   478→   478→   478→      // Fita adesiva
+   430→   479→   479→   479→      if (tapeMode) {
+   431→   480→   480→   480→        addTape(fc, pointer.x, pointer.y, tapeColor);
+   432→   481→   481→   481→        saveUndoState(fc);
+   433→   482→   482→   482→        scheduleAutoSave(fc);
+   434→   483→   483→   483→        return;
+   435→   484→   484→   484→      }
+   436→   485→   485→   485→
+   437→   486→   486→   486→      // Ferramenta de texto - criar Textbox Canva-style
+   438→   487→   487→   487→      if (currentTool === 'text') {
+   439→   488→   488→   488→        // If clicking on existing text, let fabric handle it (double-click to edit)
+   440→   489→   489→   489→        const target = opt.target as any;
+   441→   490→   490→   490→        if (target && target.type === 'textbox') {
+   442→   491→   491→   491→          return; // Let fabric handle selection/editing of existing text
+   443→   492→   492→   492→        }
+   444→   493→   493→   493→
+   445→   494→   494→   494→        const textbox = new Textbox('', {
+   446→   495→   495→   495→          left: pointer.x,
+   447→   496→   496→   496→          top: pointer.y,
+   448→   497→   497→   497→          width: 300,
+   449→   498→   498→   498→          fontSize: textFormat.fontSize,
+   450→   499→   499→   499→          fill: strokeColor,
+   451→   500→   500→   500→          fontFamily: textFormat.fontFamily,
+   452→   501→   501→   501→          fontWeight: textFormat.fontWeight,
+   453→   502→   502→   502→          fontStyle: textFormat.fontStyle,
+   454→   503→   503→   503→          underline: textFormat.underline,
+   455→   504→   504→   504→          linethrough: textFormat.linethrough,
+   456→   505→   505→   505→          textAlign: textFormat.textAlign,
+   457→   506→   506→   506→          lineHeight: textFormat.lineHeight,
+   458→   507→   507→   507→          charSpacing: textFormat.charSpacing,
+   459→   508→   508→   508→          editable: true,
+   460→   509→   509→   509→          cursorColor: '#000000',
+   461→   510→   510→   510→          cursorWidth: 2,
+   462→   511→   511→   511→          editingBorderColor: '#f59e0b',
+   463→   512→   512→   512→          padding: 8,
+   464→   513→   513→   513→        } as any);
+   465→   514→   514→   514→
+   466→   515→   515→   515→        fc.add(textbox);
+   467→   516→   516→   516→        fc.setActiveObject(textbox);
+   468→   517→   517→   517→        fc.renderAll();
+   469→   518→   518→   518→
+   470→   519→   519→   519→        // Enter editing mode with a small delay for reliable focus
+   471→   520→   520→   520→        setTimeout(() => {
+   472→   521→   521→   521→          (textbox as any).enterEditing();
+   473→   522→   522→   522→          (textbox as any).selectAll();
+   474→   523→   523→   523→          // Focus the hidden textarea that fabric creates
+   475→   524→   524→   524→          const hiddenTextarea = el.parentElement?.querySelector('textarea.fabric-textbox') as HTMLTextAreaElement;
+   476→   525→   525→   525→          if (hiddenTextarea) {
+   477→   526→   526→   526→            hiddenTextarea.focus();
+   478→   527→   527→   527→          }
+   479→   528→   528→   528→        }, 50);
+   480→   529→   529→   529→
+   481→   530→   530→   530→        // Switch back to select after creating text (Canva behavior)
+   482→   531→   531→   531→        setActiveTool('select');
+   483→   532→   532→   532→        activeToolRef.current = 'select';
+   484→   533→   533→   533→        applyTool(fc, 'select');
+   485→   534→   534→   534→
+   486→   535→   535→   535→        saveUndoState(fc);
+   487→   536→   536→   536→        scheduleAutoSave(fc);
+   488→   537→   537→   537→        return;
+   489→   538→   538→   538→      }
+   490→   539→   539→   539→
+   491→   540→   540→   540→      // Pan com space ou botao do meio
+   492→   541→   541→   541→      if (spaceHeld.current || e.button === 1) {
+   493→   542→   542→   542→        isPanning.current = true;
+   494→   543→   543→   543→        panStart.current = { x: e.clientX, y: e.clientY };
+   495→   544→   544→   544→        viewportOffset.current = { left: fc.viewportLeft, top: fc.viewportTop };
+   496→   545→   545→   545→        fc.selection = false;
+   497→   546→   546→   546→        return;
+   498→   547→   547→   547→      }
+   499→   548→   548→   548→
+   500→   549→   549→   549→      // Formas (retangulo, circulo, linha)
+   501→   550→   550→   550→      if (['rectangle', 'circle', 'line'].includes(currentTool)) {
+   502→   551→   551→   551→        isDrawingShape.current = true;
+   503→   552→   552→   552→        shapeOriginRef.current = { x: pointer.x, y: pointer.y };
+   504→   553→   553→   553→
+   505→   554→   554→   554→        if (currentTool === 'rectangle') {
+   506→   555→   555→   555→          const rect = new Rect({
+   507→   556→   556→   556→            left: pointer.x,
+   508→   557→   557→   557→            top: pointer.y,
+   509→   558→   558→   558→            width: 0,
+   510→   559→   559→   559→            height: 0,
+   511→   560→   560→   560→            fill: 'transparent',
+   512→   561→   561→   561→            stroke: strokeColor,
+   513→   562→   562→   562→            strokeWidth,
+   514→   563→   563→   563→          } as any);
+   515→   564→   564→   564→          fc.add(rect);
+   516→   565→   565→   565→          fc.setActiveObject(rect);
+   517→   566→   566→   566→          tempShapeRef.current = rect;
+   518→   567→   567→   567→        } else if (currentTool === 'circle') {
+   519→   568→   568→   568→          const circ = new Circle({
+   520→   569→   569→   569→            left: pointer.x,
+   521→   570→   570→   570→            top: pointer.y,
+   522→   571→   571→   571→            radius: 1,
+   523→   572→   572→   572→            fill: 'transparent',
+   524→   573→   573→   573→            stroke: strokeColor,
+   525→   574→   574→   574→            strokeWidth,
+   526→   575→   575→   575→            originX: 'center',
+   527→   576→   576→   576→            originY: 'center',
+   528→   577→   577→   577→          } as any);
+   529→   578→   578→   578→          fc.add(circ);
+   530→   579→   579→   579→          fc.setActiveObject(circ);
+   531→   580→   580→   580→          tempShapeRef.current = circ;
+   532→   581→   581→   581→        } else if (currentTool === 'line') {
+   533→   582→   582→   582→          const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+   534→   583→   583→   583→            stroke: strokeColor,
+   535→   584→   584→   584→            strokeWidth,
+   536→   585→   585→   585→          } as any);
+   537→   586→   586→   586→          fc.add(line);
+   538→   587→   587→   587→          fc.setActiveObject(line);
+   539→   588→   588→   588→          tempShapeRef.current = line;
+   540→   589→   589→   589→        }
+   541→   590→   590→   590→      }
+   542→   591→   591→   591→    });
+   543→   592→   592→   592→
+   544→   593→   593→   593→    fc.on('mouse:move', (opt) => {
+   545→   594→   594→   594→      const e = opt.e as MouseEvent;
+   546→   595→   595→   595→
+   547→   596→   596→   596→      if (isPanning.current) {
+   548→   597→   597→   597→        const dx = e.clientX - panStart.current.x;
+   549→   598→   598→   598→        const dy = e.clientY - panStart.current.y;
+   550→   599→   599→   599→        fc.setViewportTransform([
+   551→   600→   600→   600→          zoom, 0, 0, zoom,
+   552→   601→   601→   601→          viewportOffset.current.left + dx,
+   553→   602→   602→   602→          viewportOffset.current.top + dy,
+   554→   603→   603→   603→        ]);
+   555→   604→   604→   604→        return;
+   556→   605→   605→   605→      }
+   557→   606→   606→   606→
+   558→   607→   607→   607→      if (isDrawingShape.current && tempShapeRef.current) {
+   559→   608→   608→   608→        const pointer = fc.getScenePoint(e);
+   560→   609→   609→   609→        const origin = shapeOriginRef.current;
+   561→   610→   610→   610→        const shape = tempShapeRef.current;
+   562→   611→   611→   611→
+   563→   612→   612→   612→        if (activeTool === 'rectangle') {
+   564→   613→   613→   613→          const left = Math.min(origin.x, pointer.x);
+   565→   614→   614→   614→          const top = Math.min(origin.y, pointer.y);
+   566→   615→   615→   615→          const w = Math.abs(pointer.x - origin.x);
+   567→   616→   616→   616→          const h = Math.abs(pointer.y - origin.y);
+   568→   617→   617→   617→          shape.set({ left, top, width: w, height: h });
+   569→   618→   618→   618→        } else if (activeTool === 'circle') {
+   570→   619→   619→   619→          const dx = pointer.x - origin.x;
+   571→   620→   620→   620→          const dy = pointer.y - origin.y;
+   572→   621→   621→   621→          const r = Math.sqrt(dx * dx + dy * dy) / 2;
+   573→   622→   622→   622→          const cx = (origin.x + pointer.x) / 2;
+   574→   623→   623→   623→          const cy = (origin.y + pointer.y) / 2;
+   575→   624→   624→   624→          shape.set({ left: cx, top: cy, radius: Math.max(1, r) } as any);
+   576→   625→   625→   625→        } else if (activeTool === 'line') {
+   577→   626→   626→   626→          (shape as any).set({ x2: pointer.x, y2: pointer.y });
+   578→   627→   627→   627→        }
+   579→   628→   628→   628→        fc.renderAll();
+   580→   629→   629→   629→      }
+   581→   630→   630→   630→    });
+   582→   631→   631→   631→
+   583→   632→   632→   632→    fc.on('mouse:up', () => {
+   584→   633→   633→   633→      if (isPanning.current) {
+   585→   634→   634→   634→        isPanning.current = false;
+   586→   635→   635→   635→        fc.selection = activeToolRef.current === 'select';
+   587→   636→   636→   636→        return;
+   588→   637→   637→   637→      }
+   589→   638→   638→   638→
+   590→   639→   639→   639→      if (isDrawingShape.current) {
+   591→   640→   640→   640→        isDrawingShape.current = false;
+   592→   641→   641→   641→        tempShapeRef.current = null;
+   593→   642→   642→   642→        saveUndoState(fc);
+   594→   643→   643→   643→        scheduleAutoSave(fc);
+   595→   644→   644→   644→      }
+   596→   645→   645→   645→    });
+   597→   646→   646→   646→
+   598→   647→   647→   647→    fc.on('path:created', () => {
+   599→   648→   648→   648→      saveUndoState(fc);
+   600→   649→   649→   649→      scheduleAutoSave(fc);
+   601→   650→   650→   650→    });
+   602→   651→   651→   651→
+   603→   652→   652→   652→    fc.on('object:modified', () => {
+   604→   653→   653→   653→      saveUndoState(fc);
+   605→   654→   654→   654→      scheduleAutoSave(fc);
+   606→   655→   655→   655→    });
+   607→   656→   656→   656→
+   608→   657→   657→   657→    /* ---------- Text object events ---------- */
+   609→   658→   658→   658→
+   610→   659→   659→   659→    // When text starts/ends editing, update the toolbar
+   611→   660→   660→   660→    fc.on('text:editing:entered', () => {
+   612→   661→   661→   661→      const obj = fc.getActiveObject() as any;
+   613→   662→   662→   662→      if (obj) syncFormatFromText(obj);
+   614→   663→   663→   663→      updateTextBarPosition();
+   615→   664→   664→   664→    });
+   616→   665→   665→   665→
+   617→   666→   666→   666→    fc.on('text:editing:exited', () => {
+   618→   667→   667→   667→ const obj = fc.getActiveObject() as any;
+   619→   668→   668→   668→      if (obj && obj.type === 'textbox') {
+   620→   669→   669→   669→        // If text is empty after editing, remove it
+   621→   670→   670→   670→        if (!obj.text || obj.text.trim() === '') {
+   622→   671→   671→   671→          fc.remove(obj);
+   623→   672→   672→   672→          fc.renderAll();
+   624→   673→   673→   673→          setShowTextBar(false);
+   625→   674→   674→   674→          saveUndoState(fc);
+   626→   675→   675→   675→          scheduleAutoSave(fc);
+   627→   676→   676→   676→          return;
+   628→   677→   677→   677→        }
+   629→   678→   678→   678→        saveUndoState(fc);
+   630→   679→   679→   679→        scheduleAutoSave(fc);
+   631→   680→   680→   680→      }
+   632→   681→   681→   681→    });
+   633→   682→   682→   682→
+   634→   683→   683→   683→    // When selection changes, show/hide text bar
+   635→   684→   684→   684→    fc.on('selection:created', (opt) => {
+   636→   685→   685→   685→      const obj = opt.selected?.[0] as any;
+   637→   686→   686→   686→      if (obj && obj.type === 'textbox') {
+   638→   687→   687→   687→        syncFormatFromText(obj);
+   639→   688→   688→   688→        setTimeout(updateTextBarPosition, 10);
+   640→   689→   689→   689→      } else {
+   641→   690→   690→   690→        setShowTextBar(false);
+   642→   691→   691→   691→      }
+   643→   692→   692→   692→    });
+   644→   693→   693→   693→
+   645→   694→   694→   694→    fc.on('selection:updated', (opt) => {
+   646→   695→   695→   695→      const obj = opt.selected?.[0] as any;
+   647→   696→   696→   696→      if (obj && obj.type === 'textbox') {
+   648→   697→   697→   697→        syncFormatFromText(obj);
+   649→   698→   698→   698→        setTimeout(updateTextBarPosition, 10);
+   650→   699→   699→   699→      } else {
+   651→   700→   700→   700→        setShowTextBar(false);
+   652→   701→   701→   701→      }
+   653→   702→   702→   702→    });
+   654→   703→   703→   703→
+   655→   704→   704→   704→    fc.on('selection:cleared', () => {
+   656→   705→   705→   705→      setShowTextBar(false);
+   657→   706→   706→   706→    });
+   658→   707→   707→   707→
+   659→   708→   708→   708→    /* ---------- zoom com rolagem ---------- */
+   660→   709→   709→   709→
+   661→   710→   710→   710→    fc.on('mouse:wheel', (opt) => {
+   662→   711→   711→   711→      const e = opt.e as WheelEvent;
+   663→   712→   712→   712→      e.preventDefault();
+   664→   713→   713→   713→      e.stopPropagation();
+   665→   714→   714→   714→
+   666→   715→   715→   715→      const delta = e.deltaY;
+   667→   716→   716→   716→      let newZoom = zoom + (delta > 0 ? -0.05 : 0.05);
+   668→   717→   717→   717→      newZoom = Math.min(5, Math.max(0.1, newZoom));
+   669→   718→   718→   718→
+   670→   719→   719→   719→      const vpt = fc.viewportTransform;
+   671→   720→   720→   720→      const newVpt = [...vpt];
+   672→   721→   721→   721→      newVpt[0] = newZoom;
+   673→   722→   722→   722→      newVpt[3] = newZoom;
+   674→   723→   723→   723→      newVpt[4] = vpt[4] + (vpt[0] - newZoom) * (CANVAS_W / 2);
+   675→   724→   724→   724→      newVpt[5] = vpt[5] + (vpt[3] - newZoom) * (CANVAS_H / 2);
+   676→   725→   725→   725→
+   677→   726→   726→   726→      fc.setViewportTransform(newVpt as [number, number, number, number, number, number]);
+   678→   727→   727→   727→      setZoom(newZoom);
+   679→   728→   728→   728→    });
+   680→   729→   729→   729→
+   681→   730→   730→   730→    // Ferramenta inicial
+   682→   731→   731→   731→    applyTool(fc, activeTool);
+   683→   732→   732→   732→
+   684→   733→   733→   733→    return () => {
+   685→   734→   734→   734→      fc.dispose();
+   686→   735→   735→   735→      fcRef.current = null;
+   687→   736→   736→   736→    };
+   688→   737→   737→   737→    }, []);
+   689→   738→   738→   738→
+   690→   739→   739→   739→  /* ========================================================================
+   691→   740→   740→   740→     Sincronizar estado de ferramenta com canvas
+   692→   741→   741→   741→   ======================================================================== */
+   693→   742→   742→   742→
+   694→   743→   743→   743→  useEffect(() => {
+   695→   744→   744→   744→    const fc = fcRef.current;
+   696→   745→   745→   745→    if (!fc) return;
+   697→   746→   746→   746→    applyTool(fc, activeTool);
+   698→   747→   747→   747→  }, [activeTool, strokeColor, strokeWidth, paperColor, applyTool]);
+   699→   748→   748→   748→
+   700→   749→   749→   749→  /* ========================================================================
+   701→   750→   750→   750→     Mudanca de cor de papel / estilo - reconstruir fundo
+   702→   751→   751→   751→   ======================================================================== */
+   703→   752→   752→   752→
+   704→   753→   753→   753→  useEffect(() => {
+   705→   754→   754→   754→    const fc = fcRef.current;
+   706→   755→   755→   755→    if (!fc) return;
+   707→   756→   756→   756→    fc.backgroundColor = paperColor;
+   708→   757→   757→   757→    buildPaperBackground(fc);
+   709→   758→   758→   758→    fc.renderAll();
+   710→   759→   759→   759→    scheduleAutoSave(fc);
+   711→   760→   760→   760→  }, [paperColor, paperStyle, buildPaperBackground, scheduleAutoSave]);
+   712→   761→   761→   761→
+   713→   762→   762→   762→  /* ========================================================================
+   714→   763→   763→   763→     Atalhos de teclado
+   715→   764→   764→   764→   ======================================================================== */
+   716→   765→   765→   765→
+   717→   766→   766→   766→  useEffect(() => {
+   718→   767→   767→   767→    const handleKeyDown = (e: KeyboardEvent) => {
+   719→   768→   768→   768→      const fc = fcRef.current;
+   720→   769→   769→   769→      const activeObj = fc?.getActiveObject() as any;
+   721→   770→   770→   770→
+   722→   771→   771→   771→      // Don't intercept if editing text
+   723→   772→   772→   772→      if (activeObj && activeObj.isEditing) {
+   724→   773→   773→   773→        // But handle formatting shortcuts inside text
+   725→   774→   774→   774→        if ((e.ctrlKey || e.metaKey)) {
+   726→   775→   775→   775→          if (e.key === 'b' || e.key === 'B') {
+   727→   776→   776→   776→            e.preventDefault();
+   728→   777→   777→   777→            const newWeight = activeObj.fontWeight === 'bold' ? 'normal' : 'bold';
+   729→   778→   778→   778→            activeObj.set('fontWeight', newWeight);
+   730→   779→   779→   779→            fc?.renderAll();
+   731→   780→   780→   780→            syncFormatFromText(activeObj);
+   732→   781→   781→   781→          } else if (e.key === 'i' || e.key === 'I') {
+   733→   782→   782→   782→            e.preventDefault();
+   734→   783→   783→   783→            const newStyle = activeObj.fontStyle === 'italic' ? 'normal' : 'italic';
+   735→   784→   784→   784→            activeObj.set('fontStyle', newStyle);
+   736→   785→   785→   785→            fc?.renderAll();
+   737→   786→   786→   786→            syncFormatFromText(activeObj);
+   738→   787→   787→   787→          } else if (e.key === 'u' || e.key === 'U') {
+   739→   788→   788→   788→            e.preventDefault();
+   740→   789→   789→   789→            activeObj.set('underline', !activeObj.underline);
+   741→   790→   790→   790→            fc?.renderAll();
+   742→   791→   791→   791→            syncFormatFromText(activeObj);
+   743→   792→   792→   792→          }
+   744→   793→   793→   793→        }
+   745→   794→   794→   794→        return;
+   746→   795→   795→   795→      }
+   747→   796→   796→   796→
+   748→   797→   797→   797→      if (e.code === 'Space' && !e.repeat) {
+   749→   798→   798→   798→        e.preventDefault();
+   750→   799→   799→   799→        spaceHeld.current = true;
+   751→   800→   800→   800→      }
+   752→   801→   801→   801→
+   753→   802→   802→   802→      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+   754→   803→   803→   803→        e.preventDefault();
+   755→   804→   804→   804→        if (e.shiftKey) {
+   756→   805→   805→   805→          handleRedo();
+   757→   806→   806→   806→        } else {
+   758→   807→   807→   807→          handleUndo();
+   759→   808→   808→   808→        }
+   760→   809→   809→   809→      }
+   761→   810→   810→   810→
+   762→   811→   811→   811→      // Delete selected object
+   763→   812→   812→   812→      if ((e.key === 'Delete' || e.key === 'Backspace') && activeObj && !activeObj.isEditing) {
+   764→   813→   813→   813→        fc?.remove(activeObj);
+   765→   814→   814→   814→        fc?.renderAll();
+   766→   815→   815→   815→        saveUndoState(fc);
+   767→   816→   816→   816→        scheduleAutoSave(fc);
+   768→   817→   817→   817→      }
+   769→   818→   818→   818→
+   770→   819→   819→   819→      // Double-tap T shortcut for text
+   771→   820→   820→   820→      if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+   772→   821→   821→   821→        const target = e.target as HTMLElement;
+   773→   822→   822→   822→        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+   774→   823→   823→   823→          setActiveTool('text');
+   775→   824→   824→   824→        }
+   776→   825→   825→   825→      }
+   777→   826→   826→   826→
+   778→   827→   827→   827→      // Escape to deselect / exit text mode
+   779→   828→   828→   828→      if (e.key === 'Escape') {
+   780→   829→   829→   829→        if (activeObj && activeObj.isEditing) {
+   781→   830→   830→   830→          (activeObj as any).exitEditing();
+   782→   831→   831→   831→        } else {
+   783→   832→   832→   832→          fc?.discardActiveObject();
+   784→   833→   833→   833→          fc?.renderAll();
+   785→   834→   834→   834→          setShowTextBar(false);
+   786→   835→   835→   835→        }
+   787→   836→   836→   836→      }
+   788→   837→   837→   837→
+   789→   838→   838→   838→      // Enter on selected text to start editing
+   790→   839→   839→   839→      if (e.key === 'Enter' && activeObj && activeObj.type === 'textbox' && !activeObj.isEditing) {
+   791→   840→   840→   840→        e.preventDefault();
+   792→   841→   841→   841→        (activeObj as any).enterEditing();
+   793→   842→   842→   842→      }
+   794→   843→   843→   843→    };
+   795→   844→   844→   844→    const handleKeyUp = (e: KeyboardEvent) => {
+   796→   845→   845→   845→      if (e.code === 'Space') {
+   797→   846→   846→   846→        spaceHeld.current = false;
+   798→   847→   847→   847→      }
+   799→   848→   848→   848→    };
+   800→   849→   849→   849→    window.addEventListener('keydown', handleKeyDown);
+   801→   850→   850→   850→    window.addEventListener('keyup', handleKeyUp);
+   802→   851→   851→   851→    return () => {
+   803→   852→   852→   852→      window.removeEventListener('keydown', handleKeyDown);
+   804→   853→   853→   853→      window.removeEventListener('keyup', handleKeyUp);
+   805→   854→   854→   854→    };
+   806→   855→   855→   855→  }, [handleUndo, handleRedo, saveUndoState, scheduleAutoSave, syncFormatFromText]);
+   807→   856→   856→   856→
+   808→   857→   857→   857→  /* ========================================================================
+   809→   858→   858→   858→     Paginas
+   810→   859→   859→   859→   ======================================================================== */
+   811→   860→   860→   860→
+   812→   861→   861→   861→  const handlePageSelect = useCallback(
+   813→   862→   862→   862→    (id: string) => {
+   814→   863→   863→   863→      const fc = fcRef.current;
+   815→   864→   864→   864→      if (!fc) return;
+   816→   865→   865→   865→
+   817→   866→   866→   866→      setPages((prev) =>
+   818→   867→   867→   867→        prev.map((p) =>
+   819→   868→   868→   868→          p.id === activePageId
+   820→   869→   869→   869→            ? { ...p, canvasJSON: JSON.stringify(fc.toJSON(SERIALIZE_PROPS)) }
+   821→   870→   870→   870→            : p,
+   822→   871→   871→   871→        ),
+   823→   872→   872→   872→      );
+   824→   873→   873→   873→
+   825→   874→   874→   874→      const page = pages.find((p) => p.id === id);
+   826→   875→   875→   875→      if (!page) return;
+   827→   876→   876→   876→
+   828→   877→   877→   877→      setActivePageId(id);
+   829→   878→   878→   878→      setPaperStyle(page.paperStyle);
+   830→   879→   879→   879→      setPaperColor(page.paperColor);
+   831→   880→   880→   880→      setShowTextBar(false);
+   832→   881→   881→   881→
+   833→   882→   882→   882→      const objects = fc.getObjects();
+   834→   883→   883→   883→      for (let i = objects.length - 1; i >= 0; i--) {
+   835→   884→   884→   884→        fc.remove(objects[i]);
+   836→   885→   885→   885→      }
+   837→   886→   886→   886→
+   838→   887→   887→   887→      if (page.canvasJSON) {
+   839→   888→   888→   888→        try {
+   840→   889→   889→   889→          fc.loadFromJSON(page.canvasJSON).then(() => {
+   841→   890→   890→   890→            fc.renderAll();
+   842→   891→   891→   891→            saveUndoState(fc);
+   843→   892→   892→   892→          });
+   844→   893→   893→   893→        } catch {
+   845→   894→   894→   894→          buildPaperBackground(fc);
+   846→   895→   895→   895→          fc.renderAll();
+   847→   896→   896→   896→          saveUndoState(fc);
+   848→   897→   897→   897→        }
+   849→   898→   898→   898→      } else {
+   850→   899→   899→   899→        buildPaperBackground(fc);
+   851→   900→   900→   900→        fc.renderAll();
+   852→   901→   901→   901→        saveUndoState(fc);
+   853→   902→   902→   902→      }
+   854→   903→   903→   903→    },
+   855→   904→   904→   904→    [activePageId, pages, buildPaperBackground, saveUndoState],
+   856→   905→   905→   905→  );
+   857→   906→   906→   906→
+   858→   907→   907→   907→  const handleAddPage = useCallback(() => {
+   859→   908→   908→   908→    const fc = fcRef.current;
+   860→   909→   909→   909→    if (!fc) return;
+   861→   910→   910→   910→
+   862→   911→   911→   911→    setPages((prev) =>
+   863→   912→   912→   912→      prev.map((p) =>
+   864→   913→   913→   913→        p.id === activePageId
+   865→   914→   914→   914→          ? { ...p, canvasJSON: JSON.stringify(fc.toJSON(SERIALIZE_PROPS)) }
+   866→   915→   915→   915→          : p,
+   867→   916→   916→   916→      ),
+   868→   917→   917→   917→    );
+   869→   918→   918→   918→
+   870→   919→   919→   919→    const newId = `page-${Date.now()}`;
+   871→   920→   920→   920→    const newPage: PageData = {
+   872→   921→   921→   921→      id: newId,
+   873→   922→   922→   922→      pageNumber: pages.length + 1,
+   874→   923→   923→   923→      paperStyle,
+   875→   924→   924→   924→      paperColor,
+   876→   925→   925→   925→    };
+   877→   926→   926→   926→
+   878→   927→   927→   927→    setPages((prev) => [...prev, newPage]);
+   879→   928→   928→   928→    setActivePageId(newId);
+   880→   929→   929→   929→    setShowTextBar(false);
+   881→   930→   930→   930→
+   882→   931→   931→   931→    const objects = fc.getObjects();
+   883→   932→   932→   932→    for (let i = objects.length - 1; i >= 0; i--) {
+   884→   933→   933→   933→      fc.remove(objects[i]);
+   885→   934→   934→   934→    }
+   886→   935→   935→   935→    buildPaperBackground(fc);
+   887→   936→   936→   936→    fc.renderAll();
+   888→   937→   937→   937→    saveUndoState(fc);
+   889→   938→   938→   938→  }, [activePageId, pages.length, paperStyle, paperColor, buildPaperBackground, saveUndoState]);
+   890→   939→   939→   939→
+   891→   940→   940→   940→  const handleDeletePage = useCallback(
+   892→   941→   941→   941→    (id: string) => {
+   893→   942→   942→   942→      if (pages.length <= 1) return;
+   894→   943→   943→   943→
+   895→   944→   944→   944→      setPages((prev) => {
+   896→   945→   945→   945→        const filtered = prev.filter((p) => p.id !== id);
+   897→   946→   946→   946→        return filtered.map((p, i) => ({ ...p, pageNumber: i + 1 }));
+   898→   947→   947→   947→      });
+   899→   948→   948→   948→
+   900→   949→   949→   949→      if (id === activePageId) {
+   901→   950→   950→   950→        const remaining = pages.filter((p) => p.id !== id);
+   902→   951→   951→   951→        if (remaining.length > 0) {
+   903→   952→   952→   952→          handlePageSelect(remaining[0].id);
+   904→   953→   953→   953→        }
+   905→   954→   954→   954→      }
+   906→   955→   955→   955→    },
+   907→   956→   956→   956→    [pages, activePageId, handlePageSelect],
+   908→   957→   957→   957→  );
+   909→   958→   958→   958→
+   910→   959→   959→   959→  /* ========================================================================
+   911→   960→   960→   960→     Adicionar texto / imagem
+   912→   961→   961→   961→   ======================================================================== */
+   913→   962→   962→   962→
+   914→   963→   963→   963→  const handleAddText = useCallback(() => {
+   915→   964→   964→   964→    const fc = fcRef.current;
+   916→   965→   965→   965→    if (!fc) return;
+   917→   966→   966→   966→    setActiveTool('text');
+   918→   967→   967→   967→    applyTool(fc, 'text');
+   919→   968→   968→   968→  }, [applyTool]);
+   920→   969→   969→   969→
+   921→   970→   970→   970→  const handleAddImage = useCallback(() => {
+   922→   971→   971→   971→    fileInputRef.current?.click();
+   923→   972→   972→   972→  }, []);
+   924→   973→   973→   973→
+   925→   974→   974→   974→  const handleFileChange = useCallback(
+   926→   975→   975→   975→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   927→   976→   976→   976→      const fc = fcRef.current;
+   928→   977→   977→   977→      if (!fc) return;
+   929→   978→   978→   978→      const file = e.target.files?.[0];
+   930→   979→   979→   979→      if (!file) return;
+   931→   980→   980→   980→
+   932→   981→   981→   981→      const reader = new FileReader();
+   933→   982→   982→   982→      reader.onload = () => {
+   934→   983→   983→   983→        const dataUrl = reader.result as string;
+   935→   984→   984→   984→        FabricImage.fromURL(dataUrl).then((img) => {
+   936→   985→   985→   985→          const scale = Math.min(
+   937→   986→   986→   986→            (CANVAS_W * 0.6) / (img.width || 1),
+   938→   987→   987→   987→            (CANVAS_H * 0.6) / (img.height || 1),
+   939→   988→   988→   988→            1,
+   940→   989→   989→   989→          );
+   941→   990→   990→   990→          img.set({
+   942→   991→   991→   991→            scaleX: scale,
+   943→   992→   992→   992→            scaleY: scale,
+   944→   993→   993→   993→            left: CANVAS_W / 2 - ((img.width || 0) * scale) / 2,
+   945→   994→   994→   994→            top: CANVAS_H / 2 - ((img.height || 0) * scale) / 2,
+   946→   995→   995→   995→          } as any);
+   947→   996→   996→   996→          fc.add(img);
+   948→   997→   997→   997→          fc.setActiveObject(img);
+   949→   998→   998→   998→          fc.renderAll();
+   950→   999→   999→   999→          saveUndoState(fc);
+   951→  1000→  1000→  1000→          scheduleAutoSave(fc);
+   952→  1001→  1001→  1001→        });
+   953→  1002→  1002→  1002→      };
+   954→  1003→  1003→  1003→      reader.readAsDataURL(file);
+   955→  1004→  1004→  1004→      e.target.value = '';
+   956→  1005→  1005→  1005→    },
+   957→  1006→  1006→  1006→    [saveUndoState, scheduleAutoSave],
+   958→  1007→  1007→  1007→  );
+   959→  1008→  1008→  1008→
+   960→  1009→  1009→  1009→  /* ========================================================================
+   961→  1010→  1010→  1010→     Render
+   962→  1011→  1011→  1011→   ======================================================================== */
+   963→  1012→  1012→  1012→
+   964→  1013→  1013→  1013→  return (
+   965→  1014→  1014→  1014→    <div
+   966→  1015→  1015→  1015→      ref={containerRef}
+   967→  1016→  1016→  1016→      className="relative flex h-full w-full flex-col bg-gray-100"
+   968→  1017→  1017→  1017→      style={{ cursor: activeTool === 'select' ? 'default' : activeTool === 'text' ? 'text' : 'crosshair' }}
+   969→  1018→  1018→  1018→    >
+   970→  1019→  1019→  1019→      {/* Toolbar fixa no topo */}
+   971→  1020→  1020→  1020→      <EditorToolbar
+   972→  1021→  1021→  1021→        activeTool={activeTool}
+   973→  1022→  1022→  1022→        onToolChange={setActiveTool}
+   974→  1023→  1023→  1023→        strokeColor={strokeColor}
+   975→  1024→  1024→  1024→        onColorChange={setStrokeColor}
+   976→  1025→  1025→  1025→        strokeWidth={strokeWidth}
+   977→  1026→  1026→  1026→        onWidthChange={setStrokeWidth}
+   978→  1027→  1027→  1027→        onUndo={handleUndo}
+   979→  1028→  1028→  1028→        onRedo={handleRedo}
+   980→  1029→  1029→  1029→        canUndo={canUndo}
+   981→  1030→  1030→  1030→        canRedo={canRedo}
+   982→  1031→  1031→  1031→        zoom={zoom}
+   983→  1032→  1032→  1032→        onZoomChange={setZoom}
+   984→  1033→  1033→  1033→        paperStyle={paperStyle}
+   985→  1034→  1034→  1034→        onPaperStyleChange={setPaperStyle}
+   986→  1035→  1035→  1035→        paperColor={paperColor}
+   987→  1036→  1036→  1036→        onPaperColorChange={setPaperColor}
+   988→  1037→  1037→  1037→        onAddText={handleAddText}
+   989→  1038→  1038→  1038→        onAddImage={handleAddImage}
+   990→  1039→  1039→  1039→        onToggleTape={() => setTapeMode((prev) => !prev)}
+   991→  1040→  1040→  1040→        tapeMode={tapeMode}
+   992→  1041→  1041→  1041→      />
+   993→  1042→  1042→  1042→
+   994→  1043→  1043→  1043→      {/* Floating text formatting bar (Canva-style) */}
+   995→  1044→  1044→  1044→      <TextFormattingBar
+   996→  1045→  1045→  1045→        format={textFormat}
+   997→  1046→  1046→  1046→        onFormatChange={applyFormatToActiveText}
+   998→  1047→  1047→  1047→        visible={showTextBar}
+   999→  1048→  1048→  1048→        position={textBarPos}
+  1000→  1049→  1049→  1049→      />
+  1001→  1050→  1050→  1050→
+  1002→  1051→  1051→  1051→      {/* Fita color picker (aparece quando tapeMode ativo) */}
+  1003→  1052→  1052→  1052→      {tapeMode && (
+  1004→  1053→  1053→  1053→        <div className="flex items-center gap-3 rounded-b-xl border border-t-0 border-black/5 bg-white/80 px-3 py-2 backdrop-blur-md">
+  1005→  1054→  1054→  1054→          <span className="text-xs font-medium text-gray-500">Cor da fita:</span>
+  1006→  1055→  1055→  1055→          <StickyTapePicker activeTapeColor={tapeColor} onColorSelect={setTapeColor} />
+  1007→  1056→  1056→  1056→          <span className="ml-auto text-xs text-gray-400">Clique no canvas para adicionar fita</span>
+  1008→  1057→  1057→  1057→        </div>
+  1009→  1058→  1058→  1058→      )}
+  1010→  1059→  1059→  1059→
+  1011→  1060→  1060→  1060→      {/* Area principal */}
+  1012→  1061→  1061→  1061→      <div className="flex flex-1 overflow-hidden">
+  1013→  1062→  1062→  1062→        {/* Painel de paginas (desktop) */}
+  1014→  1063→  1063→  1063→        <div className="hidden md:block">
+  1015→  1064→  1064→  1064→          <PagePanel
+  1016→  1065→  1065→  1065→            pages={pages}
+  1017→  1066→  1066→  1066→            activePageId={activePageId}
+  1018→  1067→  1067→  1067→            onPageSelect={handlePageSelect}
+  1019→  1068→  1068→  1068→            onAddPage={handleAddPage}
+  1020→  1069→  1069→  1069→            onDeletePage={handleDeletePage}
+  1021→  1070→  1070→  1070→          />
+  1022→  1071→  1071→  1071→        </div>
+  1023→  1072→  1072→  1072→
+  1024→  1073→  1073→  1073→        {/* Canvas wrapper */}
+  1025→  1074→  1074→  1074→        <div className="relative flex-1 overflow-auto flex items-start justify-center p-4">
+  1026→  1075→  1075→  1075→          <div
+  1027→  1076→  1076→  1076→            className="shadow-xl"
+  1028→  1077→  1077→  1077→            style={{
+  1029→  1078→  1078→  1078→              width: CANVAS_W * zoom,
+  1030→  1079→  1079→  1079→              height: CANVAS_H * zoom,
+  1031→  1080→  1080→  1080→              overflow: 'hidden',
+  1032→  1081→  1081→  1081→              borderRadius: '4px',
+  1033→  1082→  1082→  1082→            }}
+  1034→  1083→  1083→  1083→          >
+  1035→  1084→  1084→  1084→            <canvas ref={canvasElRef} />
+  1036→  1085→  1085→  1085→          </div>
+  1037→  1086→  1086→  1086→
+  1038→  1087→  1087→  1087→          {/* Hidden file input */}
+  1039→  1088→  1088→  1088→          <input
+  1040→  1089→  1089→  1089→            ref={fileInputRef}
+  1041→  1090→  1090→  1090→            type="file"
+  1042→  1091→  1091→  1091→            accept="image/*"
+  1043→  1092→  1092→  1092→            className="hidden"
+  1044→  1093→  1093→  1093→            onChange={handleFileChange}
+  1045→  1094→  1094→  1094→          />
+  1046→  1095→  1095→  1095→
+  1047→  1096→  1096→  1096→          {/* Floating pen toolbar */}
+  1048→  1097→  1097→  1097→          <FloatingPenToolbar
+  1049→  1098→  1098→  1098→            activeTool={activeTool}
+  1050→  1099→  1099→  1099→            onToolChange={setActiveTool}
+  1051→  1100→  1100→  1100→            strokeColor={strokeColor}
+  1052→  1101→  1101→  1101→            onStrokeColorChange={setStrokeColor}
+  1053→  1102→  1102→  1102→            strokeWidth={strokeWidth}
+  1054→  1103→  1103→  1103→            onStrokeWidthChange={setStrokeWidth}
+  1055→  1104→  1104→  1104→            onUndo={handleUndo}
+  1056→  1105→  1105→  1105→            onRedo={handleRedo}
+  1057→  1106→  1106→  1106→            onImageImport={handleAddImage}
+  1058→  1107→  1107→  1107→            smoothing="media"
+  1059→  1108→  1108→  1108→            onSmoothingChange={() => {}}
+  1060→  1109→  1109→  1109→            stabilizer={50}
+  1061→  1110→  1110→  1110→            onStabilizerChange={() => {}}
+  1062→  1111→  1111→  1111→          />
+  1063→  1112→  1112→  1112→        </div>
+  1064→  1113→  1113→  1113→      </div>
+  1065→  1114→  1114→  1114→    </div>
+  1066→  1115→  1115→  1115→  );
+  1067→  1116→  1116→  1116→}
+  1068→  1117→  1117→  1117→

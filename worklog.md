@@ -555,3 +555,78 @@ Stage Summary:
 - Total new code: ~8,000+ lines
 - All features follow Wabi-Sabi design system
 - Server compiles successfully (GET / 200)
+
+---
+Task ID: 4-a
+Agent: main
+Task: Build "Ensinar para IA" (Teach the AI) feature - feature #19 from the StudyAI platform specification
+
+Work Log:
+- Read worklog.md for full project context (63+ features, Wabi-Sabi design system, 19-tab dashboard)
+- Read uploaded feature specification document (50+ features in pt-BR)
+- Identified "Ensinar para IA" as the most impactful missing feature (#19 in spec, described as "excelente")
+- Read existing API patterns from brain/route.ts, missions/route.ts, chat/route.ts for auth, AI, XP patterns
+- Read zai.ts for aiChat function signature and fallback chain (proxy → ZAI SDK → Groq)
+- Read BattleView.tsx, BrainView.tsx, MicroLessonView.tsx for component patterns (screens, animations, state management)
+- Read DashboardView.tsx for tab integration pattern (type, tabOrder, desktop/mobile nav, SectionErrorBoundary)
+- Read globals.css for Wabi-Sabi CSS variables (--ws-accent, --ws-glass, --ws-gold, --ws-verdigris, etc.)
+- Created /api/teach/route.ts with:
+  - GET: fetch teaching history (chatMessages with role='teaching')
+  - POST: analyze user explanation via AI
+    - Requires topic + explanation (min 20 chars)
+    - Difficulty parameter (basico/intermediario/avancado)
+    - Fetches user's related topics for AI context
+    - AI system prompt: rigorous professor evaluation with precision/depth/clarity/completeness scoring (0-100)
+    - Returns: mastery %, overallGrade (A-F), strengths, weaknesses, corrections, suggestions, questionsToExplore, nextTopics, encouragement
+    - XP award: max(5, min(25, mastery/10))
+    - Creates XPTransaction, updates user XP, recalculates level (Math.floor(xp/500)+1)
+    - Updates related topic mastery if higher than current
+    - Saves teaching session as ChatMessage for history
+- Created TeachView.tsx (~680 lines) with 4 screens:
+  1. **Topic Selection**: 3 navigation pills (Por materia, Topicos populares, Personalizado), difficulty selector (3 levels), subject list from /api/subjects, 12 topic suggestions with emojis and subjects, subject filter chips, custom topic input with Enter submit
+  2. **Explanation Screen**: AI prompt card ("Agora me explique..."), 5 teaching tips with Lightbulb icons, auto-focus textarea (min 200px), character count with validation (30 char minimum), animated submit button with gradient
+  3. **Results Screen**: Animated grade hero (A-F with spring animation, color-coded), ScoreRing SVG with animated stroke for mastery %, 4 score bars (Precisao, Profundidade, Clareza, Completude) with animated fills, FeedbackList sections: Pontos fortes (green), Pontos a melhorar (red), Correcoes (gold), Sugestoes (indigo), Perguntas para aprofundar (green), Proximos topicos recomendados (accent), Encouragement quote card (gold), action buttons (new topic + redo), XPCelebration float animation (+XP)
+  4. **History Screen**: List of past teaching sessions with grade badges, subject/difficulty/mastery info, XP earned, empty state with CTA
+- Sub-components: ScoreRing (SVG circular progress), MeterBar (animated horizontal bar), FeedbackList (icon + title + items list), XPCelebration (floating XP badge)
+- All animations via framer-motion: containerVariants, itemVariants, fadeInUp, spring animations, AnimatePresence screen transitions
+- Integrated into DashboardView.tsx:
+  - Added GraduationCap icon import
+  - Added TeachView dynamic import
+  - Added 'teach' to Tab type union and tabOrder array (after 'missions')
+  - Added desktop tab button: GraduationCap "Ensinar" with tooltip "Ensinar para IA"
+  - Added mobile tab button: GraduationCap "Ensinar"
+  - Added SectionErrorBoundary-wrapped TeachView render block
+- Lint passes clean (0 errors, 0 warnings)
+- Dev server compiles successfully (✓ Compiled)
+
+Stage Summary:
+- /api/teach/route.ts created - POST endpoint for AI-powered explanation analysis with XP awards
+- TeachView.tsx created at /src/components/studyai/TeachView.tsx (~680 lines)
+- Full "Ensinar para IA" feature with 4 screens: topic selection, explanation input, AI results, history
+- AI evaluates 5 dimensions (precision, depth, clarity, completeness, mastery) and returns A-F grade
+- XP system integrated (5-25 XP based on mastery, level recalculation, topic mastery update)
+- Dashboard tab added: "Ensinar" with GraduationCap icon (desktop + mobile nav)
+- All text in Brazilian Portuguese, warm Wabi-Sabi CSS variables, no blue/indigo primary
+- Responsive, animated with framer-motion, accessible, error-handled
+
+---
+Task ID: 5
+Agent: main
+Task: Add Word-like document editor (tiptap) + dual-mode notebook + feature improvements
+
+Work Log:
+- Created DocumentEditor.tsx with full tiptap integration for Word-like text editing
+- Features: font family/size picker, headings (H1-H3), bold/italic/underline/strikethrough, text alignment (left/center/right/justify), bullet/numbered/task lists, text color/highlight color pickers, blockquote, horizontal rule, line height, indent/outdent, undo/redo, clear formatting, print, word/char count status bar, paper backgrounds (lined/grid/dotted)
+- Fixed tiptap v3 import issues: BubbleMenu removed (not in @tiptap/react v3), TextStyle changed from default to named import
+- Updated CanvasNotebookView.tsx: added dual-mode toggle (Documento/Canvas) in top bar
+- Document mode uses tiptap editor with full Word-like ribbon toolbar
+- Canvas mode preserves all existing fabric.js drawing/editing features
+- Both modes share the same page system and save to the same API (textContent vs canvasData)
+- Sub-agent created TeachView (Ensinar para IA) feature with API route
+- Lint passes clean, browser verification shows landing page loads without errors
+
+Stage Summary:
+- DocumentEditor.tsx: Full Word-like rich text editor with 2-row ribbon toolbar
+- CanvasNotebookView: Dual-mode toggle (Documento/Canvas) integrated
+- All existing canvas features (pen, shapes, highlighter, eraser, tape, multi-page) preserved
+- API route already supports textContent field for saving
