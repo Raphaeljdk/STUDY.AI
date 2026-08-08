@@ -630,3 +630,79 @@ Stage Summary:
 - CanvasNotebookView: Dual-mode toggle (Documento/Canvas) integrated
 - All existing canvas features (pen, shapes, highlighter, eraser, tape, multi-page) preserved
 - API route already supports textContent field for saving
+
+---
+Task ID: 6-a
+Agent: api-routes-agent
+Task: Audit & fix all API routes
+
+Work Log:
+- Read prisma/schema.prisma to get canonical model names (User, Subject, Topic, Task, Goal, CalendarEvent, XPTransaction, Achievement, UserAchievement, StreakRecord, Notebook, NotebookPage, NotebookTag, Flashcard, StudySession, ChatMessage, DailyUsage, UserMemory, DiscoverItem, DiscoverSave, Battle, Mission, PreTest, Roadmap)
+- Audited all 46 API route files in src/app/api/
+- All routes use correct Prisma model names matching schema
+- All routes (except setup-db, health, stripe-webhook) have proper auth checks
+- Found and fixed 3 actual bugs:
+  1. **autpilot → autopilot typo**: Renamed src/app/api/autpilot/ to src/app/api/autopilot/ and fixed fetch('/api/autpilot') → fetch('/api/autopilot') in EmergencyView.tsx line 251
+  2. **Invalid Plan enum 'SAMURAI'** in admin/users/route.ts line 57: Changed `['FREE', 'SAMURAI', 'SENSEI']` to `['FREE', 'PREMIUM', 'SENSEI', 'ADMIN_PLAN']` matching the Prisma Plan enum
+  3. **Missing JSON parse try-catch** in sensei-chat/route.ts line 155: `await request.json()` could crash on invalid JSON body; wrapped in try-catch like all other POST routes
+- Verified teach/route.ts `role: 'teaching'` is fine (ChatMessage.role is a String, not an enum)
+- Verified setup-db/route.ts (no auth - intentional admin utility) and stripe-webhook/route.ts (auth via Stripe signature - correct) are fine
+- Lint passes clean with zero errors
+
+Stage Summary:
+- 3 bugs fixed: autopilot path typo, invalid Plan enum, missing error handling
+- 0 new lint issues introduced
+- All 46 API routes audited, all Prisma model names verified correct
+- All auth-checked routes use consistent session+userExists pattern
+
+---
+Task ID: 6-b
+Agent: general-purpose
+Task: Improve DocumentEditor UX
+
+Work Log:
+- Read DocumentEditor.tsx (718 lines) - identified all issues
+- CRITICAL FIX: Added useEffect with prevContentRef to detect content prop changes and call editor.commands.setContent() when switching pages. Normalizes empty-content comparison (<p></p> vs empty string). Uses emitUpdate=true so the onUpdate callback handles word/char counts automatically.
+- IMPROVE: Added keyboard shortcut support - Ctrl+S calls onChange with current HTML (save), Ctrl+Shift+S triggers print. Uses document-level keydown listener with proper cleanup.
+- IMPROVE: Redesigned paper styling to look like a real A4 page - changed from px to mm units (210mm x 297mm), improved shadow with layered box-shadow, added subtle border, changed background to #e8e8e8 (darker gray) for better paper contrast, adjusted lined/grid/dotted pattern colors for better visibility.
+- IMPROVE: Fixed placeholder CSS selector from `.document-editor-content p.is-editor-empty:first-child::before` (wrong - is-editor-empty goes on .tiptap, not p) to `.document-editor-content .tiptap.is-editor-empty > p:first-child::before`. Added font-style italic for better placeholder appearance.
+- IMPROVE: Added Save button to toolbar with Ctrl+S tooltip, updated Print button tooltip to show Ctrl+Shift+S shortcut.
+- Moved updateCounts declaration before useEditor to fix hoisting issue caught by linter
+- Moved keyboard shortcuts useEffect after handlePrint declaration to fix reference-before-declaration lint error
+- Fixed setState-in-effect lint errors: content sync uses emitUpdate=true to let onUpdate handle counts; initial counts use requestAnimationFrame wrapper
+- Lint passes clean with zero errors
+
+Stage Summary:
+- Editor content now properly updates when switching between pages
+- Ctrl+S saves document, Ctrl+Shift+S prints
+- Paper area looks like a real A4 page with proper dimensions, shadow, and margins
+- Placeholder text now displays correctly when editor is empty
+- Save button added to toolbar
+- All changes are non-breaking - existing functionality preserved
+
+---
+Task ID: 6-c
+Agent: general-purpose
+Task: Improve views quality (DiscoverView, BattleView, MicroLessonView)
+
+Work Log:
+- Read all three view files thoroughly to assess current state
+- **DiscoverView.tsx**: Already had skeleton loading, empty state, search, and error toasts
+  - Added `fetchError` state to distinguish API failures from empty content
+  - Added dedicated error state UI with retry button (RotateCcw icon) that shows when fetch fails and no items are cached
+  - Reset error state on filter changes and retry
+  - Added `RotateCcw` to lucide-react imports
+  - Already mobile-responsive (scrollable filter bar, single-column card layout, responsive FAB)
+- **BattleView.tsx**: Timer/progress and confidence selector already worked correctly
+  - **Critical fix**: `SubjectSelection.handleStart` was not `await`ing the async `onStart` prop, causing the button spinner to disappear immediately while the API call was still in-flight. Changed `onStart` type to `Promise<void>` and added `await` with catch
+  - **Timer fix**: Moved `handleTimeout()` call out of `setTimer` state updater (side effect in updater is an anti-pattern). Split into pure timer tick interval + separate effect that detects timer=0 and dispatches timeout via `setTimeout(0)` to satisfy `react-hooks/set-state-in-effect` lint rule
+  - Added toast notification when `handleFinishBattle` API fails (previously silently fell back to local calculation)
+- **MicroLessonView.tsx**: Already well-implemented with proper 60-second flow, 5 phases, quiz, loading overlay, and error handling
+  - Removed dead code: unused `generating` state in `TopicInputScreen` (was declared but `setGenerating` never called - parent handles loading via overlay)
+  - Removed unused `Loader2` import
+
+Stage Summary:
+- DiscoverView: Added error state with retry button for API failures
+- BattleView: Fixed critical bug where battle creation loading state was broken; cleaned up timer side-effect pattern; added error toast for result submission failures
+- MicroLessonView: Cleaned up dead code (unused state and import)
+- All changes pass lint clean with zero errors
