@@ -10,7 +10,7 @@ import {
   Plus, Trash2, Edit3, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
   Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown,
-  ListTodo, Flag, Trophy, CalendarDays
+  ListTodo, Flag, Trophy, CalendarDays, Compass, Swords, Rocket, Route, Siren, Dna
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
@@ -46,6 +46,20 @@ const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false });
 const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false });
 // @ts-expect-error dynamic import
 const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false });
+// @ts-expect-error dynamic import
+const DiscoverView = dynamic(() => import('./DiscoverView'), { ssr: false });
+// @ts-expect-error dynamic import
+const BattleView = dynamic(() => import('./BattleView'), { ssr: false });
+// @ts-expect-error dynamic import
+const MicroLessonView = dynamic(() => import('./MicroLessonView'), { ssr: false });
+// @ts-expect-error dynamic import
+const MissionsView = dynamic(() => import('./MissionsView'), { ssr: false });
+// @ts-expect-error dynamic import
+const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
+// @ts-expect-error dynamic import
+const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
+// @ts-expect-error dynamic import
+const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -138,7 +152,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-type Tab = 'dashboard' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'progress' | 'admin';
+type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -192,7 +206,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'progress', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
 
 export function DashboardView() {
   const { data: session } = useSession();
@@ -234,16 +248,21 @@ export function DashboardView() {
             <Image src="/logo.png" alt="StudyAI" width={32} height={32} className="rounded-full" />
             <span className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)] sm:text-lg">StudyAI</span>
           </button>
-          <nav className="flex items-center gap-0.5 overflow-x-auto md:gap-1">
+          <nav className="flex items-center gap-0.5 overflow-x-auto md:gap-1 no-scrollbar">
             <TabBtn icon={BarChart3} label="Home" tooltip="Visao geral" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <TabBtn icon={BookOpen} label="Matérias" tooltip="Suas matérias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
+            <TabBtn icon={Compass} label="Discover" tooltip="Feed de estudos" active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} />
+            <TabBtn icon={Swords} label="Batalha" tooltip="Duelo de conhecimento" active={activeTab === 'battle'} onClick={() => setActiveTab('battle')} />
+            <TabBtn icon={Zap} label="60s" tooltip="Aprenda em 60 segundos" active={activeTab === 'microlesson'} onClick={() => setActiveTab('microlesson')} />
+            <TabBtn icon={Rocket} label="Missoes" tooltip="Missoes de estudo" active={activeTab === 'missions'} onClick={() => setActiveTab('missions')} />
+            <TabBtn icon={BookOpen} label="Materias" tooltip="Suas materias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
             <TabBtn icon={ListTodo} label="Tarefas" tooltip="Suas tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
-            <TabBtn icon={Target} label="Metas" tooltip="Suas metas" active={activeTab === 'goals'} onClick={() => setActiveTab('goals')} />
-            <TabBtn icon={CalendarDays} label="Calendário" tooltip="Calendário" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
             <TabBtn icon={FolderOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
-            <TabBtn icon={Brain} label="Cards" tooltip="Revisão espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
+            <TabBtn icon={Brain} label="Cards" tooltip="Revisao espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
             <TabBtn icon={Timer} label="Timer" tooltip="Timer de foco" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
             <TabBtn icon={MessageCircle} label="Sensei" tooltip="Tutor IA" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+            <TabBtn icon={Dna} label="Brain" tooltip="StudyAI Brain" active={activeTab === 'brain'} onClick={() => setActiveTab('brain')} />
+            <TabBtn icon={Route} label="Trilhas" tooltip="Trilhas de aprendizagem" active={activeTab === 'roadmap'} onClick={() => setActiveTab('roadmap')} />
+            <TabBtn icon={Siren} label="Emergencia" tooltip="Estudo de emergencia" active={activeTab === 'emergency'} onClick={() => setActiveTab('emergency')} />
             <TabBtn icon={Trophy} label="Progresso" tooltip="Desempenho" active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} />
             {isAdmin && <TabBtn icon={Shield} label="Admin" tooltip="Painel admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
           </nav>
@@ -267,6 +286,9 @@ export function DashboardView() {
           <TabBtn icon={ListTodo} label="Tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
           <TabBtn icon={Target} label="Metas" active={activeTab === 'goals'} onClick={() => setActiveTab('goals')} />
           <TabBtn icon={CalendarDays} label="Calend." active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+          <TabBtn icon={Dna} label="Brain" active={activeTab === 'brain'} onClick={() => setActiveTab('brain')} />
+          <TabBtn icon={Route} label="Trilhas" active={activeTab === 'roadmap'} onClick={() => setActiveTab('roadmap')} />
+          <TabBtn icon={Siren} label="Emerg." active={activeTab === 'emergency'} onClick={() => setActiveTab('emergency')} />
           <TabBtn icon={FolderOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
           <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
           <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
@@ -289,6 +311,26 @@ export function DashboardView() {
         {activeTab === 'dashboard' && (
           <SectionErrorBoundary name="HomeDashboard">
             <HomeDashboard user={user} onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'discover' && (
+          <SectionErrorBoundary name="DiscoverView">
+            <DiscoverView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'battle' && (
+          <SectionErrorBoundary name="BattleView">
+            <BattleView />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'microlesson' && (
+          <SectionErrorBoundary name="MicroLessonView">
+            <MicroLessonView />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'missions' && (
+          <SectionErrorBoundary name="MissionsView">
+            <MissionsView onNavigate={navigateTo} />
           </SectionErrorBoundary>
         )}
         {activeTab === 'subjects' && (
@@ -321,6 +363,21 @@ export function DashboardView() {
         {activeTab === 'flashcard-review' && <FlashcardReviewer key="fcr" onBack={() => setActiveTab('flashcards')} />}
         {activeTab === 'timer' && <PomodoroTimer key="pom" />}
         {activeTab === 'chat' && <SenseiChat key="chat" />}
+        {activeTab === 'brain' && (
+          <SectionErrorBoundary name="BrainView">
+            <BrainView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'roadmap' && (
+          <SectionErrorBoundary name="RoadmapView">
+            <RoadmapView />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'emergency' && (
+          <SectionErrorBoundary name="EmergencyView">
+            <EmergencyView onNavigate={navigateTo} />
+          </SectionErrorBoundary>
+        )}
         {activeTab === 'progress' && (
           <SectionErrorBoundary name="ProgressView">
             <ProgressView user={user} />

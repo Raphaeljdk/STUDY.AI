@@ -1,0 +1,829 @@
+    95→          strokeWidth="5"
+    96→          strokeLinecap="round"
+    97→          strokeDasharray={circumference}
+    98→          strokeDashoffset={offset}
+    99→          className="transition-all duration-1000 ease-linear"
+   100→        />
+   101→      </svg>
+   102→      <div className="absolute flex flex-col items-center">
+   103→        <span
+   104→          className="text-2xl font-bold tabular-nums"
+   105→          style={{
+   106→            color: isLow ? '#DC2626' : 'var(--ws-text-primary)',
+   107→          }}
+   108→        >
+   109→          {seconds}
+   110→        </span>
+   111→        <span className="text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>
+   112→          seg
+   113→        </span>
+   114→      </div>
+   115→    </div>
+   116→  );
+   117→}
+   118→
+   119→// ===== PROGRESS DOTS =====
+   120→function ProgressDots({ current, total, answers }: { current: number; total: number; answers: (boolean | null)[] }) {
+   121→  return (
+   122→    <div className="flex items-center gap-2 justify-center">
+   123→      {Array.from({ length: total }).map((_, i) => {
+   124→        const answered = answers[i];
+   125→        let bgColor = 'var(--ws-glass-border)';
+   126→        if (answered === true) bgColor = '#16A34A';
+   127→        else if (answered === false) bgColor = '#DC2626';
+   128→        const isCurrent = i === current;
+   129→
+   130→        return (
+   131→          <motion.div
+   132→            key={i}
+   133→            className="w-3 h-3 rounded-full"
+   134→            animate={{
+   135→              scale: isCurrent ? 1.4 : 1,
+   136→            }}
+   137→            style={{
+   138→              backgroundColor: isCurrent ? 'var(--ws-accent)' : bgColor,
+   139→              boxShadow: isCurrent ? '0 0 12px color-mix(in srgb, var(--ws-accent) 40%, transparent)' : 'none',
+   140→            }}
+   141→          />
+   142→        );
+   143→      })}
+   144→    </div>
+   145→  );
+   146→}
+   147→}
+   148→
+   149→// ===== SUBJECT SELECTION =====
+   150→function SubjectSelection({ onStart }: { onStart: (subject: string) => void }) {
+   151→  const [customSubject, setCustomSubject] = useState('');
+   152→  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+   153→  const [loading, setLoading] = useState(false);
+   154→
+   155→  const handleStart = async () => {
+   156→    const subject = selectedSubject || customSubject.trim();
+   157→    if (!subject) {
+   158→      toast({ title: 'Selecione um assunto', description: 'Escolha um assunto para o duelo.' });
+   159→      return;
+   160→    }
+   161→    setLoading(true);
+   162→    try {
+   163→      onStart(subject);
+   164→    } finally {
+   165→      setLoading(false);
+   166→    }
+   167→  };
+   168→
+   169→  return (
+   170→    <motion.div
+   171→      initial={{ opacity: 0, y: 20 }}
+   172→      animate={{ opacity: 1, y: 0 }}
+   173→      exit={{ opacity: 0, y: -20 }}
+   174→      className="space-y-6"
+   175→    >
+   176→      {/* Hero */}
+   177→      <div className="text-center pt-4">
+   178→        <motion.div
+   179→          initial={{ scale: 0.5, opacity: 0 }}
+   180→          animate={{ scale: 1, opacity: 1 }}
+   181→          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+   182→          className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4"
+   183→          style={{
+   184→            background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)',
+   185→            boxShadow: 'var(--ws-shadow-enso)',
+   186→          }}
+   187→        >
+   188→          <Swords className="w-10 h-10" style={{ color: 'var(--ws-accent)' }} />
+   189→        </motion.div>
+   190→        <h1 className="font-serif-jp text-2xl font-bold mb-2" style={{ color: 'var(--ws-text-primary)' }}>
+   191→          Duelo de Conhecimento
+   192→        </h1>
+   193→        <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   194→          5 questoes · 12 segundos cada · Gane XP
+   195→        </p>
+   196→      </div>
+   197→
+   198→      {/* Subject Grid */}
+   199→      <div>
+   200→        <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: 'var(--ws-text-tertiary)' }}>
+   201→          Escolha o assunto
+   202→        </p>
+   203→        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+   204→          {POPULAR_SUBJECTS.map((subj) => {
+   205→            const isSelected = selectedSubject === subj.name;
+   206→            return (
+   207→              <motion.button
+   208→                key={subj.name}
+   209→                whileTap={{ scale: 0.97 }}
+   210→                onClick={() => {
+   211→                  setSelectedSubject(isSelected ? null : subj.name);
+   212→                  setCustomSubject('');
+   213→                }}
+   214→                className="flex items-center gap-2.5 p-3.5 text-left transition-ws"
+   215→                style={{
+   216→                  borderRadius: 'var(--ws-radius-card)',
+   217→                  background: isSelected
+   218→                    ? 'color-mix(in srgb, var(--ws-accent) 10%, var(--ws-glass))'
+   219→                    : 'var(--ws-glass)',
+   220→                  border: `1px solid ${isSelected
+   221→                    ? 'color-mix(in srgb, var(--ws-accent) 30%, transparent)'
+   222→                    : 'var(--ws-glass-border)'}`,
+   223→                  boxShadow: isSelected ? '0 4px 20px color-mix(in srgb, var(--ws-accent) 10%, transparent)' : 'var(--ws-shadow-soft)',
+   224→                }}
+   225→              >
+   226→                <span className="text-lg flex-shrink-0">{subj.emoji}</span>
+   227→                <span
+   228→                  className="text-sm font-medium truncate"
+   229→                  style={{ color: isSelected ? 'var(--ws-accent)' : 'var(--ws-text-primary)' }}
+   230→                >
+   231→                  {subj.name}
+   232→                </span>
+   233→              </motion.button>
+   234→            );
+   235→          })}
+   236→        </div>
+   237→      </div>
+   238→
+   239→      {/* Custom input */}
+   240→      <div>
+   241→        <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--ws-text-tertiary)' }}>
+   242→          Ou digite um assunto
+   243→        </p>
+   244→        <Input
+   245→          placeholder="Ex: React, Calculo, Literatura..."
+   246→          value={customSubject}
+   247→          onChange={(e) => {
+   248→            setCustomSubject(e.target.value);
+   249→            setSelectedSubject(null);
+   250→          }}
+   251→          className="h-11 rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus-visible:ring-[var(--ws-accent)]/30"
+   252→        />
+   253→      </div>
+   254→
+   255→      {/* Start Button */}
+   256→      <Button
+   257→        onClick={handleStart}
+   258→        disabled={loading || (!selectedSubject && !customSubject.trim())}
+   259→        className="w-full h-12 text-base font-semibold rounded-ws-button transition-ws"
+   260→        style={{
+   261→          background: 'var(--ws-accent)',
+   262→          color: 'var(--ws-text-on-dark)',
+   263→          boxShadow: 'var(--ws-shadow-enso)',
+   264→        }}
+   265→      >
+   266→        {loading ? (
+   267→          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+   268→        ) : (
+   269→          <Zap className="mr-2 h-5 w-5" />
+   270→        )}
+   271→        Iniciar Duelo
+   272→      </Button>
+   273→    </motion.div>
+   274→  );
+   275→}
+   276→
+   277→// ===== BATTLE SCREEN =====
+   278→function BattleScreen({
+   279→  battle,
+   280→  onFinish,
+   281→}: {
+   282→  battle: BattleState;
+   283→  onFinish: (answers: { questionId: string; selectedIndex: number; confidence: number; correct: boolean }[]) => void;
+   284→}) {
+   285→  const [currentIndex, setCurrentIndex] = useState(0);
+   286→  const [timer, setTimer] = useState(TIMER_DURATION);
+   287→  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+   288→  const [showConfidence, setShowConfidence] = useState(false);
+   289→  const [answers, setAnswers] = useState<(boolean | null)[]>(
+   290→    Array(battle.questions.length).fill(null)
+   291→  );
+   292→  const [answeredOptions, setAnsweredOptions] = useState<Record<number, number>>({});
+   293→  const [results, setResults] = useState<
+   294→    { questionId: string; selectedIndex: number; confidence: number; correct: boolean }[]
+   295→  >([]);
+   296→  const [showResult, setShowResult] = useState(false);
+   297→  const [correctFlash, setCorrectFlash] = useState<boolean | null>(null);
+   298→  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   299→
+   300→  const currentQuestion = battle.questions[currentIndex];
+   301→
+   302→  // Timer
+   303→  useEffect(() => {
+   304→    if (showConfidence || showResult) return;
+   305→    timerRef.current = setInterval(() => {
+   306→      setTimer((prev) => {
+   307→        if (prev <= 1) {
+   308→          // Time's up - auto wrong answer
+   309→          handleTimeout();
+   310→          return 0;
+   311→        }
+   312→        return prev - 1;
+   313→      });
+   314→    }, 1000);
+   315→    return () => {
+   316→      if (timerRef.current) clearInterval(timerRef.current);
+   317→    };
+   318→  }, [currentIndex, showConfidence, showResult]);
+   319→
+   320→  const handleTimeout = useCallback(() => {
+   321→    if (timerRef.current) clearInterval(timerRef.current);
+   322→    setAnsweredOptions((prev) => ({ ...prev, [currentIndex]: -1 }));
+   323→    setAnswers((prev) => {
+   324→      const next = [...prev];
+   325→      next[currentIndex] = false;
+   326→      return next;
+   327→    });
+   328→    setCorrectFlash(false);
+   329→    setTimeout(() => {
+   330→      setCorrectFlash(null);
+   331→      setShowConfidence(true);
+   332→    }, 600);
+   333→  }, [currentIndex]);
+   334→
+   335→  const handleSelectOption = (optionIndex: number) => {
+   336→    if (selectedOption !== null || showConfidence) return;
+   337→    if (timerRef.current) clearInterval(timerRef.current);
+   338→
+   339→    const isCorrect = optionIndex === currentQuestion.correctIndex;
+   340→    setSelectedOption(optionIndex);
+   341→    setAnsweredOptions((prev) => ({ ...prev, [currentIndex]: optionIndex }));
+   342→    setAnswers((prev) => {
+   343→      const next = [...prev];
+   344→      next[currentIndex] = isCorrect;
+   345→      return next;
+   346→    });
+   347→    setCorrectFlash(isCorrect);
+   348→
+   349→    setTimeout(() => {
+   350→      setCorrectFlash(null);
+   351→      setShowConfidence(true);
+   352→    }, 600);
+   353→  };
+   354→
+   355→  const handleConfidence = (confidence: number) => {
+   356→    const optionIdx = selectedOption ?? -1;
+   357→    const isCorrect = optionIdx === currentQuestion.correctIndex;
+   358→
+   359→    setResults((prev) => [
+   360→      ...prev,
+   361→      {
+   362→        questionId: currentQuestion.id,
+   363→        selectedIndex: optionIdx,
+   364→        confidence,
+   365→        correct: isCorrect,
+   366→      },
+   367→    ]);
+   368→
+   369→    setShowConfidence(false);
+   370→    setSelectedOption(null);
+   371→
+   372→    if (currentIndex < battle.questions.length - 1) {
+   373→      setCurrentIndex((prev) => prev + 1);
+   374→      setTimer(TIMER_DURATION);
+   375→    } else {
+   376→      setShowResult(true);
+   377→    }
+   378→  };
+   379→
+   380→  // Compute result and submit
+   381→  useEffect(() => {
+   382→    if (showResult && results.length === battle.questions.length) {
+   383→      const timer = setTimeout(() => onFinish(results), 500);
+   384→      return () => clearTimeout(timer);
+   385→    }
+   386→  }, [showResult, results, battle.questions.length, onFinish]);
+   387→
+   388→  return (
+   389→    <motion.div
+   390→      initial={{ opacity: 0, x: 30 }}
+   391→      animate={{ opacity: 1, x: 0 }}
+   392→      exit={{ opacity: 0, x: -30 }}
+   393→      className="space-y-5"
+   394→    >
+   395→      {/* Top bar */}
+   396→      <div className="flex items-center justify-between">
+   397→        <div className="flex items-center gap-2">
+   398→          <span className="text-sm font-medium" style={{ color: 'var(--ws-text-secondary)' }}>
+   399→            {battle.subject}
+   400→          </span>
+   401→        </div>
+   402→        <div className="flex items-center gap-2">
+   403→          <span className="text-xs font-medium px-2 py-1 rounded-full" style={{
+   404→            background: 'color-mix(in srgb, var(--ws-accent) 10%, transparent)',
+   405→            color: 'var(--ws-accent)',
+   406→          }}>
+   407→            {currentIndex + 1}/{battle.questions.length}
+   408→          </span>
+   409→        </div>
+   410→      </div>
+   411→
+   412→      {/* Timer & Progress */}
+   413→      <div className="flex flex-col items-center gap-4">
+   414→        <CircularTimer seconds={timer} maxSeconds={TIMER_DURATION} />
+   415→        <ProgressDots
+   416→          current={currentIndex}
+   417→          total={battle.questions.length}
+   418→          answers={answers}
+   419→        />
+   420→      </div>
+   421→
+   422→      {/* Question */}
+   423→      <AnimatePresence mode="wait">
+   424→        <motion.div
+   425→          key={currentIndex}
+   426→          initial={{ opacity: 0, y: 10 }}
+   427→          animate={{ opacity: 1, y: 0 }}
+   428→          exit={{ opacity: 0, y: -10 }}
+   429→          transition={{ duration: 0.25 }}
+   430→          className="space-y-4"
+   431→        >
+   432→          {/* Flash overlay */}
+   433→          {correctFlash !== null && (
+   434→            <motion.div
+   435→              initial={{ opacity: 0.3 }}
+   436→              animate={{ opacity: 0 }}
+   437→              transition={{ duration: 0.6 }}
+   438→              className="fixed inset-0 z-50 pointer-events-none"
+   439→              style={{
+   440→                backgroundColor: correctFlash ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)',
+   441→              }}
+   442→            />
+   443→          )}
+   444→
+   445→          <div
+   446→            className="glass-enhanced p-5"
+   447→            style={{ borderRadius: 'var(--ws-radius-card)' }}
+   448→          >
+   449→            <h2
+   450→              className="font-serif-jp text-lg font-semibold leading-relaxed"
+   451→              style={{ color: 'var(--ws-text-primary)' }}
+   452→            >
+   453→              {currentQuestion.question}
+   454→            </h2>
+   455→          </div>
+   456→
+   457→          {/* Options */}
+   458→          <div className="space-y-2.5">
+   459→            {currentQuestion.options.map((option, idx) => {
+   460→              const answeredIdx = answeredOptions[currentIndex];
+   461→              const isAnswered = answeredIdx !== undefined;
+   462→              const isSelected = answeredIdx === idx;
+   463→              const isCorrectAnswer = idx === currentQuestion.correctIndex;
+   464→              const isTimeout = answeredIdx === -1;
+   465→
+   466→              let optionBg = 'var(--ws-glass)';
+   467→              let optionBorder = 'var(--ws-glass-border)';
+   468→              let optionColor = 'var(--ws-text-primary)';
+   469→
+   470→              if (isAnswered) {
+   471→                if (isCorrectAnswer) {
+   472→                  optionBg = 'rgba(22, 163, 74, 0.1)';
+   473→                  optionBorder = 'rgba(22, 163, 74, 0.3)';
+   474→                  optionColor = '#16A34A';
+   475→                } else if (isSelected && !isCorrectAnswer) {
+   476→                  optionBg = 'rgba(220, 38, 38, 0.1)';
+   477→                  optionBorder = 'rgba(220, 38, 38, 0.3)';
+   478→                  optionColor = '#DC2626';
+   479→                } else {
+   480→                  optionBg = 'color-mix(in srgb, var(--ws-glass) 50%, transparent)';
+   481→                  optionBorder = 'var(--ws-glass-border)';
+   482→                  optionColor = 'var(--ws-text-tertiary)';
+   483→                }
+   484→              }
+   485→
+   486→              return (
+   487→                <motion.button
+   488→                  key={idx}
+   489→                  whileTap={!isAnswered ? { scale: 0.98 } : undefined}
+   490→                  onClick={() => handleSelectOption(idx)}
+   491→                  disabled={isAnswered || showConfidence}
+   492→                  className="w-full flex items-center gap-3 p-4 text-left transition-ws"
+   493→                  style={{
+   494→                    borderRadius: 'var(--ws-radius-button)',
+   495→                    background: optionBg,
+   496→                    border: `1.5px solid ${optionBorder}`,
+   497→                    color: optionColor,
+   498→                    opacity: isAnswered && !isCorrectAnswer && !isSelected ? 0.5 : 1,
+   499→                  }}
+   500→                >
+   501→                  <div
+   502→                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+   503→                    style={{
+   504→                      background: isAnswered && isCorrectAnswer
+   505→                        ? 'rgba(22, 163, 74, 0.15)'
+   506→                        : isAnswered && isSelected && !isCorrectAnswer
+   507→                          ? 'rgba(220, 38, 38, 0.15)'
+   508→                          : 'color-mix(in srgb, var(--ws-ink) 6%, transparent)',
+   509→                    }}
+   510→                  >
+   511→                    {isAnswered && isCorrectAnswer ? (
+   512→                      <Check className="w-4 h-4" />
+   513→                    ) : isAnswered && isSelected && !isCorrectAnswer ? (
+   514→                      <X className="w-4 h-4" />
+   515→                    ) : (
+   516→                      String.fromCharCode(65 + idx)
+   517→                    )}
+   518→                  </div>
+   519→                  <span className="text-sm font-medium leading-snug">
+   520→                    {option}
+   521→                  </span>
+   522→                </motion.button>
+   523→              );
+   524→            })}
+   525→          </div>
+   526→        </motion.div>
+   527→      </AnimatePresence>
+   528→
+   529→      {/* Confidence Selector */}
+   530→      <AnimatePresence>
+   531→        {showConfidence && (
+   532→          <motion.div
+   533→            initial={{ opacity: 0, y: 20 }}
+   534→            animate={{ opacity: 1, y: 0 }}
+   535→            exit={{ opacity: 0, y: 20 }}
+   536→            className="space-y-3 pt-2"
+   537→          >
+   538→            <p className="text-center text-sm font-medium" style={{ color: 'var(--ws-text-secondary)' }}>
+   539→              Quao confiante voce esta?
+   540→            </p>
+   541→            <div className="grid grid-cols-4 gap-2">
+   542→              {CONFIDENCE_LEVELS.map((level) => (
+   543→                <motion.button
+   544→                  key={level.value}
+   545→                  whileTap={{ scale: 0.95 }}
+   546→                  onClick={() => handleConfidence(level.value)}
+   547→                  className="flex flex-col items-center gap-1.5 p-3 transition-ws hover-lift"
+   548→                  style={{
+   549→                    borderRadius: 'var(--ws-radius-button)',
+   550→                    background: 'var(--ws-glass)',
+   551→                    border: '1px solid var(--ws-glass-border)',
+   552→                  }}
+   553→                >
+   554→                  <span className="text-2xl">{level.emoji}</span>
+   555→                  <span className="text-[10px] font-medium text-center leading-tight" style={{ color: 'var(--ws-text-secondary)' }}>
+   556→                    {level.label}
+   557→                  </span>
+   558→                </motion.button>
+   559→              ))}
+   560→            </div>
+   561→          </motion.div>
+   562→        )}
+   563→      </AnimatePresence>
+   564→    </motion.div>
+   565→  );
+   566→}
+   567→
+   568→// ===== RESULTS SCREEN =====
+   569→function ResultsScreen({
+   570→  result,
+   571→  history,
+   572→  onPlayAgain,
+   573→  onBack,
+   574→}: {
+   575→  result: BattleResult;
+   576→  history: BattleHistoryItem[];
+   577→  onPlayAgain: () => void;
+   578→  onBack: () => void;
+   579→}) {
+   580→  const [showHistory, setShowHistory] = useState(false);
+   581→
+   582→  const getScoreEmoji = () => {
+   583→    const pct = result.accuracy;
+   584→    if (pct >= 100) return '🏆';
+   585→    if (pct >= 80) return '🎯';
+   586→    if (pct >= 60) return '💪';
+   587→    if (pct >= 40) return '📚';
+   588→    return '🔄';
+   589→  };
+   590→
+   591→  const getScoreMessage = () => {
+   592→    const pct = result.accuracy;
+   593→    if (pct >= 100) return 'Perfeito! Conhecimento absoluto!';
+   594→    if (pct >= 80) return 'Excelente! Quase la!';
+   595→    if (pct >= 60) return 'Bom trabalho! Continue assim!';
+   596→    if (pct >= 40) return 'Ta no caminho. Revise e tente de novo!';
+   597→    return 'Nao desista! A pratica faz a perfeicao.';
+   598→  };
+   599→
+   600→  return (
+   601→    <motion.div
+   602→      initial={{ opacity: 0, scale: 0.95 }}
+   603→      animate={{ opacity: 1, scale: 1 }}
+   604→      exit={{ opacity: 0, scale: 0.95 }}
+   605→      className="space-y-6"
+   606→    >
+   607→      {/* Score Hero */}
+   608→      <div className="text-center pt-6">
+   609→        <motion.div
+   610→          initial={{ scale: 0, rotate: -180 }}
+   611→          animate={{ scale: 1, rotate: 0 }}
+   612→          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+   613→          className="text-6xl mb-4"
+   614→        >
+   615→          {getScoreEmoji()}
+   616→        </motion.div>
+   617→        <h2 className="font-serif-jp text-2xl font-bold mb-1" style={{ color: 'var(--ws-text-primary)' }}>
+   618→          {result.score}/{result.total}
+   619→        </h2>
+   620→        <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   621→          {getScoreMessage()}
+   622→        </p>
+   623→      </div>
+   624→
+   625→      {/* Stats Grid */}
+   626→      <div className="grid grid-cols-2 gap-3">
+   627→        <motion.div
+   628→          initial={{ opacity: 0, y: 15 }}
+   629→          animate={{ opacity: 1, y: 0 }}
+   630→          transition={{ delay: 0.3 }}
+   631→          className="glass-enhanced p-4 text-center"
+   632→          style={{ borderRadius: 'var(--ws-radius-card)' }}
+   633→        >
+   634→          <Zap className="w-5 h-5 mx-auto mb-1" style={{ color: 'var(--ws-accent)' }} />
+   635→          <p className="text-xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   636→            +{result.xpEarned}
+   637→          </p>
+   638→          <p className="text-[11px]" style={{ color: 'var(--ws-text-tertiary)' }}>XP Ganho</p>
+   639→        </motion.div>
+   640→
+   641→        <motion.div
+   642→          initial={{ opacity: 0, y: 15 }}
+   643→          animate={{ opacity: 1, y: 0 }}
+   644→          transition={{ delay: 0.4 }}
+   645→          className="glass-enhanced p-4 text-center"
+   646→          style={{ borderRadius: 'var(--ws-radius-card)' }}
+   647→        >
+   648→          <Target className="w-5 h-5 mx-auto mb-1" style={{ color: '#D97706' }} />
+   649→          <p className="text-xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   650→            {result.accuracy}%
+   651→          </p>
+   652→          <p className="text-[11px]" style={{ color: 'var(--ws-text-tertiary)' }}>Precisao</p>
+   653→        </motion.div>
+   654→
+   655→        <motion.div
+   656→          initial={{ opacity: 0, y: 15 }}
+   657→          animate={{ opacity: 1, y: 0 }}
+   658→          transition={{ delay: 0.5 }}
+   659→          className="glass-enhanced p-4 text-center"
+   660→          style={{ borderRadius: 'var(--ws-radius-card)' }}
+   661→        >
+   662→          <Flame className="w-5 h-5 mx-auto mb-1" style={{ color: '#EA580C' }} />
+   663→          <p className="text-xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   664→            {result.avgConfidence > 0 ? (result.avgConfidence / 4 * 100).toFixed(0) + '%' : '--'}
+   665→          </p>
+   666→          <p className="text-[11px]" style={{ color: 'var(--ws-text-tertiary)' }}>Confianca Media</p>
+   667→        </motion.div>
+   668→
+   669→        <motion.div
+   670→          initial={{ opacity: 0, y: 15 }}
+   671→          animate={{ opacity: 1, y: 0 }}
+   672→          transition={{ delay: 0.6 }}
+   673→          className="glass-enhanced p-4 text-center"
+   674→          style={{ borderRadius: 'var(--ws-radius-card)' }}
+   675→        >
+   676→          <Swords className="w-5 h-5 mx-auto mb-1" style={{ color: 'var(--ws-accent)' }} />
+   677→          <p className="text-sm font-bold truncate px-1" style={{ color: 'var(--ws-text-primary)' }}>
+   678→            {result.subject}
+   679→          </p>
+   680→          <p className="text-[11px]" style={{ color: 'var(--ws-text-tertiary)' }}>Assunto</p>
+   681→        </motion.div>
+   682→      </div>
+   683→
+   684→      {/* Actions */}
+   685→      <div className="space-y-2.5">
+   686→        <Button
+   687→          onClick={onPlayAgain}
+   688→          className="w-full h-12 text-base font-semibold rounded-ws-button transition-ws"
+   689→          style={{
+   690→            background: 'var(--ws-accent)',
+   691→            color: 'var(--ws-text-on-dark)',
+   692→            boxShadow: 'var(--ws-shadow-enso)',
+   693→          }}
+   694→        >
+   695→          <RotateCcw className="mr-2 h-5 w-5" />
+   696→          Desafiar novamente
+   697→        </Button>
+   698→        <Button
+   699→          onClick={onBack}
+   700→          variant="outline"
+   701→          className="w-full h-11 rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:bg-[var(--ws-glass)]"
+   702→        >
+   703→          Voltar ao inicio
+   704→        </Button>
+   705→      </div>
+   706→
+   707→      {/* History */}
+   708→      {history.length > 0 && (
+   709→        <div className="pt-2">
+   710→          <button
+   711→            onClick={() => setShowHistory(!showHistory)}
+   712→            className="flex items-center gap-2 mx-auto text-sm font-medium transition-ws"
+   713→            style={{ color: 'var(--ws-text-tertiary)' }}
+   714→          >
+   715→            <History className="w-4 h-4" />
+   716→            Historico de duelos ({history.length})
+   717→            <ChevronRight
+   718→              className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-90' : ''}`}
+   719→            />
+   720→          </button>
+   721→
+   722→          <AnimatePresence>
+   723→            {showHistory && (
+   724→              <motion.div
+   725→                initial={{ height: 0, opacity: 0 }}
+   726→                animate={{ height: 'auto', opacity: 1 }}
+   727→                exit={{ height: 0, opacity: 0 }}
+   728→                className="overflow-hidden"
+   729→              >
+   730→                <div className="space-y-2 pt-3 max-h-64 overflow-y-auto">
+   731→                  {history.map((item, i) => (
+   732→                    <div
+   733→                      key={item.id}
+   734→                      className="flex items-center gap-3 p-3"
+   735→                      style={{
+   736→                        borderRadius: 'var(--ws-radius-button)',
+   737→                        background: 'var(--ws-glass)',
+   738→                        border: '1px solid var(--ws-glass-border)',
+   739→                      }}
+   740→                    >
+   741→                      <div
+   742→                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+   743→                        style={{
+   744→                          background: item.accuracy >= 80
+   745→                            ? 'rgba(22, 163, 74, 0.1)'
+   746→                            : item.accuracy >= 50
+   747→                              ? 'rgba(217, 119, 6, 0.1)'
+   748→                              : 'rgba(220, 38, 38, 0.1)',
+   749→                          color: item.accuracy >= 80
+   750→                            ? '#16A34A'
+   751→                            : item.accuracy >= 50
+   752→                              ? '#D97706'
+   753→                              : '#DC2626',
+   754→                        }}
+   755→                      >
+   756→                        {item.score}/{item.total}
+   757→                      </div>
+   758→                      <div className="flex-1 min-w-0">
+   759→                        <p className="text-sm font-medium truncate" style={{ color: 'var(--ws-text-primary)' }}>
+   760→                          {item.subject}
+   761→                        </p>
+   762→                        <p className="text-[11px]" style={{ color: 'var(--ws-text-tertiary)' }}>
+   763→                          +{item.xpEarned} XP · {item.accuracy}%
+   764→                        </p>
+   765→                      </div>
+   766→                    </div>
+   767→                  ))}
+   768→                </div>
+   769→              </motion.div>
+   770→            )}
+   771→          </AnimatePresence>
+   772→        </div>
+   773→      )}
+   774→    </motion.div>
+   775→  );
+   776→}
+   777→
+   778→// ===== MAIN COMPONENT =====
+   779→type Screen = 'subject' | 'battle' | 'results';
+   780→
+   781→export function BattleView() {
+   782→  const [screen, setScreen] = useState<Screen>('subject');
+   783→  const [subject, setSubject] = useState('');
+   784→  const [battle, setBattle] = useState<BattleState | null>(null);
+   785→  const [result, setResult] = useState<BattleResult | null>(null);
+   786→  const [history, setHistory] = useState<BattleHistoryItem[]>([]);
+   787→  const [loading, setLoading] = useState(false);
+   788→  const [loadingHistory, setLoadingHistory] = useState(true);
+   789→
+   790→  // Fetch history on mount
+   791→  useEffect(() => {
+   792→    const fetchHistory = async () => {
+   793→      try {
+   794→        const res = await fetch('/api/battle');
+   795→        if (res.ok) {
+   796→          const data = await res.json();
+   797→          setHistory(data.battles || data || []);
+   798→        }
+   799→      } catch {
+   800→        // silent
+   801→      } finally {
+   802→        setLoadingHistory(false);
+   803→      }
+   804→    };
+   805→    fetchHistory();
+   806→  }, []);
+   807→
+   808→  const handleStartBattle = async (selectedSubject: string) => {
+   809→    setSubject(selectedSubject);
+   810→    setLoading(true);
+   811→    try {
+   812→      const res = await fetch('/api/battle', {
+   813→        method: 'POST',
+   814→        headers: { 'Content-Type': 'application/json' },
+   815→        body: JSON.stringify({ subject: selectedSubject }),
+   816→      });
+   817→      if (!res.ok) {
+   818→        const err = await res.json().catch(() => ({}));
+   819→        throw new Error(err.error || 'Failed to start battle');
+   820→      }
+   821→      const data = await res.json();
+   822→      setBattle(data);
+   823→      setScreen('battle');
+   824→    } catch (err: any) {
+   825→      toast({
+   826→        title: 'Erro ao iniciar duelo',
+   827→        description: err.message || 'Tente novamente.',
+   828→      });
+   829→    } finally {
+   830→      setLoading(false);
+   831→    }
+   832→  };
+   833→
+   834→  const handleFinishBattle = async (
+   835→    answers: { questionId: string; selectedIndex: number; confidence: number; correct: boolean }[]
+   836→  ) => {
+   837→    if (!battle) return;
+   838→    try {
+   839→      const res = await fetch('/api/battle/finish', {
+   840→        method: 'POST',
+   841→        headers: { 'Content-Type': 'application/json' },
+   842→        body: JSON.stringify({
+   843→          battleId: battle.id,
+   844→          answers,
+   845→        }),
+   846→      });
+   847→      if (res.ok) {
+   848→        const data = await res.json();
+   849→        setResult(data);
+   850→        // Refresh history
+   851→        const histRes = await fetch('/api/battle');
+   852→        if (histRes.ok) {
+   853→          const histData = await histRes.json();
+   854→          setHistory(histData.battles || histData || []);
+   855→        }
+   856→      }
+   857→    } catch {
+   858→      // If API fails, compute locally
+   859→      const score = answers.filter((a) => a.correct).length;
+   860→      const localResult: BattleResult = {
+   861→        id: battle.id,
+   862→        subject,
+   863→        score,
+   864→        total: battle.questions.length,
+   865→        xpEarned: score * 20,
+   866→        accuracy: Math.round((score / battle.questions.length) * 100),
+   867→        avgConfidence:
+   868→          answers.length > 0
+   869→            ? Math.round(answers.reduce((sum, a) => sum + a.confidence, 0) / answers.length * 10) / 10
+   870→            : 0,
+   871→        completedAt: new Date().toISOString(),
+   872→      };
+   873→      setResult(localResult);
+   874→    }
+   875→    setScreen('results');
+   876→  };
+   877→
+   878→  const handlePlayAgain = () => {
+   879→    setBattle(null);
+   880→    setResult(null);
+   881→    setScreen('subject');
+   882→  };
+   883→
+   884→  const handleBackToStart = () => {
+   885→    setBattle(null);
+   886→    setResult(null);
+   887→    setSubject('');
+   888→    setScreen('subject');
+   889→  };
+   890→
+   891→  return (
+   892→    <div className="relative min-h-full pb-24">
+   893→      {/* Header */}
+   894→      <div className="mb-6">
+   895→        <h1 className="font-serif-jp text-2xl font-bold mb-1" style={{ color: 'var(--ws-text-primary)' }}>
+   896→          Duelo de Conhecimento
+   897→        </h1>
+   898→        <p className="text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   899→          Teste seus conhecimentos em 1 minuto
+   900→        </p>
+   901→      </div>
+   902→
+   903→      <AnimatePresence mode="wait">
+   904→        {screen === 'subject' && (
+   905→          <SubjectSelection key="subject" onStart={handleStartBattle} />
+   906→        )}
+   907→        {screen === 'battle' && battle && (
+   908→          <BattleScreen key="battle" battle={battle} onFinish={handleFinishBattle} />
+   909→        )}
+   910→        {screen === 'results' && result && (
+   911→          <ResultsScreen
+   912→            key="results"
+   913→            result={result}
+   914→            history={history}
+   915→            onPlayAgain={handlePlayAgain}
+   916→            onBack={handleBackToStart}
+   917→          />
+   918→        )}
+   919→      </AnimatePresence>
+   920→    </div>
+   921→  );
+   922→}
+   923→

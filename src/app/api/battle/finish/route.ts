@@ -1,0 +1,103 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+
+async function awardXP(userId: string, amount: number, source: any, description: string) {
+  const xpTx = await db.xPTransaction.create({
+    data: { userId, amount, source, description },
+  });
+
+  const user = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+  if (!user) return xpTx;
+
+  const newXP = user.xp + amount;
+  const newLevel = Math.floor(newXP / 500) + 1;
+
+  await db.user.update({
+    where: { id: userId },
+    data: { xp: newXP, level: newLevel },
+  });
+
+  return xpTx;
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
+    }
+    const userId = (session.user as any)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
+    }
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
+    }
+
+    const { battleId, correctAnswers, confidenceAvg, timeUsed } = body;
+
+    if (!battleId || typeof battleId !== 'string') {
+      return NextResponse.json({ error: 'ID da batalha obrigatorio' }, { status: 400 });
+    }
+
+    const battle = await db.battle.findFirst({ where: { id: battleId, userId } });
+    if (!battle) {
+      return NextResponse.json({ error: 'Batalha nao encontrada' }, { status: 404 });
+    }
+    if (battle.completedAt) {
+      return NextResponse.json({ error: 'Batalha ja finalizada' }, { status: 400 });
+    }
+
+    const correct = typeof correctAnswers === 'number' ? correctAnswers : 0;
+    const confidence = typeof confidenceAvg === 'number' ? confidenceAvg : 0;
+    const percentage = battle.totalQuestions > 0 ? Math.round((correct / battle.totalQuestions) * 100) : 0;
+
+    // XP: 10 per correct answer + bonus for high accuracy
+    let xpAmount = correct * 10;
+    if (percentage >= 80) xpAmount += 25;
+    else if (percentage >= 60) xpAmount += 10;
+    if (percentage === 100) xpAmount += 20; // Perfect bonus
+
+    const updatedBattle = await db.battle.update({
+      where: { id: battleId },
+      data: {
+        correctAnswers: correct,
+        confidenceAvg: confidence,
+        xpEarned: xpAmount,
+        completedAt: new Date(),
+      },
+    });
+
+    // Award XP
+    const xpTx = await awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
+
+    // Update user total questions answered
+    await db.user.update({
+      where: { id: userId },
+      data: { totalQuestionsAnswered: { increment: battle.totalQuestions } },
+    });
+
+    const user = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+
+    return NextResponse.json({
+      battle: updatedBattle,
+      xpAwarded: xpAmount,
+      newXp: user?.xp,
+      newLevel: user?.level,
+      percentage,
+    });
+  } catch (error) {
+    console.error('Route error:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+  }
+}

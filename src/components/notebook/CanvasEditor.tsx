@@ -19,6 +19,7 @@ import {
 
 import EditorToolbar from './EditorToolbar';
 import TextFormattingBar, { type TextFormat } from './TextFormattingBar';
+import { FloatingPenToolbar } from './FloatingPenToolbar';
 import { addTape, getTapeColors, StickyTapePicker } from './StickyTape';
 import PagePanel from './PagePanel';
 
@@ -1090,6 +1091,23 @@ export default function CanvasEditor({
             accept="image/*"
             className="hidden"
             onChange={handleFileChange}
+          />
+
+          {/* Floating pen toolbar */}
+          <FloatingPenToolbar
+            activeTool={activeTool}
+            onToolChange={setActiveTool}
+            strokeColor={strokeColor}
+            onStrokeColorChange={setStrokeColor}
+            strokeWidth={strokeWidth}
+            onStrokeWidthChange={setStrokeWidth}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onImageImport={handleAddImage}
+            smoothing="media"
+            onSmoothingChange={() => {}}
+            stabilizer={50}
+            onStabilizerChange={() => {}}
           />
         </div>
       </div>

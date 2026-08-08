@@ -1,0 +1,842 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import ReactMarkdown from 'react-markdown';
+     6→import {
+     7→  Search, Bookmark, BookmarkCheck, Sparkles,
+     8→  Loader2, Clock, ChevronDown, ChevronUp,
+     9→  BookPlus, Brain, FileQuestion, X, Plus, Check,
+    10→} from 'lucide-react';
+    11→import { toast } from '@/hooks/use-toast';
+    12→import { Input } from '@/components/ui/input';
+    13→import { Button } from '@/components/ui/button';
+    14→import { Badge } from '@/components/ui/badge';
+    15→import {
+    16→  Dialog,
+    17→  DialogContent,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→  DialogFooter,
+    21→} from '@/components/ui/dialog';
+    22→
+    23→// ===== TYPES =====
+    24→interface DiscoverViewProps {
+    25→  onNavigate: (tab: string) => void;
+    26→}
+    27→
+    28→interface DiscoverItem {
+    29→  id: string;
+    30→  type: string;
+    31→  title: string;
+    32→  content: string;
+    33→  summary: string | null;
+    34→  subject: string | null;
+    35→  difficulty: string;
+    36→  duration: number | null;
+    37→  emoji: string;
+    38→  tags: string | null;
+    39→  isPublic: boolean;
+    40→  likes: number;
+    41→  saves: number;
+    42→  userId: string | null;
+    43→  user: { id: string; name: string } | null;
+    44→  createdAt: string;
+    45→  _count?: { discoverSaves: number };
+    46→  isSaved?: boolean;
+    47→}
+    48→
+    49→interface Subject {
+    50→  id: string;
+    51→  name: string;
+    52→  color: string;
+    53→  icon: string;
+    54→}
+    55→
+    56→// ===== CARD TYPE CONFIG =====
+    57→const CARD_TYPES: Record<string, { label: string; emoji: string; accent: string; accentBg: string; accentBorder: string }> = {
+    58→  mini_aula: { label: 'Mini-aula', emoji: '🏭', accent: '#DC2626', accentBg: 'rgba(220,38,38,0.08)', accentBorder: 'rgba(220,38,38,0.2)' },
+    59→  dica: { label: 'Dica', emoji: '💡', accent: '#D97706', accentBg: 'rgba(217,119,6,0.08)', accentBorder: 'rgba(217,119,6,0.2)' },
+    60→  conceito: { label: 'Conceito', emoji: '🧠', accent: '#7C3AED', accentBg: 'rgba(124,58,237,0.08)', accentBorder: 'rgba(124,58,237,0.2)' },
+    61→  questao: { label: 'Questao', emoji: '❓', accent: '#2563EB', accentBg: 'rgba(37,99,235,0.08)', accentBorder: 'rgba(37,99,235,0.2)' },
+    62→  resumo: { label: 'Resumo', emoji: '📌', accent: '#16A34A', accentBg: 'rgba(22,163,74,0.08)', accentBorder: 'rgba(22,163,74,0.2)' },
+    63→  curiosidade: { label: 'Curiosidade', emoji: '⚡', accent: '#EA580C', accentBg: 'rgba(234,88,12,0.08)', accentBorder: 'rgba(234,88,12,0.2)' },
+    64→  tecnica: { label: 'Tecnica', emoji: '📝', accent: '#0D9488', accentBg: 'rgba(13,148,136,0.08)', accentBorder: 'rgba(13,148,136,0.2)' },
+    65→  codigo: { label: 'Codigo', emoji: '💻', accent: '#6B7280', accentBg: 'rgba(107,114,128,0.08)', accentBorder: 'rgba(107,114,128,0.2)' },
+    66→  formula: { label: 'Formula', emoji: '📐', accent: '#DB2777', accentBg: 'rgba(219,39,119,0.08)', accentBorder: 'rgba(219,39,119,0.2)' },
+    67→};
+    68→
+    69→const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    70→  facil: { label: 'Facil', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' },
+    71→  medio: { label: 'Medio', color: '#D97706', bg: 'rgba(217,119,6,0.1)' },
+    72→  dificil: { label: 'Dificil', color: '#DC2626', bg: 'rgba(220,38,38,0.1)' },
+    73→};
+    74→
+    75→const FILTER_OPTIONS = [
+    76→  { key: 'todos', label: 'Todos', emoji: '✨' },
+    77→  ...Object.entries(CARD_TYPES).map(([key, val]) => ({ key, label: val.label, emoji: val.emoji })),
+    78→];
+    79→
+    80→const AI_SUBJECTS = [
+    81→  'Matematica', 'Fisica', 'Quimica', 'Biologia', 'Historia',
+    82→  'Geografia', 'Portugues', 'Ingles', 'Literatura', 'Filosofia',
+    83→  'Sociologia', 'Programacao', 'Estatistica', 'Algebra', 'Geometria',
+    84→  'Trigonometria', 'Calculo', 'Redacao', 'Gramatica', 'Estudos Gerais',
+    85→];
+    86→
+    87→const AI_DIFFICULTIES = [
+    88→  { key: 'facil', label: 'Facil' },
+    89→  { key: 'medio', label: 'Medio' },
+    90→  { key: 'dificil', label: 'Dificil' },
+    91→];
+    92→
+    93→// ===== SKELETON =====
+    94→function SkeletonCard() {
+    95→  return (
+    96→    <div
+    97→      className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
+    98→      style={{ borderRadius: 'var(--ws-radius-card)' }}
+    99→    >
+   100→      <div className="flex items-center gap-3 mb-3">
+   101→        <div className="skeleton h-10 w-10 rounded-full flex-shrink-0" />
+   102→        <div className="flex-1 space-y-2">
+   103→          <div className="skeleton h-4 w-24" />
+   104→          <div className="skeleton h-3 w-16" />
+   105→        </div>
+   106→        <div className="skeleton h-8 w-8 rounded-full" />
+   107→      </div>
+   108→      <div className="skeleton h-5 w-3/4 mb-3" />
+   109→      <div className="space-y-2">
+   110→        <div className="skeleton h-3 w-full" />
+   111→        <div className="skeleton h-3 w-5/6" />
+   112→        <div className="skeleton h-3 w-2/3" />
+   113→      </div>
+   114→      <div className="flex gap-2 mt-4">
+   115→        <div className="skeleton h-6 w-16 rounded-full" />
+   116→        <div className="skeleton h-6 w-20 rounded-full" />
+   117→      </div>
+   118→    </div>
+   119→  );
+   120→}
+   121→
+   122→// ===== EMPTY STATE =====
+   123→function EmptyState({ hasFilter, onGenerateClick }: { hasFilter: boolean; onGenerateClick: () => void }) {
+   124→  return (
+   125→    <motion.div
+   126→      initial={{ opacity: 0, y: 20 }}
+   127→      animate={{ opacity: 1, y: 0 }}
+   128→      className="flex flex-col items-center justify-center py-16 px-6 text-center"
+   129→    >
+   130→      <div
+   131→        className="mb-6 flex h-20 w-20 items-center justify-center text-4xl"
+   132→        style={{
+   133→          background: 'var(--ws-glass)',
+   134→          borderRadius: '50%',
+   135→          border: '1px solid var(--ws-glass-border)',
+   136→        }}
+   137→      >
+   138→        {hasFilter ? '🔍' : '🌿'}
+   139→      </div>
+   140→      <h3
+   141→        className="font-serif-jp text-xl font-semibold mb-2"
+   142→        style={{ color: 'var(--ws-text-primary)' }}
+   143→      >
+   144→        {hasFilter ? 'Nenhum resultado encontrado' : 'Explore o Discover'}
+   145→      </h3>
+   146→      <p
+   147→        className="text-sm max-w-xs"
+   148→        style={{ color: 'var(--ws-text-tertiary)' }}
+   149→      >
+   150→        {hasFilter
+   151→          ? 'Tente ajustar os filtros ou buscar por outro termo.'
+   152→          : 'Conteudo educacional incrivel esta esperando por voce. Gere seu primeiro conteudo com IA!'}
+   153→      </p>
+   154→      {!hasFilter && (
+   155→        <button
+   156→          onClick={onGenerateClick}
+   157→          className="mt-6 flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws"
+   158→          style={{
+   159→            background: 'var(--ws-accent)',
+   160→            boxShadow: 'var(--ws-shadow-soft)',
+   161→          }}
+   162→        >
+   163→          <Sparkles className="h-4 w-4" />
+   164→          Gerar com IA
+   165→        </button>
+   166→      )}
+   167→    </motion.div>
+   168→  );
+   169→}
+   170→
+   171→// ===== MAIN COMPONENT =====
+   172→export function DiscoverView({ onNavigate }: DiscoverViewProps) {
+   173→  const [items, setItems] = useState<DiscoverItem[]>([]);
+   174→  const [loading, setLoading] = useState(true);
+   175→  const [activeFilter, setActiveFilter] = useState('todos');
+   176→  const [searchQuery, setSearchQuery] = useState('');
+   177→  const [expandedId, setExpandedId] = useState<string | null>(null);
+   178→  const [savingId, setSavingId] = useState<string | null>(null);
+   179→  const [page, setPage] = useState(1);
+   180→  const [totalPages, setTotalPages] = useState(1);
+   181→  const [subjects, setSubjects] = useState<Subject[]>([]);
+   182→
+   183→  const [showAIDialog, setShowAIDialog] = useState(false);
+   184→  const [aiType, setAiType] = useState('dica');
+   185→  const [aiSubject, setAiSubject] = useState('');
+   186→  const [aiDifficulty, setAiDifficulty] = useState('medio');
+   187→  const [aiGenerating, setAiGenerating] = useState(false);
+   188→
+   189→  const [showSubjectDialog, setShowSubjectDialog] = useState(false);
+   190→  const [subjectSelectItemId, setSubjectSelectItemId] = useState<string | null>(null);
+   191→  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+   192→
+   193→  // ===== FETCH =====
+   194→  const fetchItems = useCallback(async (pageNum: number, type?: string) => {
+   195→    try {
+   196→      const params = new URLSearchParams({ page: String(pageNum), limit: '20' });
+   197→      if (type && type !== 'todos') params.set('type', type);
+   198→      const res = await fetch(`/api/discover?${params.toString()}`);
+   199→      if (!res.ok) throw new Error('Failed');
+   200→      const data = await res.json();
+   201→      if (pageNum === 1) {
+   202→        setItems(data.items || []);
+   203→      } else {
+   204→        setItems(prev => [...prev, ...(data.items || [])]);
+   205→      }
+   206→      setTotalPages(data.pagination?.totalPages || 1);
+   207→    } catch {
+   208→      toast({ title: 'Erro ao carregar conteudo', description: 'Tente novamente mais tarde.' });
+   209→    }
+   210→  }, []);
+   211→
+   212→  const fetchSubjects = useCallback(async () => {
+   213→    try {
+   214→      const res = await fetch('/api/subjects');
+   215→      if (!res.ok) return;
+   216→      const data = await res.json();
+   217→      setSubjects(Array.isArray(data) ? data : data.subjects || []);
+   218→    } catch {
+   219→      // silent
+   220→    }
+   221→  }, []);
+   222→
+   223→  useEffect(() => {
+   224→ const load = async () => {
+   225→      setLoading(true);
+   226→      setPage(1);
+   227→      await fetchItems(1, activeFilter);
+   228→      setLoading(false);
+   229→    };
+   230→    load();
+   231→  }, [activeFilter, fetchItems]);
+   232→
+   233→  useEffect(() => {
+   234→    fetchSubjects();
+   235→  }, [fetchSubjects]);
+   236→
+   237→  const loadMore = useCallback(async () => {
+   238→    if (loading || page >= totalPages) return;
+   239→    const next = page + 1;
+   240→    setPage(next);
+   241→    await fetchItems(next, activeFilter);
+   242→  }, [loading, page, totalPages, activeFilter, fetchItems]);
+   243→
+   244→  // ===== FILTERED ITEMS =====
+   245→  const filteredItems = useMemo(() => {
+   246→    if (!searchQuery.trim()) return items;
+   247→    const q = searchQuery.toLowerCase();
+   248→    return items.filter(
+   249→      item =>
+   250→        item.title.toLowerCase().includes(q) ||
+   251→        item.content.toLowerCase().includes(q) ||
+   252→        item.summary?.toLowerCase().includes(q) ||
+   253→        item.subject?.toLowerCase().includes(q) ||
+   254→        item.tags?.toLowerCase().includes(q)
+   255→    );
+   256→  }, [items, searchQuery]);
+   257→
+   258→  // ===== SAVE =====
+   259→  const handleSave = async (e: React.MouseEvent, itemId: string) => {
+   260→    e.stopPropagation();
+   261→    setSavingId(itemId);
+   262→    try {
+   263→      const res = await fetch(`/api/discover/${itemId}/save`, { method: 'POST' });
+   264→      if (!res.ok) throw new Error('Failed');
+   265→      const data = await res.json();
+   266→      setItems(prev =>
+   267→        prev.map(item =>
+   268→          item.id === itemId
+   269→            ? { ...item, isSaved: data.isSaved, saves: data.isSaved ? item.saves + 1 : Math.max(0, item.saves - 1) }
+   270→            : item
+   271→        )
+   272→      );
+   273→      toast({
+   274→        title: data.isSaved ? 'Salvo!' : 'Removido dos salvos',
+   275→        description: data.isSaved ? 'Conteudo adicionado aos seus salvos.' : 'Conteudo removido dos salvos.',
+   276→      });
+   277→    } catch {
+   278→      toast({ title: 'Erro', description: 'Nao foi possível salvar o conteudo.' });
+   279→    } finally {
+   280→      setSavingId(null);
+   281→    }
+   282→  };
+   283→
+   284→  // ===== AI GENERATE =====
+   285→  const handleAIGenerate = async () => {
+   286→    if (!aiSubject.trim()) {
+   287→      toast({ title: 'Informe o assunto', description: 'Digite um assunto para gerar conteudo.' });
+   288→      return;
+   289→    }
+   290→    setAiGenerating(true);
+   291→    try {
+   292→      const res = await fetch('/api/discover', {
+   293→        method: 'POST',
+   294→        headers: { 'Content-Type': 'application/json' },
+   295→        body: JSON.stringify({ type: aiType, subject: aiSubject.trim(), difficulty: aiDifficulty, generateWithAI: true }),
+   296→      });
+   297→      if (!res.ok) {
+   298→        const err = await res.json().catch(() => ({}));
+   299→        throw new Error(err.error || 'Failed');
+   300→      }
+   301→      const data = await res.json();
+   302→      if (data.item) {
+   303→        setItems(prev => [data.item, ...prev]);
+   304→        toast({ title: 'Conteudo gerado!', description: data.item.title });
+   305→      }
+   306→      setShowAIDialog(false);
+   307→      setAiSubject('');
+   308→    } catch (err: any) {
+   309→      toast({ title: 'Erro ao gerar', description: err.message || 'Tente novamente.' });
+   310→    } finally {
+   311→      setAiGenerating(false);
+   312→    }
+   313→  };
+   314→
+   315→  // ===== ADD TO SUBJECT =====
+   316→  const openSubjectSelector = (e: React.MouseEvent, itemId: string) => {
+   317→    e.stopPropagation();
+   318→    setSubjectSelectItemId(itemId);
+   319→    setSelectedSubjectId('');
+   320→    setShowSubjectDialog(true);
+   321→  };
+   322→
+   323→  const handleAddToSubject = async () => {
+   324→    if (!selectedSubjectId || !subjectSelectItemId) return;
+   325→    try {
+   326→      const item = items.find(i => i.id === subjectSelectItemId);
+   327→      if (!item) return;
+   328→      const res = await fetch('/api/notes', {
+   329→        method: 'POST',
+   330→        headers: { 'Content-Type': 'application/json' },
+   331→        body: JSON.stringify({ title: `[Discover] ${item.title}`, content: item.content, subjectId: selectedSubjectId }),
+   332→      });
+   333→      if (res.ok) {
+   334→        toast({ title: 'Adicionado a materia!', description: 'Conteudo salvo na materia selecionada.' });
+   335→        setShowSubjectDialog(false);
+   336→      } else {
+   337→        throw new Error('Failed');
+   338→      }
+   339→    } catch {
+   340→      toast({ title: 'Erro', description: 'Nao foi possivel adicionar a materia.' });
+   341→    }
+   342→  };
+   343→
+   344→  const handleGenerateFlashcards = (e: React.MouseEvent) => {
+   345→    e.stopPropagation();
+   346→    toast({ title: 'Flashcards em breve!', description: 'Funcionalidade sera liberada em breve.' });
+   347→  };
+   348→
+   349→  const handleGenerateQuestions = (e: React.MouseEvent) => {
+   350→    e.stopPropagation();
+   351→    toast({ title: 'Questoes em breve!', description: 'Funcionalidade sera liberada em breve.' });
+   352→  };
+   353→
+   354→  // ===== HELPERS =====
+   355→  const getTypeConfig = (type: string) => CARD_TYPES[type] || CARD_TYPES.dica;
+   356→  const getDifficultyConfig = (d: string) => DIFFICULTY_CONFIG[d] || DIFFICULTY_CONFIG.medio;
+   357→  const formatDuration = (seconds: number | null) => {
+   358→    if (!seconds) return null;
+   359→    if (seconds < 60) return `${seconds}s`;
+   360→    const m = Math.floor(seconds / 60);
+   361→    const s = seconds % 60;
+   362→    return s > 0 ? `${m}m ${s}s` : `${m}min`;
+   363→  };
+   364→
+   365→  const hasActiveFilter = activeFilter !== 'todos' || !!searchQuery.trim();
+   366→
+   367→  return (
+   368→    <div className="relative min-h-full pb-24">
+   369→      {/* Header */}
+   370→      <div className="mb-6">
+   371→        <h1 className="font-serif-jp text-2xl font-bold mb-1" style={{ color: 'var(--ws-text-primary)' }}>
+   372→          Discover
+   373→        </h1>
+   374→        <p className="text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   375→          Explore conteudo educacional gerado pela comunidade e IA
+   376→        </p>
+   377→      </div>
+   378→
+   379→      {/* Search */}
+   380→      <div className="relative mb-4">
+   381→        <Search
+   382→          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+   383→          style={{ color: 'var(--ws-text-tertiary)' }}
+   384→        />
+   385→        <Input
+   386→          placeholder="Buscar conteudo..."
+   387→          value={searchQuery}
+   388→          onChange={e => setSearchQuery(e.target.value)}
+   389→          className="pl-10 pr-10 h-11 w-full rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus-visible:ring-[var(--ws-accent)]/30"
+   390→        />
+   391→        {searchQuery && (
+   392→          <button
+   393→            onClick={() => setSearchQuery('')}
+   394→            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 transition-ws"
+   395→            style={{ color: 'var(--ws-text-tertiary)' }}
+   396→            aria-label="Limpar busca"
+   397→          >
+   398→            <X className="h-4 w-4" />
+   399→          </button>
+   400→        )}
+   401→      </div>
+   402→
+   403→      {/* Filter Bar */}
+   404→      <div className="mb-6 -mx-4 px-4 overflow-x-auto no-scrollbar">
+   405→        <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
+   406→          {FILTER_OPTIONS.map(opt => {
+   407→            const isActive = activeFilter === opt.key;
+   408→            const typeConf = opt.key !== 'todos' ? CARD_TYPES[opt.key] : null;
+   409→            return (
+   410→              <button
+   411→                key={opt.key}
+   412→                onClick={() => { setActiveFilter(opt.key); setPage(1); }}
+   413→                className="flex items-center gap-1.5 whitespace-nowrap rounded-ws-button px-3.5 py-2 text-xs font-medium transition-ws"
+   414→                style={{
+   415→                  background: isActive
+   416→                    ? typeConf ? typeConf.accentBg : 'color-mix(in srgb, var(--ws-accent) 10%, transparent)'
+   417→                    : 'var(--ws-glass)',
+   418→                  color: isActive
+   419→                    ? typeConf ? typeConf.accent : 'var(--ws-accent)'
+   420→                    : 'var(--ws-text-secondary)',
+   421→                  border: `1px solid ${isActive
+   422→                    ? typeConf ? typeConf.accentBorder : 'color-mix(in srgb, var(--ws-accent) 25%, transparent)'
+   423→                    : 'var(--ws-glass-border)'}`,
+   424→                  boxShadow: isActive ? 'var(--ws-shadow-soft)' : 'none',
+   425→                }}
+   426→                aria-pressed={isActive}
+   427→              >
+   428→                <span>{opt.emoji}</span>
+   429→                <span>{opt.label}</span>
+   430→              </button>
+   431→            );
+   432→          })}
+   433→        </div>
+   434→      </div>
+   435→
+   436→      {/* Feed */}
+   437→      {loading && items.length === 0 ? (
+   438→        <div className="space-y-4">
+   439→          {Array.from({ length: 4 }).map((_, i) => (
+   440→            <SkeletonCard key={i} />
+   441→          ))}
+   442→        </div>
+   443→      ) : filteredItems.length === 0 ? (
+   444→        <EmptyState hasFilter={hasActiveFilter} onGenerateClick={() => setShowAIDialog(true)} />
+   445→      ) : (
+   446→        <div className="space-y-4">
+   447→          <AnimatePresence mode="popLayout">
+   448→            {filteredItems.map((item, index) => {
+   449→              const typeConf = getTypeConfig(item.type);
+   450→              const diffConf = getDifficultyConfig(item.difficulty);
+   451→              const isExpanded = expandedId === item.id;
+   452→              const duration = formatDuration(item.duration);
+   453→
+   454→              return (
+   455→                <motion.div
+   456→                  key={item.id}
+   457→                  layout
+   458→                  initial={{ opacity: 0, y: 16 }}
+   459→                  animate={{ opacity: 1, y: 0 }}
+   460→                  exit={{ opacity: 0, y: -10 }}
+   461→                  transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.2), ease: [0.4, 0, 0.2, 1] }}
+   462→                  className="hover-lift cursor-pointer"
+   463→                  style={{ borderRadius: 'var(--ws-radius-card)' }}
+   464→                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+   465→                >
+   466→                  <div
+   467→                    className="border backdrop-blur-xl p-5 transition-ws"
+   468→                    style={{
+   469→                      borderRadius: 'var(--ws-radius-card)',
+   470→                      borderColor: isExpanded ? typeConf.accentBorder : 'var(--ws-glass-border)',
+   471→                      background: isExpanded
+   472→                        ? `color-mix(in srgb, ${typeConf.accent} 3%, var(--ws-glass))`
+   473→                        : 'var(--ws-glass)',
+   474→                      boxShadow: isExpanded
+   475→                        ? `0 8px 40px color-mix(in srgb, ${typeConf.accent} 8%, transparent)`
+   476→                        : 'var(--ws-shadow-soft)',
+   477→                    }}
+   478→                  >
+   479→                    {/* Header */}
+   480→                    <div className="flex items-start gap-3 mb-3">
+   481→                      <div
+   482→                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center text-lg"
+   483→                        style={{ background: typeConf.accentBg, borderRadius: '12px 11px 13px 10px' }}
+   484→                      >
+   485→                        {item.emoji || typeConf.emoji}
+   486→                      </div>
+   487→                      <div className="flex-1 min-w-0">
+   488→                        <div className="flex items-center gap-2 flex-wrap">
+   489→                          <span
+   490→                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+   491→                            style={{ background: typeConf.accentBg, color: typeConf.accent }}
+   492→                          >
+   493→                            {typeConf.label}
+   494→                          </span>
+   495→                          <span
+   496→                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+   497→                            style={{ background: diffConf.bg, color: diffConf.color }}
+   498→                          >
+   499→                            {diffConf.label}
+   500→                          </span>
+   501→                          {duration && (
+   502→                            <span
+   503→                              className="inline-flex items-center gap-1 text-[10px]"
+   504→                              style={{ color: 'var(--ws-text-tertiary)' }}
+   505→                            >
+   506→                              <Clock className="h-2.5 w-2.5" />
+   507→                              {duration}
+   508→                            </span>
+   509→                          )}
+   510→                        </div>
+   511→                      </div>
+   512→                      <button
+   513→                        onClick={(e) => handleSave(e, item.id)}
+   514→                        className="flex-shrink-0 rounded-full p-1.5 transition-ws hover:scale-110"
+   515→                        style={{ color: item.isSaved ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }}
+   516→                        disabled={savingId === item.id}
+   517→                        aria-label={item.isSaved ? 'Remover dos salvos' : 'Salvar conteudo'}
+   518→                      >
+   519→                        {savingId === item.id ? (
+   520→                          <Loader2 className="h-4 w-4 animate-spin" />
+   521→                        ) : item.isSaved ? (
+   522→                          <BookmarkCheck className="h-4 w-4" />
+   523→                        ) : (
+   524→                          <Bookmark className="h-4 w-4" />
+   525→                        )}
+   526→                      </button>
+   527→                    </div>
+   528→
+   529→                    {/* Title */}
+   530→                    <h3 className="font-semibold text-[15px] leading-snug mb-2" style={{ color: 'var(--ws-text-primary)' }}>
+   531→                      {item.title}
+   532→                    </h3>
+   533→
+   534→                    {/* Summary */}
+   535→                    {!isExpanded && (
+   536→                      <p className="text-sm leading-relaxed line-clamp-2 mb-3" style={{ color: 'var(--ws-text-secondary)' }}>
+   537→                        {item.summary || item.content.replace(/[#*_`]/g, '').substring(0, 150)}
+   538→                      </p>
+   539→                    )}
+   540→
+   541→                    {/* Expanded */}
+   542→                    <AnimatePresence>
+   543→                      {isExpanded && (
+   544→                        <motion.div
+   545→                          initial={{ height: 0, opacity: 0 }}
+   546→                          animate={{ height: 'auto', opacity: 1 }}
+   547→                          exit={{ height: 0, opacity: 0 }}
+   548→                          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+   549→                          className="overflow-hidden"
+   550→                        >
+   551→                          <div className="markdown-content text-sm leading-relaxed mb-4 pt-1" style={{ color: 'var(--ws-text-secondary)' }}>
+   552→                            <ReactMarkdown>{item.content}</ReactMarkdown>
+   553→                          </div>
+   554→                          <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--ws-glass-border)' }}>
+   555→                            <button
+   556→                              onClick={(e) => openSubjectSelector(e, item.id)}
+   557→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   558→                              style={{ background: typeConf.accentBg, color: typeConf.accent, border: `1px solid ${typeConf.accentBorder}` }}
+   559→                            >
+   560→                              <BookPlus className="h-3 w-3" />
+   561→                              Adicionar a materia
+   562→                            </button>
+   563→                            <button
+   564→                              onClick={handleGenerateFlashcards}
+   565→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   566→                              style={{ background: 'var(--ws-glass)', color: 'var(--ws-text-secondary)', border: '1px solid var(--ws-glass-border)' }}
+   567→                            >
+   568→                              <Brain className="h-3 w-3" />
+   569→                              Gerar flashcards
+   570→                            </button>
+   571→                            <button
+   572→                              onClick={handleGenerateQuestions}
+   573→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   574→                              style={{ background: 'var(--ws-glass)', color: 'var(--ws-text-secondary)', border: '1px solid var(--ws-glass-border)' }}
+   575→                            >
+   576→                              <FileQuestion className="h-3 w-3" />
+   577→                              Gerar questoes
+   578→                            </button>
+   579→                          </div>
+   580→                        </motion.div>
+   581→                      )}
+   582→                    </AnimatePresence>
+   583→
+   584→                    {/* Footer */}
+   585→                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+   586→                      {item.subject && (
+   587→                        <Badge
+   588→                          variant="outline"
+   589→                          className="text-[10px] font-normal rounded-full px-2 py-0"
+   590→                          style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}
+   591→                        >
+   592→                          {item.subject}
+   593→                        </Badge>
+   594→                      )}
+   595→                      <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>
+   596→                        <Bookmark className="h-2.5 w-2.5" />
+   597→                        {item.saves}
+   598→                      </span>
+   599→                      <div className="ml-auto">
+   600→                        {isExpanded ? (
+   601→                          <ChevronUp className="h-4 w-4" style={{ color: typeConf.accent }} />
+   602→                        ) : (
+   603→                          <ChevronDown className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   604→                        )}
+   605→                      </div>
+   606→                    </div>
+   607→                  </div>
+   608→                </motion.div>
+   609→              );
+   610→            })}
+   611→          </AnimatePresence>
+   612→
+   613→          {page < totalPages && (
+   614→            <div className="flex justify-center pt-4 pb-2">
+   615→              <Button
+   616→                variant="outline"
+   617→                onClick={loadMore}
+   618→                disabled={loading}
+   619→                className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:bg-[var(--ws-glass)] hover:text-[var(--ws-text-primary)]"
+   620→              >
+   621→                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   622→                Carregar mais
+   623→              </Button>
+   624→            </div>
+   625→          )}
+   626→        </div>
+   627→      )}
+   628→
+   629→      {/* FAB */}
+   630→      <motion.button
+   631→        initial={{ scale: 0, opacity: 0 }}
+   632→        animate={{ scale: 1, opacity: 1 }}
+   633→        transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 20 }}
+   634→        onClick={() => setShowAIDialog(true)}
+   635→        className="fixed bottom-24 right-4 sm:right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
+   636→        style={{
+   637→          background: 'var(--ws-accent)',
+   638→          color: 'var(--ws-text-on-dark)',
+   639→          boxShadow: 'var(--ws-shadow-enso), var(--ws-shadow-medium)',
+   640→        }}
+   641→        aria-label="Gerar conteudo com IA"
+   642→      >
+   643→        <Sparkles className="h-6 w-6" />
+   644→      </motion.button>
+   645→
+   646→      {/* ===== AI DIALOG ===== */}
+   647→      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+   648→        <DialogContent
+   649→          className="sm:max-w-md rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+   650→          style={{ boxShadow: 'var(--ws-shadow-medium)' }}
+   651→        >
+   652→          <DialogHeader>
+   653→            <DialogTitle className="font-serif-jp text-lg" style={{ color: 'var(--ws-text-primary)' }}>
+   654→              <span className="mr-2">{'\u2728'}</span>Gerar conteudo com IA
+   655→            </DialogTitle>
+   656→          </DialogHeader>
+   657→
+   658→          <div className="space-y-5 mt-2">
+   659→            {/* Type */}
+   660→            <div>
+   661→              <label className="block text-xs font-medium mb-2" style={{ color: 'var(--ws-text-secondary)' }}>
+   662→                Tipo de conteudo
+   663→              </label>
+   664→              <div className="grid grid-cols-3 gap-2">
+   665→                {Object.entries(CARD_TYPES).map(([key, val]) => {
+   666→                  const isAct = aiType === key;
+   667→                  return (
+   668→                    <button
+   669→                      key={key}
+   670→                      onClick={() => setAiType(key)}
+   671→                      className="flex flex-col items-center gap-1 rounded-ws-button p-2.5 text-center transition-ws"
+   672→                      style={{
+   673→                        background: isAct ? val.accentBg : 'var(--ws-glass)',
+   674→                        border: `1px solid ${isAct ? val.accentBorder : 'var(--ws-glass-border)'}`,
+   675→                        color: isAct ? val.accent : 'var(--ws-text-secondary)',
+   676→                      }}
+   677→                    >
+   678→                      <span className="text-base">{val.emoji}</span>
+   679→                      <span className="text-[10px] font-medium leading-tight">{val.label}</span>
+   680→                    </button>
+   681→                  );
+   682→                })}
+   683→              </div>
+   684→            </div>
+   685→
+   686→            {/* Subject */}
+   687→            <div>
+   688→              <label className="block text-xs font-medium mb-2" style={{ color: 'var(--ws-text-secondary)' }}>
+   689→                Assunto
+   690→              </label>
+   691→              <Input
+   692→                placeholder="Ex: Termodinamica, literatura brasileira..."
+   693→                value={aiSubject}
+   694→                onChange={e => setAiSubject(e.target.value)}
+   695→                className="h-10 rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)]"
+   696→              />
+   697→              <div className="flex flex-wrap gap-1.5 mt-2">
+   698→                {AI_SUBJECTS.slice(0, 8).map(sub => (
+   699→                  <button
+   700→                    key={sub}
+   701→                    onClick={() => setAiSubject(sub)}
+   702→                    className="rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-ws"
+   703→                    style={{
+   704→                      background: aiSubject === sub ? 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' : 'var(--ws-glass)',
+   705→                      color: aiSubject === sub ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)',
+   706→                      border: `1px solid ${aiSubject === sub ? 'color-mix(in srgb, var(--ws-accent) 25%, transparent)' : 'var(--ws-glass-border)'}`,
+   707→                    }}
+   708→                  >
+   709→                    {sub}
+   710→                  </button>
+   711→                ))}
+   712→              </div>
+   713→            </div>
+   714→
+   715→            {/* Difficulty */}
+   716→            <div>
+   717→              <label className="block text-xs font-medium mb-2" style={{ color: 'var(--ws-text-secondary)' }}>
+   718→                Dificuldade
+   719→              </label>
+   720→              <div className="flex gap-2">
+   721→                {AI_DIFFICULTIES.map(d => {
+   722→                  const dc = DIFFICULTY_CONFIG[d.key];
+   723→                  const isAct = aiDifficulty === d.key;
+   724→                  return (
+   725→                    <button
+   726→                      key={d.key}
+   727→                      onClick={() => setAiDifficulty(d.key)}
+   728→                      className="flex-1 rounded-ws-button py-2 text-xs font-medium transition-ws"
+   729→                      style={{
+   730→                        background: isAct ? dc.bg : 'var(--ws-glass)',
+   731→                        color: isAct ? dc.color : 'var(--ws-text-secondary)',
+   732→                        border: `1px solid ${isAct ? dc.color + '33' : 'var(--ws-glass-border)'}`,
+   733→                      }}
+   734→                    >
+   735→                      {d.label}
+   736→                    </button>
+   737→                  );
+   738→                })}
+   739→              </div>
+   740→            </div>
+   741→          </div>
+   742→
+   743→          <DialogFooter className="mt-6 gap-2">
+   744→            <Button
+   745→              variant="outline"
+   746→              onClick={() => setShowAIDialog(false)}
+   747→              className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)]"
+   748→              disabled={aiGenerating}
+   749→            >
+   750→              Cancelar
+   751→            </Button>
+   752→            <Button
+   753→              onClick={handleAIGenerate}
+   754→              disabled={aiGenerating || !aiSubject.trim()}
+   755→              className="rounded-ws-button"
+   756→              style={{ background: 'var(--ws-accent)' }}
+   757→            >
+   758→              {aiGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+   759→              Gerar
+   760→            </Button>
+   761→          </DialogFooter>
+   762→        </DialogContent>
+   763→      </Dialog>
+   764→
+   765→      {/* ===== SUBJECT DIALOG ===== */}
+   766→      <Dialog open={showSubjectDialog} onOpenChange={setShowSubjectDialog}>
+   767→        <DialogContent
+   768→          className="sm:max-w-sm rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+   769→          style={{ boxShadow: 'var(--ws-shadow-medium)' }}
+   770→        >
+   771→          <DialogHeader>
+   772→            <DialogTitle className="font-serif-jp text-lg" style={{ color: 'var(--ws-text-primary)' }}>
+   773→              <span className="mr-2">{'\uD83D\uDCDA'}</span>Adicionar a materia
+   774→            </DialogTitle>
+   775→          </DialogHeader>
+   776→
+   777→          {subjects.length === 0 ? (
+   778→            <div className="text-center py-6">
+   779→              <p className="text-sm mb-3" style={{ color: 'var(--ws-text-tertiary)' }}>
+   780→                Nenhuma materia encontrada. Crie uma materia primeiro.
+   781→              </p>
+   782→              <Button
+   783→                variant="outline"
+   784→                onClick={() => { setShowSubjectDialog(false); onNavigate('subjects'); }}
+   785→                className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)]"
+   786→              >
+   787→                <Plus className="mr-2 h-4 w-4" />
+   788→                Criar materia
+   789→              </Button>
+   790→            </div>
+   791→          ) : (
+   792→            <>
+   793→              <div className="max-h-64 overflow-y-auto space-y-2 mt-2">
+   794→                {subjects.map(sub => (
+   795→                  <button
+   796→                    key={sub.id}
+   797→                    onClick={() => setSelectedSubjectId(sub.id)}
+   798→                    className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-ws"
+   799→                    style={{
+   800→                      background: selectedSubjectId === sub.id
+   801→                        ? 'color-mix(in srgb, var(--ws-accent) 8%, transparent)'
+   802→                        : 'var(--ws-glass)',
+   803→                      border: `1px solid ${selectedSubjectId === sub.id
+   804→                        ? 'color-mix(in srgb, var(--ws-accent) 30%, transparent)'
+   805→                        : 'var(--ws-glass-border)'}`,
+   806→                    }}
+   807→                  >
+   808→                    <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ background: sub.color }} />
+   809→                    <span className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>
+   810→                      {sub.name}
+   811→                    </span>
+   812→                    {selectedSubjectId === sub.id && (
+   813→                      <Check className="h-4 w-4 ml-auto" style={{ color: 'var(--ws-accent)' }} />
+   814→                    )}
+   815→                  </button>
+   816→                ))}
+   817→              </div>
+   818→              <DialogFooter className="mt-4 gap-2">
+   819→                <Button
+   820→                  variant="outline"
+   821→                  onClick={() => setShowSubjectDialog(false)}
+   822→                  className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)]"
+   823→                >
+   824→                  Cancelar
+   825→                </Button>
+   826→                <Button
+   827→                  onClick={handleAddToSubject}
+   828→                  disabled={!selectedSubjectId}
+   829→                  className="rounded-ws-button"
+   830→                  style={{ background: 'var(--ws-accent)' }}
+   831→                >
+   832→                  Adicionar
+   833→                </Button>
+   834→              </DialogFooter>
+   835→            </>
+   836→          )}
+   837→        </DialogContent>
+   838→      </Dialog>
+   839→    </div>
+   840→  );
+   841→}
+   842→

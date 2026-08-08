@@ -1,0 +1,658 @@
+   385→          {reviewCards.map((_, i) => (
+   386→            <div
+   387→              key={i}
+   388→              className="h-1.5 rounded-full transition-all"
+   389→              style={{
+   390→                width: i === currentCardIdx ? '24px' : '8px',
+   391→                background: i === currentCardIdx ? 'var(--ws-accent)' : 'color-mix(in srgb, var(--ws-ink) 12%, transparent)',
+   392→              }}
+   393→            />
+   394→          ))}
+   395→        </div>
+   396→
+   397→        {/* Swipeable card */
+   398→        <motion.div
+   399→          className="relative w-full max-w-sm"
+   400→          style={{ opacity: cardOpacity }}
+   401→        >
+   402→          <motion.div
+   403→            className="cursor-grab active:cursor-grabbing"
+   404→            style={{ y: cardY }}
+   405→            drag="y"
+   406→            dragConstraints={{ top: 0, bottom: 0 }}
+   407→            dragElastic={0.2}
+   408→            onDragEnd={handleSwipe}
+   409→          >
+   410→            <WabiSabiCard hover={false} glass className="min-h-[360px]">
+   411→              <div className="flex flex-col items-center text-center">
+   412→                <Badge
+   413→                  variant="outline"
+   414→                  className="mb-4 text-xs"
+   415→                  style={{ borderColor: 'var(--ws-accent)', color: 'var(--ws-accent)' }}
+   416→                >
+   417→                  {card.topic}
+   418→                </Badge>
+   419→
+   420→                <p className="text-sm leading-relaxed" style={{ color: 'var(--ws-text-primary)' }}>
+   421→                  {card.concept}
+   422→                </p>
+   423→
+   424→                <div className="mt-6 w-full border-t border-[var(--ws-glass-border)] pt-4">
+   425→                  <p className="text-sm font-medium" style={{ color: 'var(--ws-text-secondary)' }}>
+   426→                    {card.question}
+   427→                  </p>
+   428→                </div>
+   429→
+   430→                <AnimatePresence>
+   431→                  {showAnswer ? (
+   432→                    <motion.div
+   433→                      initial={{ opacity: 0, height: 0 }}
+   434→                      animate={{ opacity: 1, height: 'auto' }}
+   435→                      exit={{ opacity: 0, height: 0 }}
+   436→                      className="mt-3 w-full"
+   437→                    >
+   438→                      <div
+   439→                        className="rounded-lg p-3 text-left text-sm"
+   440→                        style={{
+   441→                          background: 'color-mix(in srgb, var(--ws-verdigris) 8%, transparent)',
+   442→                          color: 'var(--ws-text-secondary)',
+   443→                        }}
+   444→                      >
+   445→                        {card.answer}
+   446→                      </div>
+   447→                    </motion.div>
+   448→                  ) : null}
+   449→                </AnimatePresence>
+   450→
+   451→                <button
+   452→                  className="mt-4 rounded-ws-button px-4 py-2 text-sm font-medium transition-colors"
+   453→                  style={{
+   454→                    background: showAnswer ? 'color-mix(in srgb, var(--ws-accent) 8%, transparent)' : 'var(--ws-accent)',
+   455→                    color: showAnswer ? 'var(--ws-accent)' : 'var(--ws-text-on-dark)',
+   456→                  }}
+   457→                  onClick={() => setShowAnswer(!showAnswer)}
+   458→                >
+   459→                  {showAnswer ? 'Ocultar resposta' : 'Ver resposta'}
+   460→                </button>
+   461→              </div>
+   462→            </WabiSabiCard>
+   463→          </motion.div>
+   464→        </motion.div>
+   465→
+   466→        {/* Swipe hints */
+   467→        <div className="mt-6 flex items-center gap-6 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   468→          <button
+   469→            className="flex items-center gap-1 rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 transition-colors hover:border-[var(--ws-accent)]"
+   470→            style={{ background: 'var(--ws-glass)' }}
+   471→            onClick={() => { if (currentCardIdx > 0) { setCurrentCardIdx(p => p - 1); setShowAnswer(false); } }}
+   472→          >
+   473→            <ChevronUp className="h-3 w-3" /> Anterior
+   474→          </button>
+   475→          <button
+   476→            className="flex items-center gap-1 rounded-full border border-[var(--ws-glass-border)] px-3 py-1.5 transition-colors hover:border-[var(--ws-accent)]"
+   477→            style={{ background: 'var(--ws-glass)' }}
+   478→            onClick={() => { if (currentCardIdx < reviewCards.length - 1) { setCurrentCardIdx(p => p + 1); setShowAnswer(false); } }}
+   479→          >
+   480→            Proxima <ChevronDown className="h-3 w-3" />
+   481→          </button>
+   482→        </div>
+   483→      </motion.div>
+   484→    );
+   485→  }
+   486→
+   487→  // ===== RENDER: Active session =====
+   488→  if (sessionActive && sessionActivities.length > 0) {
+   489→    const current = sessionActivities[currentActivityIdx];
+   490→    const progress = sessionActivities.filter(a => a.completed).length;
+   491→    const total = sessionActivities.length;
+   492→
+   493→    return (
+   494→      <motion.div
+   495→        className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   496→        initial={{ opacity: 0, scale: 0.95 }}
+   497→        animate={{ opacity: 1, scale: 1 }}
+   498→      >
+   499→        {/* Session header */}
+   500→        <WabiSabiCard hover={false} glass>
+   501→          <div className="flex items-center justify-between">
+   502→            <div className="flex items-center gap-2">
+   503→              <Timer className="h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+   504→              <span className="font-serif-jp text-lg font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   505→                Sessao Otimizada
+   506→              </span>
+   507→            </div>
+   508→            <div className="flex items-center gap-2">
+   509→              <Badge
+   510→                className="rounded-full px-2.5"
+   511→                style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)', color: 'var(--ws-accent)' }}
+   512→              >
+   513→                <Zap className="mr-1 h-3 w-3" /> {sessionXp} XP
+   514→              </Badge>
+   515→            </div>
+   516→          </div>
+   517→
+   518→          {/* Timer */}
+   519→          <div className="mt-4 text-center">
+   520→            <motion.div
+   521→              className="font-mono text-4xl font-bold tabular-nums"
+   522→              style={{ color: timeLeft < 60 ? 'var(--ws-accent)' : 'var(--ws-text-primary)' }}
+   523→              key={timeLeft}
+   524→              initial={{ scale: 1.05 }}
+   525→              animate={{ scale: 1 }}
+   526→              transition={{ duration: 0.15 }}
+   527→            >
+   528→              {formatTime(timeLeft)}
+   529→            </motion.div>
+   530→          </div>
+   531→
+   532→          {/* Progress */}
+   533→          <div className="mt-3 flex items-center justify-between text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   534→            <span>{progress}/{total} atividades</span>
+   535→            <button
+   536→              onClick={() => setSessionPaused(!sessionPaused)}
+   537→              className="flex items-center gap-1 rounded-full px-2 py-1 transition-colors"
+   538→              style={{ background: 'color-mix(in srgb, var(--ws-gold) 10%, transparent)', color: 'var(--ws-gold)' }}
+   539→            >
+   540→              {sessionPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+   541→              {sessionPaused ? 'Retomar' : 'Pausar'}
+   542→            </button>
+   543→          </div>
+   544→          <div className="relative mt-1.5 h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-ink) 6%, transparent)' }}>
+   545→            <motion.div
+   546→              className="h-full rounded-full"
+   547→              style={{ background: 'var(--ws-accent)' }}
+   548→              animate={{ width: `${total > 0 ? (progress / total) * 100 : 0}%` }}
+   549→            />
+   550→          </div>
+   551→        </WabiSabiCard>
+   552→
+   553→        {/* Current activity */}
+   554→        {current && !sessionPaused && (
+   555→          <AnimatePresence mode="wait">
+   556→            <motion.div
+   557→              key={current.id}
+   558→              initial={{ opacity: 0, x: 40 }}
+   559→              animate={{ opacity: 1, x: 0 }}
+   560→              exit={{ opacity: 0, x: -40 }}
+   561→            >
+   562→              <WabiSabiCard hover={false} className="border-l-4" style={{ borderLeftColor: current.type === 'question' ? 'var(--ws-accent)' : current.type === 'flashcard' ? 'var(--ws-verdigris)' : 'var(--ws-gold)' }}>
+   563→                <div className="flex items-start justify-between">
+   564→                  <div>
+   565→                    <div className="flex items-center gap-2">
+   566→                      {current.type === 'flashcard' && <BookOpen className="h-4 w-4" style={{ color: 'var(--ws-verdigris)' }} />}
+   567→                      {current.type === 'question' && <Target className="h-4 w-4" style={{ color: 'var(--ws-accent)' }} />}
+   568→                      {current.type === 'review' && <Brain className="h-4 w-4" style={{ color: 'var(--ws-gold)' }} />}
+   569→                      <span className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>{current.title}</span>
+   570→                    </div>
+   571→                    <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   572→                      <Badge variant="outline" className="text-xs" style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}>{current.topic}</Badge>
+   573→                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> ~{Math.round(current.duration / 60)} min</span>
+   574→                    </div>
+   575→                  </div>
+   576→                </div>
+   577→
+   578→                <div className="mt-4 flex items-center justify-center rounded-lg p-6" style={{ background: 'color-mix(in srgb, var(--ws-ink) 3%, transparent)' }}>
+   579→                  <p className="text-center text-sm italic" style={{ color: 'var(--ws-text-tertiary)' }}>
+   580→                    {current.type === 'flashcard' && 'Revise este conceito e marque como concluido quando se sentir confiante.'}
+   581→                    {current.type === 'question' && 'Resolva esta questao mentalmente e marque quando terminar.'}
+   582→                    {current.type === 'review' && 'Leia o resumo do topico e tente explicar em voz alta.'}
+   583→                  </p>
+   584→                </div>
+   585→
+   586→                <Button
+   587→                  className="mt-4 w-full rounded-ws-button"
+   588→                  style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   589→                  onClick={() => completeActivity(currentActivityIdx)}
+   590→                >
+   591→                  <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir atividade
+   592→                </Button>
+   593→              </WabiSabiCard>
+   594→            </motion.div>
+   595→          </AnimatePresence>
+   596→        )}
+   597→
+   598→        {/* Paused state */}
+   599→        {sessionPaused && (
+   600→          <WabiSabiCard hover={false}>
+   601→            <div className="flex flex-col items-center py-8 text-center">
+   602→              <Coffee className="mb-3 h-10 w-10" style={{ color: 'var(--ws-gold)' }} />
+   603→              <p className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Sessao pausada</p>
+   604→              <p className="mt-1 text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>Tome um respiro. Estamos te esperando.</p>
+   605→              <Button
+   606→                className="mt-4 rounded-ws-button"
+   607→                style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   608→                onClick={() => setSessionPaused(false)}
+   609→              >
+   610→                <Play className="mr-2 h-4 w-4" /> Retomar
+   611→              </Button>
+   612→            </div>
+   613→          </WabiSabiCard>
+   614→        )}
+   615→
+   616→        {/* Activity list */}
+   617→        <div className="max-h-64 space-y-1.5 overflow-y-auto">
+   618→          {sessionActivities.map((act, idx) => (
+   619→            <div
+   620→              key={act.id}
+   621→              className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors"
+   622→              style={{
+   623→                background: idx === currentActivityIdx ? 'color-mix(in srgb, var(--ws-accent) 6%, transparent)' : 'transparent',
+   624→                color: act.completed ? 'var(--ws-text-tertiary)' : 'var(--ws-text-secondary)',
+   625→              }}
+   626→            >
+   627→              {act.completed ? (
+   628→                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'var(--ws-verdigris)' }} />
+   629→              ) : idx === currentActivityIdx ? (
+   630→                <div className="h-3.5 w-3.5 animate-pulse rounded-full" style={{ background: 'var(--ws-accent)' }} />
+   631→              ) : (
+   632→                <div className="h-3.5 w-3.5 rounded-full border border-[var(--ws-glass-border)]" />
+   633→              )}
+   634→              <span className={act.completed ? 'line-through' : ''}>{act.title}</span>
+   635→            </div>
+   636→          ))}
+   637→        </div>
+   638→
+   639→        {/* End session button */}
+   640→        <Button
+   641→          variant="outline"
+   642→          className="w-full rounded-ws-button"
+   643→          style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}
+   644→          onClick={() => { setSessionActive(false); setSelectedTime(null); }}
+   645→        >
+   646→          Encerrar sessao
+   647→        </Button>
+   648→      </motion.div>
+   649→    );
+   650→  }
+   651→
+   652→  // ===== RENDER: Emergency plan view =====
+   653→  if (emergencyPlan && emergencyPlan.length > 0 && !sessionActive) {
+   654→    return (
+   655→      <motion.div
+   656→        className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   657→        initial={{ opacity: 0, x: 20 }}
+   658→        animate={{ opacity: 1, x: 0 }}
+   659→      >
+   660→        <button
+   661→          onClick={() => { setEmergencyPlan(null); setSelectedTime(null); }}
+   662→          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-70"
+   663→          style={{ color: 'var(--ws-accent)' }}
+   664→        >
+   665→          <ChevronUp className="h-4 w-4 rotate-180" /> Voltar
+   666→        </button>
+   667→
+   668→        <WabiSabiCard hover={false} glass>
+   669→          <div className="mb-3 flex items-center gap-2">
+   670→            <AlertTriangle className="h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+   671→            <h1 className="font-serif-jp text-xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>Plano de Emergencia</h1>
+   672→          </div>
+   673→          <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   674→            Estudo priorizado para suas lacunas mais criticas.
+   675→          </p>
+   676→        </WabiSabiCard>
+   677→
+   678→        <div className="space-y-2">
+   679→          {emergencyPlan.map((act, idx) => (
+   680→            <motion.div
+   681→              key={act.id}
+   682→              className="rounded-ws-card border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4"
+   683→              initial={{ opacity: 0, y: 12 }}
+   684→              animate={{ opacity: 1, y: 0 }}
+   685→              transition={{ delay: idx * 0.05 }}
+   686→            >
+   687→              <div className="flex items-center gap-3">
+   688→                <div
+   689→                  className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold"
+   690→                  style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)', color: 'var(--ws-accent)' }}
+   691→                >
+   692→                  {idx + 1}
+   693→                </div>
+   694→                <div className="flex-1">
+   695→                  <span className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>{act.title}</span>
+   696→                  <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   697→                    <Badge variant="outline" className="text-xs" style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}>{act.type}</Badge>
+   698→                    <span>{Math.round(act.duration / 60)} min</span>
+   699→                  </div>
+   700→                </div>
+   701→              </div>
+   702→            </motion.div>
+   703→          ))}
+   704→        </div>
+   705→
+   706→        <Button
+   707→          className="w-full rounded-ws-button py-6 text-base font-semibold"
+   708→          style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   709→          onClick={() => startSession(30)}
+   710→        >
+   711→          <Rocket className="mr-2 h-5 w-5" /> Iniciar sessao de emergencia (30 min)
+   712→        </Button>
+   713→      </motion.div>
+   714→    );
+   715→  }
+   716→
+   717→  // ===== RENDER: Autopilot plan view =====
+   718→  if (autopilotPlan) {
+   719→    return (
+   720→      <motion.div
+   721→        className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   722→        initial={{ opacity: 0, x: 20 }}
+   723→        animate={{ opacity: 1, x: 0 }}
+   724→      >
+   725→        <button
+   726→          onClick={() => { setAutopilotPlan(null); }}
+   727→          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-70"
+   728→          style={{ color: 'var(--ws-accent)' }}
+   729→        >
+   730→          <ChevronUp className="h-4 w-4 rotate-180" /> Voltar
+   731→        </button>
+   732→
+   733→        <WabiSabiCard hover={false} glass>
+   734→          <div className="mb-3 flex items-center gap-2">
+   735→            <Compass className="h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+   736→            <h1 className="font-serif-jp text-xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>{autopilotPlan.title}</h1>
+   737→          </div>
+   738→          <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>{autopilotPlan.summary}</p>
+   739→          <div className="mt-3 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   740→            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {autopilotPlan.totalDays} dias</span>
+   741→            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {autopilotPlan.dailyHours}h/dia</span>
+   742→            <span className="flex items-center gap-1"><Target className="h-3 w-3" /> {autopilotPlan.estimatedCoverage}</span>
+   743→          </div>
+   744→        </WabiSabiCard>
+   745→
+   746→        {/* Phases */}
+   747→        {autopilotPlan.phases?.length > 0 && (
+   748→          <WabiSabiCard hover={false}>
+   749→            <h2 className="mb-3 font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Fases do Plano</h2>
+   750→            <div className="space-y-3 max-h-96 overflow-y-auto">
+   751→              {autopilotPlan.phases.map((phase, idx) => (
+   752→                <motion.div
+   753→                  key={idx}
+   754→                  className="rounded-lg border border-[var(--ws-glass-border)] p-3"
+   755→                  style={{ background: 'var(--ws-glass)' }}
+   756→                  initial={{ opacity: 0, x: -10 }}
+   757→                  animate={{ opacity: 1, x: 0 }}
+   758→                  transition={{ delay: idx * 0.08 }}
+   759→                >
+   760→                  <div className="flex items-center justify-between">
+   761→                    <span className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>{phase.name}</span>
+   762→                    <Badge variant="outline" className="text-xs" style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}>
+   763→                      {phase.days} dias
+   764→                    </Badge>
+   765→                  </div>
+   766→                  <p className="mt-1 text-xs" style={{ color: 'var(--ws-text-secondary)' }}>{phase.focus}</p>
+   767→                  {phase.activities?.length > 0 && (
+   768→                    <ul className="mt-2 space-y-0.5">
+   769→                      {phase.activities.map((act, i) => (
+   770→                        <li key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   771→                          <div className="h-1 w-1 rounded-full" style={{ background: 'var(--ws-gold)' }} />
+   772→                          {act}
+   773→                        </li>
+   774→                      ))}
+   775→                    </ul>
+   776→                  )}
+   777→                </motion.div>
+   778→              ))}
+   779→            </div>
+   780→          </WabiSabiCard>
+   781→        )}
+   782→
+   783→        {/* Weekly schedule */}
+   784→        {autopilotPlan.weeklySchedule?.length > 0 && (
+   785→          <WabiSabiCard hover={false}>
+   786→            <h2 className="mb-3 font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Rotina Semanal</h2>
+   787→            <div className="max-h-96 space-y-2 overflow-y-auto">
+   788→              {autopilotPlan.weeklySchedule.map((day, idx) => (
+   789→                <div key={idx} className="rounded-lg border border-[var(--ws-glass-border)] p-3" style={{ background: 'var(--ws-glass)' }}>
+   790→                  <span className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>{day.day}</span>
+   791→                  {day.blocks?.map((block, i) => (
+   792→                    <div key={i} className="mt-2 flex items-center gap-2 text-xs" style={{ color: 'var(--ws-text-secondary)' }}>
+   793→                      <span className="font-mono font-medium" style={{ color: 'var(--ws-accent)' }}>{block.time}</span>
+   794→                      <span>{block.subject}</span>
+   795→                      <span style={{ color: 'var(--ws-text-tertiary)' }}>— {block.activity}</span>
+   796→                    </div>
+   797→                  ))}
+   798→                </div>
+   799→              ))}
+   800→            </div>
+   801→          </WabiSabiCard>
+   802→        )}
+   803→
+   804→        {/* Milestones */}
+   805→        {autopilotPlan.milestones?.length > 0 && (
+   806→          <WabiSabiCard hover={false}>
+   807→            <h2 className="mb-3 font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Marcos</h2>
+   808→            <div className="space-y-2">
+   809→              {autopilotPlan.milestones.map((m, idx) => (
+   810→                <div key={idx} className="flex items-center gap-3 rounded-lg p-2" style={{ background: 'color-mix(in srgb, var(--ws-gold) 5%, transparent)' }}>
+   811→                  <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold" style={{ background: 'color-mix(in srgb, var(--ws-gold) 15%, transparent)', color: 'var(--ws-gold)' }}>
+   812→                    D{m.day}
+   813→                  </div>
+   814→                  <span className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>{m.description}</span>
+   815→                </div>
+   816→              ))}
+   817→            </div>
+   818→          </WabiSabiCard>
+   819→        )}
+   820→
+   821→        {/* Tips */}
+   822→        {autopilotPlan.tips?.length > 0 && (
+   823→          <WabiSabiCard hover={false}>
+   824→            <h2 className="mb-3 font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Dicas</h2>
+   825→            <div className="space-y-2">
+   826→              {autopilotPlan.tips.map((tip, idx) => (
+   827→                <div key={idx} className="flex items-start gap-2 text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   828→                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--ws-gold)' }} />
+   829→                  <span>{tip}</span>
+   830→                </div>
+   831→              ))}
+   832→            </div>
+   833→          </WabiSabiCard>
+   834→        )}
+   835→
+   836→        <Button
+   837→          className="w-full rounded-ws-button"
+   838→          style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   839→          onClick={() => setAutopilotOpen(true)}
+   840→        >
+   841→          <RotateCcw className="mr-2 h-4 w-4" /> Gerar novo plano
+   842→        </Button>
+   843→      </motion.div>
+   844→    );
+   845→  }
+   846→
+   847→  // ===== MAIN VIEW =====
+   848→  return (
+   849→    <motion.div
+   850→      className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   851→      variants={containerVariants}
+   852→      initial="hidden"
+   853→      animate="show"
+   854→    >
+   855→      {/* Header */}
+   856→      <motion.div variants={itemVariants} className="text-center">
+   857→        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-1.5 backdrop-blur-xl">
+   858→          <Zap className="h-4 w-4" style={{ color: 'var(--ws-accent)' }} />
+   859→          <span className="text-xs font-medium" style={{ color: 'var(--ws-text-secondary)' }}>Modo Emergencia</span>
+   860→        </div>
+   861→        <h1 className="font-serif-jp text-3xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   862→          Estudo Rapido
+   863→        </h1>
+   864→        <p className="mt-1 text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   865→          Maximize seu tempo com sessoes otimizadas
+   866→        </p>
+   867→      </motion.div>
+   868→
+   869→      {/* ===== SECTION 1: TIME SELECTOR ===== */}
+   870→      <motion.div variants={itemVariants}>
+   871→        <WabiSabiCard hover={false}>
+   872→          <div className="mb-4 flex items-center gap-2">
+   873→            <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}>
+   874→              <Timer className="h-4 w-4" style={{ color: 'var(--ws-accent)' }} />
+   875→            </div>
+   876→            <div>
+   877→              <h2 className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Quanto tempo voce tem?</h2>
+   878→              <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Escolha e receba uma sessao otimizada</p>
+   879→            </div>
+   880→          </div>
+   881→
+   882→          <div className="grid grid-cols-5 gap-2">
+   883→            {TIME_OPTIONS.map((opt) => (
+   884→              <motion.button
+   885→                key={opt.minutes}
+   886→                className="flex flex-col items-center gap-1 rounded-ws-button border p-3 transition-all"
+   887→                style={{
+   888→                  borderColor: selectedTime === opt.minutes ? 'var(--ws-accent)' : 'var(--ws-glass-border)',
+   889→                  background: selectedTime === opt.minutes ? 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' : 'var(--ws-glass)',
+   890→                }}
+   891→                onClick={() => startSession(opt.minutes)}
+   892→                whileHover={{ scale: 1.05 }}
+   893→                whileTap={{ scale: 0.95 }}
+   894→              >
+   895→                <Clock className="h-5 w-5" style={{ color: selectedTime === opt.minutes ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }} />
+   896→                <span className="text-xs font-semibold" style={{ color: selectedTime === opt.minutes ? 'var(--ws-accent)' : 'var(--ws-text-primary)' }}>{opt.label}</span>
+   897→              </motion.button>
+   898→            ))}
+   899→          </div>
+   900→        </WabiSabiCard>
+   901→      </motion.div>
+   902→
+   903→      {/* ===== SECTION 2: EMERGENCY MODE ===== */}
+   904→      <motion.div variants={itemVariants}>
+   905→        <WabiSabiCard hover={false} glass>
+   906→          <div className="flex items-start gap-3">
+   907→            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}>
+   908→              <Flame className="h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+   909→            </div>
+   910→            <div className="flex-1">
+   911→              <h2 className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Modo Emergencia</h2>
+   912→              <p className="mt-0.5 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   913→                Analisa suas lacunas e cria um plano de estudo intensivo
+   914→              </p>
+   915→              <Button
+   916→                className="mt-3 rounded-ws-button"
+   917→                style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   918→                onClick={startEmergency}
+   919→                disabled={emergencyLoading}
+   920→              >
+   921→                {emergencyLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando...</> : <><AlertTriangle className="mr-2 h-4 w-4" /> Minha prova e amanha!</>}
+   922→              </Button>
+   923→            </div>
+   924→          </div>
+   925→        </WabiSabiCard>
+   926→      </motion.div>
+   927→
+   928→      {/* ===== SECTION 3: REVIEW SHORTS ===== */}
+   929→      <motion.div variants={itemVariants}>
+   930→        <WabiSabiCard hover={false}>
+   931→          <div className="mb-3 flex items-center gap-2">
+   932→            <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-gold) 12%, transparent)' }}>
+   933→              <BookOpen className="h-4 w-4" style={{ color: 'var(--ws-gold)' }} />
+   934→            </div>
+   935→            <div>
+   936→              <h2 className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Review Shorts</h2>
+   937→              <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Revise conceitos rapidamente, estilo TikTok</p>
+   938→            </div>
+   939→          </div>
+   940→
+   941→          <div className="flex items-center gap-3 rounded-lg p-4" style={{ background: 'color-mix(in srgb, var(--ws-gold) 5%, transparent)' }}>
+   942→            <div className="flex-1">
+   943→              <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   944→                Deslize por cards de revisao baseados nos seus topicos fracos. Perfeito para revisar em fila, no busao ou entre intervalos.
+   945→              </p>
+   946→            </div>
+   947→            <Button
+   948→              variant="outline"
+   949→              className="shrink-0 rounded-ws-button"
+   950→              style={{ borderColor: 'var(--ws-gold)', color: 'var(--ws-gold)' }}
+   951→              onClick={() => { loadReviewCards().then(() => startReview()); }}
+   952→            >
+   953→              <Play className="mr-1.5 h-4 w-4" /> Iniciar
+   954→            </Button>
+   955→          </div>
+   956→        </WabiSabiCard>
+   957→      </motion.div>
+   958→
+   959→      {/* ===== SECTION 4: AUTOPILOT ===== */}
+   960→      <motion.div variants={itemVariants}>
+   961→        <WabiSabiCard hover={false} glass>
+   962→          <div className="mb-4 flex items-center gap-2">
+   963→            <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}>
+   964→              <Compass className="h-4 w-4" style={{ color: 'var(--ws-accent)' }} />
+   965→            </div>
+   966→            <div>
+   967→              <h2 className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>StudyAI Autopilot</h2>
+   968→              <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Plano de estudo completo gerado por IA</p>
+   969→            </div>
+   970→          </div>
+   971→
+   972→          <div className="space-y-3">
+   973→            <div>
+   974→              <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--ws-text-secondary)' }}>Prova / Materia</label>
+   975→              <Input
+   976→                placeholder="Ex: ENEM, Concurso Publico, Vestibular..."
+   977→                value={autopilotExam}
+   978→                onChange={(e) => setAutopilotExam(e.target.value)}
+   979→                className="rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)]"
+   980→                style={{ color: 'var(--ws-text-primary)' }}
+   981→              />
+   982→            </div>
+   983→            <div className="grid grid-cols-2 gap-3">
+   984→              <div>
+   985→                <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--ws-text-secondary)' }}>Data da prova (opcional)</label>
+   986→                <Input
+   987→                  type="date"
+   988→                  value={autopilotDate}
+   989→                  onChange={(e) => setAutopilotDate(e.target.value)}
+   990→                  className="rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)]"
+   991→                  style={{ color: 'var(--ws-text-primary)' }}
+   992→                />
+   993→              </div>
+   994→              <div>
+   995→                <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--ws-text-secondary)' }}>Horas/dia</label>
+   996→                <Input
+   997→                  type="number"
+   998→                  min="1"
+   999→                  max="12"
+  1000→                  value={autopilotHours}
+  1001→                  onChange={(e) => setAutopilotHours(e.target.value)}
+  1002→                  className="rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)]"
+  1003→                  style={{ color: 'var(--ws-text-primary)' }}
+  1004→                />
+  1005→              </div>
+  1006→            </div>
+  1007→
+  1008→            <Button
+  1009→              className="w-full rounded-ws-button"
+  1010→              style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+  1011→              onClick={generateAutopilot}
+  1012→              disabled={autopilotLoading || !autopilotExam.trim()}
+  1013→            >
+  1014→              {autopilotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando plano...</> : <><Rocket className="mr-2 h-4 w-4" /> Gerar plano automatico</>}
+  1015→            </Button>
+  1016→          </div>
+  1017→        </WabiSabiCard>
+  1018→      </motion.div>
+  1019→
+  1020→      {/* Quick nav to other views */}
+  1021→      <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
+  1022→        <button
+  1023→          className="rounded-ws-card border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4 text-left transition-all hover-lift"
+  1024→          onClick={() => onNavigate('brain')}
+  1025→        >
+  1026→          <Brain className="mb-2 h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+  1027→          <span className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>Analise do Cerebro</span>
+  1028→          <p className="mt-0.5 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Descubra suas lacunas</p>
+  1029→        </button>
+  1030→        <button
+  1031→          className="rounded-ws-card border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4 text-left transition-all hover-lift"
+  1032→          onClick={() => onNavigate('roadmaps')}
+  1033→        >
+  1034→          <Sparkles className="mb-2 h-5 w-5" style={{ color: 'var(--ws-gold)' }} />
+  1035→          <span className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>Roadmaps</span>
+  1036→          <p className="mt-0.5 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Planeje seu caminho</p>
+  1037→        </button>
+  1038→      </motion.div>
+  1039→    </motion.div>
+  1040→  );
+  1041→}
+  1042→

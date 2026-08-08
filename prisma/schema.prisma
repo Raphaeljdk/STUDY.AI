@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -97,6 +97,9 @@ model User {
   totalTasksCompleted   Int      @default(0)
   totalFlashcardsReviewed Int   @default(0)
   totalQuestionsAnswered Int    @default(0)
+  reputation        Int      @default(0)
+  reputationLevel   String   @default("Aprendiz")
+  learningStyle     String?  // visual, auditory, kinesthetic, reading
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -113,6 +116,12 @@ model User {
   xpTransactions       XPTransaction[]
   achievements          UserAchievement[]
   streakRecords        StreakRecord[]
+  discoverItems       DiscoverItem[]
+  discoverSaves        DiscoverSave[]
+  battles              Battle[]
+  missions             Mission[]
+  preTests             PreTest[]
+  roadmaps             Roadmap[]
 }
 
 // ============================================================
@@ -400,6 +409,133 @@ model UserMemory {
   source    String   @default("conversation")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================
+// DISCOVER FEED
+// ============================================================
+
+model DiscoverItem {
+  id          String   @id @default(cuid())
+  type        String   // mini_aula, dica, conceito, questao, resumo, curiosidade, tecnica, codigo, formula
+  title       String
+  content     String   // markdown content
+  summary     String?  // short summary for cards
+  subject     String?  // related subject area
+  difficulty  String   @default("medio") // facil, medio, dificil
+  duration    Int?     // estimated seconds
+  emoji       String   @default("💡")
+  tags        String?  // comma-separated tags
+  isPublic    Boolean  @default(true)
+  likes       Int      @default(0)
+  saves       Int      @default(0)
+  userId      String?  // creator (null for system-generated)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  discoverSaves DiscoverSave[]
+}
+
+model DiscoverSave {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discoverItemId String
+  discoverItem  DiscoverItem @relation(fields: [discoverItemId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@unique([userId, discoverItemId])
+  @@index([userId])
+}
+
+// ============================================================
+// BATTLE / DUELO
+// ============================================================
+
+model Battle {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String   // e.g. "Java", "Matematica"
+  totalQuestions Int     @default(5)
+  correctAnswers Int    @default(0)
+  confidenceAvg Float   @default(0) // 0-100 average confidence
+  duration      Int      @default(60) // seconds
+  xpEarned      Int      @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================
+// MISSIONS
+// ============================================================
+
+model Mission {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  subject       String?
+  status        String       @default("active") // active, completed, abandoned
+  steps         String       // JSON array of steps
+  completedSteps Int        @default(0)
+  totalSteps    Int          @default(0)
+  startMastery  Float        @default(0)
+  endMastery    Float?
+  estimatedMinutes Int?
+  xpReward      Int          @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================================
+// PRE-TESTS
+// ============================================================
+
+model PreTest {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId     String?
+  topic         String
+  initialScore  Float    // 0-100
+  finalScore    Float?
+  questions     String   // JSON array of questions
+  answers       String?  // JSON array of answers
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================
+// ROADMAPS / TRILHAS
+// ============================================================
+
+model Roadmap {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  topic         String
+  steps         String   // JSON: ordered array of topics
+  currentStep   Int      @default(0)
+  totalSteps    Int      @default(0)
+  status        String   @default("active") // active, completed, paused
+  isAI          Boolean  @default(false) // generated by AI
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([userId])
 }

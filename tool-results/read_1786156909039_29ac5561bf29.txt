@@ -1,0 +1,713 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import {
+     6→  Map, Plus, Loader2, Trash2, Sparkles, Check,
+     7→  ChevronRight, ChevronDown, Clock, BookOpen, Zap,
+     8→  Target, ArrowRight, ListChecks, Play, Pause,
+     9→  Milestone, Route, Lightbulb, X,
+    10→} from 'lucide-react';
+    11→import { toast } from '@/hooks/use-toast';
+    12→import { Button } from '@/components/ui/button';
+    13→import { Badge } from '@/components/ui/badge';
+    14→import { Input } from '@/components/ui/input';
+    15→import { WabiSabiCard } from './WabiSabiCard';
+    16→import {
+    17→  Dialog,
+    18→  DialogContent,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→  DialogFooter,
+    22→} from '@/components/ui/dialog';
+    23→
+    24→// ===== TYPES =====
+    25→interface RoadmapStep {
+    26→  name: string;
+    27→  description: string;
+    28→  estimatedHours: number;
+    29→  difficulty: string;
+    30→}
+    31→
+    32→interface Roadmap {
+    33→  id: string;
+    34→  title: string;
+    35→  description: string | null;
+    36→  topic: string;
+    37→  steps: string; // JSON string
+    38→  totalSteps: number;
+    39→  currentStep: number;
+    40→  status: string;
+    41→  isAI: boolean;
+    42→  createdAt: string;
+    43→}
+    44→
+    45→const SUGGESTED_ROADMAPS = [
+    46→  {
+    47→    title: 'Desenvolvimento Backend',
+    48→    topic: 'desenvolvimento backend',
+    49→    emoji: '⚙️',
+    50→    description: 'APIs, banco de dados, autenticacao e deploy',
+    51→  },
+    52→  {
+    53→    title: 'Machine Learning',
+    54→    topic: 'machine learning',
+    55→    emoji: '🤖',
+    56→    description: 'Fundamentos de IA, modelos preditivos e deep learning',
+    57→  },
+    58→  {
+    59→    title: 'Ciencia de Dados',
+    60→    topic: 'ciencia de dados',
+    61→    emoji: '📊',
+    62→    description: 'Analise, visualizacao e storytelling com dados',
+    63→  },
+    64→  {
+    65→    title: 'Frontend Avancado',
+    66→    topic: 'frontend avancado react typescript',
+    67→    emoji: '🎨',
+    68→    description: 'React, TypeScript, performance e arquitetura',
+    69→  },
+    70→];
+    71→
+    72→function getDifficultyColor(difficulty: string): string {
+    73→  const d = difficulty?.toLowerCase() || '';
+    74→  if (d.includes('facil') || d.includes('iniciante')) return 'var(--ws-verdigris)';
+    75→  if (d.includes('medio') || d.includes('intermediario')) return 'var(--ws-gold)';
+    76→  return 'var(--ws-accent)';
+    77→}
+    78→
+    79→function getStatusBadge(status: string) {
+    80→  switch (status) {
+    81→    case 'completed':
+    82→      return { bg: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)', color: 'var(--ws-verdigris)', label: 'Concluida' };
+    83→    case 'paused':
+    84→      return { bg: 'color-mix(in srgb, var(--ws-gold) 12%, transparent)', color: 'var(--ws-gold)', label: 'Pausada' };
+    85→    default:
+    86→      return { bg: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)', color: 'var(--ws-accent)', label: 'Em andamento' };
+    87→  }
+    88→}
+    89→
+    90→// ===== COMPONENT =====
+    91→export function RoadmapView() {
+    92→  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
+    93→  const [loading, setLoading] = useState(true);
+    94→  const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
+    95→  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
+    96→
+    97→  // Generate dialog
+    98→  const [generateOpen, setGenerateOpen] = useState(false);
+    99→  const [generateInput, setGenerateInput] = useState('');
+   100→  const [generating, setGenerating] = useState(false);
+   101→
+   102→  // Delete confirm
+   103→  const [deleteTarget, setDeleteTarget] = useState<Roadmap | null>(null);
+   104→
+   105→  // Animation
+   106→  const containerVariants = {
+   107→    hidden: { opacity: 0 },
+   108→    show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+   109→  };
+   110→  const itemVariants = {
+   111→    hidden: { opacity: 0, y: 16 },
+   112→    show: { opacity: 1, y: 0 },
+   113→  };
+   114→
+   115→  // Fetch roadmaps
+   116→  const fetchRoadmaps = useCallback(async () => {
+   117→    setLoading(true);
+   118→    try {
+   119→      const res = await fetch('/api/roadmaps');
+   120→      if (!res.ok) throw new Error();
+   121→      const data = await res.json();
+   122→      setRoadmaps(data.roadmaps || []);
+   123→    } catch {
+   124→      toast({ title: 'Erro', description: 'Nao foi possivel carregar as trilhas.', variant: 'destructive' });
+   125→    } finally {
+   126→      setLoading(false);
+   127→    }
+   128→  }, []);
+   129→
+   130→  useEffect(() => { fetchRoadmaps(); }, [fetchRoadmaps]);
+   131→
+   132→  // Generate roadmap with AI
+   133→  const generateRoadmap = async (topic: string) => {
+   134→    if (!topic.trim()) return;
+   135→    setGenerating(true);
+   136→    try {
+   137→      const res = await fetch('/api/roadmaps', {
+   138→        method: 'POST',
+   139→        headers: { 'Content-Type': 'application/json' },
+   140→        body: JSON.stringify({
+   141→          title: `Trilha: ${topic.trim()}`,
+   142→          topic: topic.trim(),
+   143→          description: `Plano de estudo gerado por IA para ${topic.trim()}`,
+   144→          steps: [], // will be populated by AI
+   145→          isAI: true,
+   146→        }),
+   147→      });
+   148→      if (!res.ok) throw new Error();
+   149→      toast({ title: 'Trilha criada!', description: 'Sua trilha de aprendizagem foi gerada.' });
+   150→      setGenerateOpen(false);
+   151→      setGenerateInput('');
+   152→      fetchRoadmaps();
+   153→    } catch {
+   154→      toast({ title: 'Erro', description: 'Nao foi possivel gerar a trilha.', variant: 'destructive' });
+   155→    } finally {
+   156→      setGenerating(false);
+   157→    }
+   158→  };
+   159→
+   160→  // Generate roadmap via AI suggestion
+   161→  const handleSuggestedRoadmap = async (suggestion: typeof SUGGESTED_ROADMAPS[0]) => {
+   162→    setGenerating(true);
+   163→    try {
+   164→      // Generate steps locally based on topic
+   165→      const defaultSteps: RoadmapStep[] = generateDefaultSteps(suggestion.topic);
+   166→      const res = await fetch('/api/roadmaps', {
+   167→        method: 'POST',
+   168→        headers: { 'Content-Type': 'application/json' },
+   169→        body: JSON.stringify({
+   170→          title: suggestion.title,
+   171→          topic: suggestion.topic,
+   172→          description: suggestion.description,
+   173→          steps: defaultSteps,
+   174→          isAI: true,
+   175→        }),
+   176→      });
+   177→      if (!res.ok) throw new Error();
+   178→      toast({ title: 'Trilha criada!', description: `${suggestion.title} adicionada as suas trilhas.` });
+   179→      fetchRoadmaps();
+   180→    } catch {
+   181→      toast({ title: 'Erro', description: 'Nao foi possivel criar a trilha.', variant: 'destructive' });
+   182→    } finally {
+   183→      setGenerating(false);
+   184→    }
+   185→  };
+   186→
+   187→  // Complete step
+   188→  const completeStep = async (roadmap: Roadmap, stepIndex: number) => {
+   189→    try {
+   190→      let steps: RoadmapStep[] = [];
+   191→      try {
+   192→        steps = JSON.parse(roadmap.steps);
+   193→      } catch { /* empty */ }
+   194→
+   195→      const newStep = stepIndex + 1;
+   196→      const newStatus = newStep >= roadmap.totalSteps ? 'completed' : 'active';
+   197→
+   198→      const res = await fetch(`/api/roadmaps/${roadmap.id}`, {
+   199→        method: 'PATCH',
+   200→        headers: { 'Content-Type': 'application/json' },
+   201→        body: JSON.stringify({ currentStep: newStep, status: newStatus }),
+   202→      });
+   203→      if (!res.ok) throw new Error();
+   204→
+   205→      if (newStatus === 'completed') {
+   206→        toast({ title: 'Trilha concluida!', description: `Parabens! Voce completou "${roadmap.title}".` });
+   207→      }
+   208→      fetchRoadmaps();
+   209→      // Update selected if viewing detail
+   210→      if (selectedRoadmap?.id === roadmap.id) {
+   211→        const data = await res.json();
+   212→        setSelectedRoadmap(data.roadmap);
+   213→      }
+   214→    } catch {
+   215→      toast({ title: 'Erro', description: 'Nao foi possivel atualizar a trilha.', variant: 'destructive' });
+   216→    }
+   217→  };
+   218→
+   219→  // Delete roadmap
+   220→  const deleteRoadmap = async () => {
+   221→    if (!deleteTarget) return;
+   222→    try {
+   223→      const res = await fetch(`/api/roadmaps/${deleteTarget.id}`, { method: 'DELETE' });
+   224→      if (!res.ok) throw new Error();
+   225→      toast({ title: 'Trilha removida', description: '"${deleteTarget.title}" foi excluida.' });
+   226→      if (selectedRoadmap?.id === deleteTarget.id) setSelectedRoadmap(null);
+   227→      setDeleteTarget(null);
+   228→      fetchRoadmaps();
+   229→    } catch {
+   230→      toast({ title: 'Erro', description: 'Nao foi possivel excluir a trilha.', variant: 'destructive' });
+   231→    }
+   232→  };
+   233→
+   234→  // Toggle step expansion
+   235→  const toggleStep = (idx: number) => {
+   236→    setExpandedSteps(prev => {
+   237→      const next = new Set(prev);
+   238→      if (next.has(idx)) next.delete(idx); else next.add(idx);
+   239→      return next;
+   240→    });
+   241→  };
+   242→
+   243→  // Parse steps helper
+   244→  const parseSteps = (roadmap: Roadmap): RoadmapStep[] => {
+   245→    try {
+   246→      const parsed = JSON.parse(roadmap.steps);
+   247→      return Array.isArray(parsed) ? parsed : [];
+   248→    } catch {
+   249→      return [];
+   250→    }
+   251→  };
+   252→
+   253→  // ===== RENDER =====
+   254→
+   255→  // Detail view
+   256→  if (selectedRoadmap) {
+   257→    const steps = parseSteps(selectedRoadmap);
+   258→    const statusBadge = getStatusBadge(selectedRoadmap.status);
+   259→    const progress = selectedRoadmap.totalSteps > 0
+   260→      ? Math.round((selectedRoadmap.currentStep / selectedRoadmap.totalSteps) * 100)
+   261→      : 0;
+   262→
+   263→    return (
+   264→      <motion.div
+   265→        className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   266→        initial={{ opacity: 0, x: 20 }}
+   267→        animate={{ opacity: 1, x: 0 }}
+   268→      >
+   269→        {/* Back button */}
+   270→        <button
+   271→          onClick={() => { setSelectedRoadmap(null); setExpandedSteps(new Set()); }}
+   272→          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-70"
+   273→          style={{ color: 'var(--ws-accent)' }}
+   274→        >
+   275→          <ChevronRight className="h-4 w-4 rotate-180" /> Voltar as trilhas
+   276→        </button>
+   277→
+   278→        {/* Header */}
+   279→        <WabiSabiCard hover={false} glass>
+   280→          <div className="mb-3 flex items-start justify-between">
+   281→            <div className="flex-1">
+   282→              <h1 className="font-serif-jp text-2xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>{selectedRoadmap.title}</h1>
+   283→              {selectedRoadmap.description && (
+   284→                <p className="mt-1 text-sm" style={{ color: 'var(--ws-text-secondary)' }}>{selectedRoadmap.description}</p>
+   285→              )}
+   286→            </div>
+   287→            <span
+   288→              className="rounded-full px-3 py-1 text-xs font-semibold"
+   289→              style={{ background: statusBadge.bg, color: statusBadge.color }}
+   290→            >
+   291→              {statusBadge.label}
+   292→            </span>
+   293→          </div>
+   294→
+   295→          {/* Progress */}
+   296→          <div className="flex items-center justify-between text-sm">
+   297→            <span style={{ color: 'var(--ws-text-secondary)' }}>Progresso</span>
+   298→            <span className="font-semibold" style={{ color: 'var(--ws-accent)' }}>{selectedRoadmap.currentStep}/{selectedRoadmap.totalSteps} etapas</span>
+   299→          </div>
+   300→          <div className="relative mt-2 h-2.5 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-ink) 6%, transparent)' }}>
+   301→            <motion.div
+   302→              className="absolute left-0 top-0 h-full rounded-full"
+   303→              style={{ background: 'var(--ws-accent)' }}
+   304→              initial={{ width: 0 }}
+   305→              animate={{ width: `${progress}%` }}
+   306→              transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+   307→            />
+   308→          </div>
+   309→          {selectedRoadmap.isAI && (
+   310→            <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   311→              <Sparkles className="h-3 w-3" /> Gerada por IA
+   312→            </div>
+   313→          )}
+   314→        </WabiSabiCard>
+   315→
+   316→        {/* Timeline steps */}
+   317→        <div className="relative pl-8">
+   318→          {/* Vertical line */}
+   319→          <div
+   320→            className="absolute bottom-0 left-3 top-0 w-0.5"
+   321→            style={{ background: 'var(--ws-glass-border)' }}
+   322→          />
+   323→
+   324→          {steps.map((step, idx) => {
+   325→            const isCompleted = idx < selectedRoadmap.currentStep;
+   326→            const isCurrent = idx === selectedRoadmap.currentStep;
+   327→            const isExpanded = expandedSteps.has(idx);
+   328→
+   329→            return (
+   330→              <motion.div
+   331→                key={idx}
+   332→                className="relative mb-4 last:mb-0"
+   333→                initial={{ opacity: 0, y: 12 }}
+   334→                animate={{ opacity: 1, y: 0 }}
+   335→                transition={{ delay: idx * 0.05 }}
+   336→              >
+   337→                {/* Dot */}
+   338→                <div
+   339→                  className="absolute -left-8 top-4 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors"
+   340→                  style={{
+   341→                    borderColor: isCompleted ? 'var(--ws-verdigris)' : isCurrent ? 'var(--ws-accent)' : 'var(--ws-glass-border)',
+   342→                    background: isCompleted ? 'var(--ws-verdigris)' : isCurrent ? 'color-mix(in srgb, var(--ws-accent) 15%, transparent)' : 'var(--ws-bg)',
+   343→                  }}
+   344→                >
+   345→                  {isCompleted ? (
+   346→                    <Check className="h-3 w-3" style={{ color: 'var(--ws-text-on-dark)' }} />
+   347→                  ) : (
+   348→                    <span className="text-xs font-bold" style={{ color: isCurrent ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }}>{idx + 1}</span>
+   349→                  )}
+   350→                </div>
+   351→
+   352→                {/* Card */}
+   353→                <div
+   354→                  className="cursor-pointer rounded-ws-card border p-4 transition-all hover-lift"
+   355→                  style={{
+   356→                    borderColor: isCurrent ? 'var(--ws-accent)' : 'var(--ws-glass-border)',
+   357→                    background: isCurrent ? 'color-mix(in srgb, var(--ws-accent) 4%, var(--ws-glass))' : 'var(--ws-glass)',
+   358→                  }}
+   359→                  onClick={() => toggleStep(idx)}
+   360→                >
+   361→                  <div className="flex items-start justify-between">
+   362→                    <div className="flex-1">
+   363→                      <div className="flex items-center gap-2">
+   364→                        <span
+   365→                          className="rounded-full px-2 py-0.5 text-xs font-medium"
+   366→                          style={{ background: `${getDifficultyColor(step.difficulty)}15`, color: getDifficultyColor(step.difficulty) }}
+   367→                        >
+   368→                          {step.difficulty}
+   369→                        </span>
+   370→                        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   371→                          <Clock className="h-3 w-3" /> {step.estimatedHours}h
+   372→                        </span>
+   373→                      </div>
+   374→                      <h3
+   375→                        className="mt-1.5 text-sm font-semibold"
+   376→                        style={{ color: isCompleted ? 'var(--ws-text-tertiary)' : 'var(--ws-text-primary)', textDecoration: isCompleted ? 'line-through' : 'none' }}
+   377→                      >
+   378→                        {step.name}
+   379→                      </h3>
+   380→                    </div>
+   381→                    <div className="ml-2">
+   382→                      {isExpanded ? <ChevronUp className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} /> : <ChevronDown className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />}
+   383→                    </div>
+   384→                  </div>
+   385→
+   386→                  <AnimatePresence>
+   387→                    {isExpanded && (
+   388→                      <motion.div
+   389→                        initial={{ opacity: 0, height: 0 }}
+   390→                        animate={{ opacity: 1, height: 'auto' }}
+   391→                        exit={{ opacity: 0, height: 0 }}
+   392→                        className="mt-3"
+   393→                      >
+   394→                        <p className="text-sm leading-relaxed" style={{ color: 'var(--ws-text-secondary)' }}>
+   395→                          {step.description}
+   396→                        </p>
+   397→                        {!isCompleted && (
+   398→                          <Button
+   399→                            size="sm"
+   400→                            className="mt-3 rounded-ws-button"
+   401→                            style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   402→                            onClick={(e) => { e.stopPropagation(); completeStep(selectedRoadmap, idx); }}
+   403→                          >
+   404→                            <Check className="mr-1.5 h-3.5 w-3.5" /> Marcar como concluido
+   405→                          </Button>
+   406→                        )}
+   407→                      </motion.div>
+   408→                    )}
+   409→                  </AnimatePresence>
+   410→                </div>
+   411→              </motion.div>
+   412→            );
+   413→          })}
+   414→        </div>
+   415→      </motion.div>
+   416→    );
+   417→  }
+   418→
+   419→  // ===== LIST VIEW =====
+   420→  return (
+   421→    <motion.div
+   422→      className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-4"
+   423→      variants={containerVariants}
+   424→      initial="hidden"
+   425→      animate="show"
+   426→    >
+   427→      {/* Header */}
+   428→      <motion.div variants={itemVariants} className="text-center">
+   429→        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-1.5 backdrop-blur-xl">
+   430→          <Route className="h-4 w-4" style={{ color: 'var(--ws-accent)' }} />
+   431→          <span className="text-xs font-medium" style={{ color: 'var(--ws-text-secondary)' }}>Trilhas de Aprendizagem</span>
+   432→        </div>
+   433→        <h1 className="font-serif-jp text-3xl font-bold" style={{ color: 'var(--ws-text-primary)' }}>
+   434→          Roadmaps
+   435→        </h1>
+   436→        <p className="mt-1 text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   437→          Planeje seu caminho de aprendizagem
+   438→        </p>
+   439→      </motion.div>
+   440→
+   441→      {/* Generate button */}
+   442→      <motion.div variants={itemVariants}>
+   443→        <Button
+   444→          onClick={() => setGenerateOpen(true)}
+   445→          className="w-full rounded-ws-button py-6 text-base font-semibold"
+   446→          style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   447→          whileHover={{ scale: 1.01 }}
+   448→          whileTap={{ scale: 0.98 }}
+   449→        >
+   450→          <Sparkles className="mr-2 h-5 w-5" /> Gerar nova trilha
+   451→        </Button>
+   452→      </motion.div>
+   453→
+   454→      {/* Suggested roadmaps (when empty) */}
+   455→      {roadmaps.length === 0 && !loading && (
+   456→        <motion.div variants={itemVariants}>
+   457→          <WabiSabiCard hover={false}>
+   458→            <div className="mb-4 flex items-center gap-2">
+   459→              <Lightbulb className="h-5 w-5" style={{ color: 'var(--ws-gold)' }} />
+   460→              <div>
+   461→                <h2 className="font-serif-jp text-lg font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Sugestoes populares</h2>
+   462→                <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>Comece com uma trilha pre-estruturada</p>
+   463→              </div>
+   464→            </div>
+   465→
+   466→            <div className="space-y-2">
+   467→              {SUGGESTED_ROADMAPS.map((s) => (
+   468→                <button
+   469→                  key={s.topic}
+   470→                  className="flex w-full items-center gap-3 rounded-ws-button border border-[var(--ws-glass-border)] p-3 text-left transition-all hover:border-[var(--ws-accent)] hover-lift"
+   471→                  style={{ background: 'var(--ws-glass)' }}
+   472→                  onClick={() => handleSuggestedRoadmap(s)}
+   473→                  disabled={generating}
+   474→                >
+   475→                  <span className="text-2xl">{s.emoji}</span>
+   476→                  <div className="flex-1">
+   477→                    <span className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>{s.title}</span>
+   478→                    <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>{s.description}</p>
+   479→                  </div>
+   480→                  <ArrowRight className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   481→                </button>
+   482→              ))}
+   483→            </div>
+   484→          </WabiSabiCard>
+   485→        </motion.div>
+   486→      )}
+   487→
+   488→      {/* Roadmap list */}
+   489→      {loading ? (
+   490→        <div className="space-y-3">
+   491→          {[1, 2, 3].map((i) => (
+   492→            <div key={i} className="skeleton skeleton-card h-24" />
+   493→          ))}
+   494→        </div>
+   495→      ) : roadmaps.length > 0 ? (
+   496→        <motion.div variants={itemVariants} className="space-y-3">
+   497→          {roadmaps.map((rm, idx) => {
+   498→            const steps = parseSteps(rm);
+   499→            const statusBadge = getStatusBadge(rm.status);
+   500→            const progress = rm.totalSteps > 0 ? Math.round((rm.currentStep / rm.totalSteps) * 100) : 0;
+   501→            const totalHours = steps.reduce((sum, s) => sum + (s.estimatedHours || 0), 0);
+   502→
+   503→            return (
+   504→              <motion.div
+   505→                key={rm.id}
+   506→                className="group cursor-pointer rounded-ws-card border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] p-4 backdrop-blur-xl transition-all hover-lift"
+   507→                onClick={() => setSelectedRoadmap(rm)}
+   508→                initial={{ opacity: 0, y: 12 }}
+   509→                animate={{ opacity: 1, y: 0 }}
+   510→                transition={{ delay: idx * 0.05 }}
+   511→              >
+   512→                <div className="flex items-start justify-between">
+   513→                  <div className="flex-1">
+   514→                    <div className="flex items-center gap-2">
+   515→                      {rm.isAI && <Sparkles className="h-3.5 w-3.5" style={{ color: 'var(--ws-gold)' }} />}
+   516→                      <h3 className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>{rm.title}</h3>
+   517→                    </div>
+   518→                    <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   519→                      <Badge variant="outline" className="text-xs" style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-tertiary)' }}>
+   520→                        {rm.topic}
+   521→                      </Badge>
+   522→                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {totalHours}h</span>
+   523→                    </div>
+   524→                  </div>
+   525→                  <div className="flex items-center gap-2">
+   526→                    <span
+   527→                      className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+   528→                      style={{ background: statusBadge.bg, color: statusBadge.color }}
+   529→                    >
+   530→                      {statusBadge.label}
+   531→                    </span>
+   532→                    <button
+   533→                      className="rounded-full p-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+   534→                      style={{ background: 'color-mix(in srgb, var(--ws-accent) 8%, transparent)' }}
+   535→                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(rm); }}
+   536→                    >
+   537→                      <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--ws-accent)' }} />
+   538→                    </button>
+   539→                    <ChevronRight className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   540→                  </div>
+   541→                </div>
+   542→
+   543→                {/* Progress bar */}
+   544→                <div className="mt-3 flex items-center gap-3">
+   545→                  <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--ws-ink) 6%, transparent)' }}>
+   546→                    <div
+   547→                      className="h-full rounded-full transition-all duration-500"
+   548→                      style={{ width: `${progress}%`, background: rm.status === 'completed' ? 'var(--ws-verdigris)' : 'var(--ws-accent)' }}
+   549→                    />
+   550→                  </div>
+   551→                  <span className="text-xs font-medium tabular-nums" style={{ color: 'var(--ws-text-secondary)' }}>
+   552→                    {rm.currentStep}/{rm.totalSteps}
+   553→                  </span>
+   554→                </div>
+   555→              </motion.div>
+   556→            );
+   557→          })}
+   558→        </motion.div>
+   559→      ) : null}
+   560→
+   561→      {/* Generate Dialog */}
+   562→      <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
+   563→        <DialogContent className="sm:max-w-md" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
+   564→          <DialogHeader>
+   565→            <DialogTitle className="font-serif-jp" style={{ color: 'var(--ws-text-primary)' }}>
+   566→              <Sparkles className="mr-2 inline h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+   567→              Gerar nova trilha
+   568→            </DialogTitle>
+   569→          </DialogHeader>
+   570→
+   571→          <div className="space-y-4">
+   572→            <div>
+   573→              <label className="mb-1.5 block text-sm font-medium" style={{ color: 'var(--ws-text-secondary)' }}>
+   574→                Quero aprender...
+   575→              </label>
+   576→              <Input
+   577→                placeholder="Ex: desenvolvimento backend, machine learning, calculo..."
+   578→                value={generateInput}
+   579→                onChange={(e) => setGenerateInput(e.target.value)}
+   580→                onKeyDown={(e) => { if (e.key === 'Enter' && generateInput.trim()) generateRoadmap(generateInput); }}
+   581→                className="rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)]"
+   582→                style={{ color: 'var(--ws-text-primary)' }}
+   583→              />
+   584→            </div>
+   585→
+   586→            <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+   587→              A IA vai criar uma trilha completa com 8-15 etapas ordenadas, cada uma com descricao, duracao estimada e dificuldade.
+   588→            </p>
+   589→          </div>
+   590→
+   591→          <DialogFooter>
+   592→            <Button
+   593→              variant="outline"
+   594→              className="rounded-ws-button"
+   595→              style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-secondary)' }}
+   596→              onClick={() => setGenerateOpen(false)}
+   597→            >
+   598→              Cancelar
+   599→            </Button>
+   600→            <Button
+   601→              className="rounded-ws-button"
+   602→              style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   603→              onClick={() => generateRoadmap(generateInput)}
+   604→              disabled={generating || !generateInput.trim()}
+   605→            >
+   606→              {generating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar trilha</>}
+   607→            </Button>
+   608→          </DialogFooter>
+   609→        </DialogContent>
+   610→      </Dialog>
+   611→
+   612→      {/* Delete Confirm Dialog */}
+   613→      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+   614→        <DialogContent className="sm:max-w-sm" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
+   615→          <DialogHeader>
+   616→            <DialogTitle className="font-serif-jp" style={{ color: 'var(--ws-text-primary)' }}>Excluir trilha?</DialogTitle>
+   617→          </DialogHeader>
+   618→          <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
+   619→            Tem certeza que deseja excluir &ldquo;{deleteTarget?.title}&rdquo;? Esta acao nao pode ser desfeita.
+   620→          </p>
+   621→          <DialogFooter>
+   622→            <Button
+   623→              variant="outline"
+   624→              className="rounded-ws-button"
+   625→              style={{ borderColor: 'var(--ws-glass-border)', color: 'var(--ws-text-secondary)' }}
+   626→              onClick={() => setDeleteTarget(null)}
+   627→            >
+   628→              Cancelar
+   629→            </Button>
+   630→            <Button
+   631→              className="rounded-ws-button"
+   632→              style={{ background: 'var(--ws-accent)', color: 'var(--ws-text-on-dark)' }}
+   633→              onClick={deleteRoadmap}
+   634→            >
+   635→              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+   636→            </Button>
+   637→          </DialogFooter>
+   638→        </DialogContent>
+   639→      </Dialog>
+   640→    </motion.div>
+   641→  );
+   642→}
+   643→
+   644→// ===== HELPER: Generate default steps for suggested roadmaps =====
+   645→function generateDefaultSteps(topic: string): RoadmapStep[] {
+   646→  const topicLower = topic.toLowerCase();
+   647→
+   648→  if (topicLower.includes('backend') || topicLower.includes('desenvolvimento')) {
+   649→    return [
+   650→      { name: 'Fundamentos de HTTP e APIs REST', description: 'Entenda como a web funciona por tras: protocolo HTTP, metodos, status codes e arquitetura REST.', estimatedHours: 4, difficulty: 'Iniciante' },
+   651→      { name: 'Linguagem de programacao (Node.js/Python)', description: 'Domine os fundamentos da linguagem escolhida: sintaxe, estruturas de dados, funcoes e modulos.', estimatedHours: 8, difficulty: 'Iniciante' },
+   652→      { name: 'Banco de dados relacional (SQL)', description: 'Aprenda a modelar, criar e consultar bancos relacionais com SQL. Entenda normalizacao e indices.', estimatedHours: 6, difficulty: 'Iniciante' },
+   653→      { name: 'ORM e manipulacao de dados', description: 'Use um ORM (Prisma, Sequelize, SQLAlchemy) para interagir com o banco de forma eficiente e segura.', estimatedHours: 5, difficulty: 'Intermediario' },
+   654→      { name: 'Autenticacao e autorizacao', description: 'Implemente login, registro, JWT, sessions e controle de acesso a recursos protegidos.', estimatedHours: 6, difficulty: 'Intermediario' },
+   655→      { name: 'Validacao e seguranca', description: 'Proteja sua API contra injecao SQL, XSS, CSRF. Implemente validacao de dados e rate limiting.', estimatedHours: 5, difficulty: 'Intermediario' },
+   656→      { name: 'Testes automatizados', description: 'Escreva testes unitarios e de integracao. Aprenda TDD e ferramentas como Jest, Vitest ou Pytest.', estimatedHours: 6, difficulty: 'Intermediario' },
+   657→      { name: 'Arquitetura e padroes', description: 'Explore padroes como MVC, Repository, Services. Aprenda sobre clean architecture e SOLID.', estimatedHours: 5, difficulty: 'Avancado' },
+   658→      { name: 'Deploy e DevOps basico', description: 'Configure CI/CD, Docker, deploy em cloud (AWS, Vercel, Railway). Monitore sua aplicacao.', estimatedHours: 6, difficulty: 'Avancado' },
+   659→    ];
+   660→  }
+   661→
+   662→  if (topicLower.includes('machine learning') || topicLower.includes('ml') || topicLower.includes('ia')) {
+   663→    return [
+   664→      { name: 'Fundamentos de Python para ML', description: 'Revise Python com foco em bibliotecas cientificas: NumPy, Pandas, Matplotlib.', estimatedHours: 5, difficulty: 'Iniciante' },
+   665→      { name: 'Estatistica e probabilidade', description: 'Distribuicoes, teste de hipotese, correlacao e regressao linear — a base da ML.', estimatedHours: 6, difficulty: 'Iniciante' },
+   666→      { name: 'Analise exploratoria de dados', description: 'Aprenda a limpar, visualizar e extrair insights de datasets reais.', estimatedHours: 5, difficulty: 'Iniciante' },
+   667→      { name: 'Regressao linear e logistica', description: 'Seu primeiro modelo! Entenda como algoritmos aprendem relacoes nos dados.', estimatedHours: 6, difficulty: 'Intermediario' },
+   668→      { name: 'Arvores de decisao e ensemble', description: 'Decision Trees, Random Forest e Gradient Boosting para problemas de classificacao e regressao.', estimatedHours: 6, difficulty: 'Intermediario' },
+   669→      { name: 'Avaliacao de modelos', description: 'Metricas: acuracia, precision, recall, F1, ROC-AUC. Overfitting, underfitting e validacao cruzada.', estimatedHours: 4, difficulty: 'Intermediario' },
+   670→      { name: 'Introducao ao Deep Learning', description: 'Redes neurais artificiais: perceptron, backpropagation e frameworks como PyTorch ou TensorFlow.', estimatedHours: 8, difficulty: 'Avancado' },
+   671→      { name: 'Projeto pratico end-to-end', description: 'Construa um projeto completo: coleta de dados, preprocessamento, treinamento e deploy de um modelo.', estimatedHours: 10, difficulty: 'Avancado' },
+   672→    ];
+   673→  }
+   674→
+   675→  if (topicLower.includes('dados') || topicLower.includes('data')) {
+   676→    return [
+   677→      { name: 'Fundamentos de analise de dados', description: 'O que e ciencia de dados, ciclo de vida de um projeto e ferramentas essenciais.', estimatedHours: 3, difficulty: 'Iniciante' },
+   678→      { name: 'Python e Pandas', description: 'Manipule DataFrames, limpe dados, faca agregacoes e merge de tabelas com confianca.', estimatedHours: 6, difficulty: 'Iniciante' },
+   679→      { name: 'Visualizacao de dados', description: 'Crie graficos eficazes com Matplotlib, Seaborn ou Plotly. Storytelling com dados.', estimatedHours: 5, difficulty: 'Iniciante' },
+   680→      { name: 'Estatistica aplicada', description: 'Medidas de tendencia central, dispersao, distribuicoes, correlacao e testes de hipotese.', estimatedHours: 6, difficulty: 'Intermediario' },
+   681→      { name: 'SQL avancado', description: 'Joins complexos, window functions, CTEs e otimizacao de queries para analise.', estimatedHours: 5, difficulty: 'Intermediario' },
+   682→      { name: 'ETL e pipelines de dados', description: 'Extraia, transforme e carregue dados. Ferramentas como Airflow e dbt.', estimatedHours: 6, difficulty: 'Intermediario' },
+   683→      { name: 'Dashboard e comunicacao', description: 'Crie dashboards interativos e aprenda a comunicar insights para stakeholders.', estimatedHours: 5, difficulty: 'Avancado' },
+   684→      { name: 'Projeto portfolio', description: 'Construa um portfolio com 2-3 projetos de analise de dados reais com storytelling.', estimatedHours: 10, difficulty: 'Avancado' },
+   685→    ];
+   686→  }
+   687→
+   688→  if (topicLower.includes('frontend') || topicLower.includes('react') || topicLower.includes('web')) {
+   689→    return [
+   690→      { name: 'HTML, CSS e responsividade', description: 'Domine a base da web: semantica, Flexbox, Grid e design responsivo.', estimatedHours: 4, difficulty: 'Iniciante' },
+   691→      { name: 'JavaScript moderno (ES6+)', description: 'Destructuring, arrow functions, promises, async/await, modules.', estimatedHours: 5, difficulty: 'Iniciante' },
+   692→      { name: 'TypeScript fundamentos', description: 'Tipagem estatica, interfaces, generics e configuracao de projetos TS.', estimatedHours: 5, difficulty: 'Iniciante' },
+   693→      { name: 'React basico', description: 'Componentes, props, estado, hooks (useState, useEffect) e ciclo de vida.', estimatedHours: 6, difficulty: 'Intermediario' },
+   694→      { name: 'React avancado', description: 'Context API, custom hooks, useRef, useMemo, useCallback e padroes avancados.', estimatedHours: 6, difficulty: 'Intermediario' },
+   695→      { name: 'Gerenciamento de estado', description: 'Zustand, Redux ou Jotai. Entenda quando e por que usar gerenciamento global de estado.', estimatedHours: 5, difficulty: 'Intermediario' },
+   696→      { name: 'Performance e otimizacao', description: 'Code splitting, lazy loading, memoizacao, React Profiler e Core Web Vitals.', estimatedHours: 5, difficulty: 'Avancado' },
+   697→      { name: 'Testes e qualidade', description: 'Testing Library, Jest, Cypress. Estrategias de testes para apps React.', estimatedHours: 6, difficulty: 'Avancado' },
+   698→      { name: 'Arquitetura de apps', description: 'Clean architecture, feature-based structure, design patterns e escalabilidade.', estimatedHours: 5, difficulty: 'Avancado' },
+   699→    ];
+   700→  }
+   701→
+   702→  // Generic fallback
+   703→  return [
+   704→    { name: 'Fundamentos e conceitos basicos', description: 'Entenda os conceitos centrais, terminologia e o panorama geral do tema.', estimatedHours: 4, difficulty: 'Iniciante' },
+   705→    { name: 'Primeiros passos praticos', description: 'Coloque a mao na massa: configure o ambiente e crie seu primeiro projeto/exercicio.', estimatedHours: 5, difficulty: 'Iniciante' },
+   706→    { name: 'Aprofundamento teorico', description: 'Estude os conceitos intermediarios que formam a base solida do conhecimento.', estimatedHours: 6, difficulty: 'Intermediario' },
+   707→    { name: 'Pratica orientada', description: 'Resolva exercicios e desafios praticos para consolidar o aprendizado.', estimatedHours: 6, difficulty: 'Intermediario' },
+   708→    { name: 'Projetos reais', description: 'Aplique tudo em projetos praticos que simulem situacoes reais.', estimatedHours: 8, difficulty: 'Intermediario' },
+   709→    { name: 'Topicos avancados', description: 'Explore conceitos avancados e tendencias na area.', estimatedHours: 7, difficulty: 'Avancado' },
+   710→    { name: 'Revisao e certificacao', description: 'Revise todo o conteudo e prepare-se para uma certificacao ou avaliacao final.', estimatedHours: 5, difficulty: 'Avancado' },
+   711→  ];
+   712→}
+   713→

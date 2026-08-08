@@ -1,0 +1,920 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import ReactMarkdown from 'react-markdown';
+     6→import {
+     7→  Search, Bookmark, BookmarkCheck, Sparkles, Filter,
+     8→  Loader2, Clock, Eye, ChevronDown, ChevronUp,
+     9→  BookPlus, Brain, FileQuestion, X, Plus,
+    10→} from 'lucide-react';
+    11→import { toast } from '@/hooks/use-toast';
+    12→import { Input } from '@/components/ui/input';
+    13→import { Button } from '@/components/ui/button';
+    14→import { Badge } from '@/components/ui/badge';
+    15→import {
+    16→  Dialog,
+    17→  DialogContent,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→  DialogFooter,
+    21→} from '@/components/ui/dialog';
+    22→
+    23→// ===== TYPES =====
+    24→interface DiscoverViewProps {
+    25→  onNavigate: (tab: string) => void;
+    26→}
+    27→
+    28→interface DiscoverItem {
+    29→  id: string;
+    30→  type: string;
+    31→  title: string;
+    32→  content: string;
+    33→  summary: string | null;
+    34→  subject: string | null;
+    35→  difficulty: string;
+    36→  duration: number | null;
+    37→  emoji: string;
+    38→  tags: string | null;
+    39→  isPublic: boolean;
+    40→  likes: number;
+    41→  saves: number;
+    42→  userId: string | null;
+    43→  user: { id: string; name: string } | null;
+    44→  createdAt: string;
+    45→  _count?: { discoverSaves: number };
+    46→  isSaved?: boolean;
+    47→}
+    48→
+    49→interface Subject {
+    50→  id: string;
+    51→  name: string;
+    52→  color: string;
+    53→  icon: string;
+    54→}
+    55→
+    56→// ===== CARD TYPE CONFIG =====
+    57→const CARD_TYPES: Record<string, { label: string; emoji: string; accent: string; accentBg: string; accentBorder: string }> = {
+    58→  mini_aula: { label: 'Mini-aula', emoji: '🎥', accent: '#DC2626', accentBg: 'rgba(220,38,38,0.08)', accentBorder: 'rgba(220,38,38,0.2)' },
+    59→  dica: { label: 'Dica', emoji: '💡', accent: '#D97706', accentBg: 'rgba(217,119,6,0.08)', accentBorder: 'rgba(217,119,6,0.2)' },
+    60→  conceito: { label: 'Conceito', emoji: '🧠', accent: '#7C3AED', accentBg: 'rgba(124,58,237,0.08)', accentBorder: 'rgba(124,58,237,0.2)' },
+    61→  questao: { label: 'Questão', emoji: '❓', accent: '#2563EB', accentBg: 'rgba(37,99,235,0.08)', accentBorder: 'rgba(37,99,235,0.2)' },
+    62→  resumo: { label: 'Resumo', emoji: '📌', accent: '#16A34A', accentBg: 'rgba(22,163,74,0.08)', accentBorder: 'rgba(22,163,74,0.2)' },
+    63→  curiosidade: { label: 'Curiosidade', emoji: '⚡', accent: '#EA580C', accentBg: 'rgba(234,88,12,0.08)', accentBorder: 'rgba(234,88,12,0.2)' },
+    64→  tecnica: { label: 'Técnica', emoji: '📝', accent: '#0D9488', accentBg: 'rgba(13,148,136,0.08)', accentBorder: 'rgba(13,148,136,0.2)' },
+    65→  codigo: { label: 'Código', emoji: '💻', accent: '#6B7280', accentBg: 'rgba(107,114,128,0.08)', accentBorder: 'rgba(107,114,128,0.2)' },
+    66→  formula: { label: 'Fórmula', emoji: '📐', accent: '#DB2777', accentBg: 'rgba(219,39,119,0.08)', accentBorder: 'rgba(219,39,119,0.2)' },
+    67→};
+    68→
+    69→const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    70→  facil: { label: 'Fácil', color: '#16A34A', bg: 'rgba(22,163,74,0.1)' },
+    71→  medio: { label: 'Médio', color: '#D97706', bg: 'rgba(217,119,6,0.1)' },
+    72→  dificil: { label: 'Difícil', color: '#DC2626', bg: 'rgba(220,38,38,0.1)' },
+    73→};
+    74→
+    75→const FILTER_OPTIONS = [
+    76→  { key: 'todos', label: 'Todos', emoji: '✨' },
+    77→  ...Object.entries(CARD_TYPES).map(([key, val]) => ({ key, label: val.label, emoji: val.emoji })),
+    78→];
+    79→
+    80→const AI_SUBJECTS = [
+    81→  'Matemática', 'Física', 'Química', 'Biologia', 'História',
+    82→  'Geografia', 'Português', 'Inglês', 'Literatura', 'Filosofia',
+    83→  'Sociologia', 'Programação', 'Estatística', 'Álgebra', 'Geometria',
+    84→  'Trigonometria', 'Cálculo', 'Redação', 'Gramática', 'Estudos Gerais',
+    85→];
+    86→
+    87→const AI_DIFFICULTIES = [
+    88→  { key: 'facil', label: 'Fácil' },
+    89→  { key: 'medio', label: 'Médio' },
+    90→  { key: 'dificil', label: 'Difícil' },
+    91→];
+    92→
+    93→// ===== SKELETON COMPONENT =====
+    94→function SkeletonCard() {
+    95→  return (
+    96→    <div
+    97→      className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
+    98→      style={{ borderRadius: 'var(--ws-radius-card)' }}
+    99→    >
+   100→      <div className="flex items-center gap-3 mb-3">
+   101→        <div className="skeleton h-10 w-10 rounded-full flex-shrink-0" />
+   102→        <div className="flex-1 space-y-2">
+   103→          <div className="skeleton h-4 w-24" />
+   104→          <div className="skeleton h-3 w-16" />
+   105→        </div>
+   106→        <div className="skeleton h-8 w-8 rounded-full" />
+   107→      </div>
+   108→      <div className="skeleton h-5 w-3/4 mb-3" />
+   109→      <div className="space-y-2">
+   110→        <div className="skeleton h-3 w-full" />
+   111→        <div className="skeleton h-3 w-5/6" />
+   112→        <div className="skeleton h-3 w-2/3" />
+   113→      </div>
+   114→      <div className="flex gap-2 mt-4">
+   115→        <div className="skeleton h-6 w-16 rounded-full" />
+   116→        <div className="skeleton h-6 w-20 rounded-full" />
+   117→      </div>
+   118→    </div>
+   119→  );
+   120→}
+   121→
+   122→// ===== EMPTY STATE =====
+   123→function EmptyState({ hasFilter }: { hasFilter: boolean }) {
+   124→  return (
+   125→    <motion.div
+   126→      initial={{ opacity: 0, y: 20 }}
+   127→      animate={{ opacity: 1, y: 0 }}
+   128→      className="flex flex-col items-center justify-center py-16 px-6 text-center"
+   129→    >
+   130→      <div
+   131→        className="mb-6 flex h-20 w-20 items-center justify-center text-4xl"
+   132→        style={{
+   133→          background: 'var(--ws-glass)',
+   134→          borderRadius: '50%',
+   135→          border: '1px solid var(--ws-glass-border)',
+   136→        }}
+   137→      >
+   138→        {hasFilter ? '🔍' : '🌿'}
+   139→      </div>
+   140→      <h3
+   141→        className="font-serif-jp text-xl font-semibold mb-2"
+   142→        style={{ color: 'var(--ws-text-primary)' }}
+   143→      >
+   144→        {hasFilter ? 'Nenhum resultado encontrado' : 'Explore o Discover'}
+   145→      </h3>
+   146→      <p
+   147→        className="text-sm max-w-xs"
+   148→        style={{ color: 'var(--ws-text-tertiary)' }}
+   149→      >
+   150→        {hasFilter
+   151→          ? 'Tente ajustar os filtros ou buscar por outro termo.'
+   152→          : 'Conteúdo educacional incrível está esperando por você. Gere seu primeiro conteúdo com IA!'}
+   153→      </p>
+   154→      {!hasFilter && (
+   155→        <button
+   156→          className="mt-6 flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws"
+   157→          style={{
+   158→            background: 'var(--ws-accent)',
+   159→            boxShadow: 'var(--ws-shadow-soft)',
+   160→          }}
+   161→          id="empty-generate-btn"
+   162→        >
+   163→          <Sparkles className="h-4 w-4" />
+   164→          Gerar com IA
+   165→        </button>
+   166→      )}
+   167→    </motion.div>
+   168→  );
+   169→}
+   170→
+   171→// ===== MAIN COMPONENT =====
+   172→export function DiscoverView({ onNavigate }: DiscoverViewProps) {
+   173→  // State
+   174→  const [items, setItems] = useState<DiscoverItem[]>([]);
+   175→  const [loading, setLoading] = useState(true);
+   176→  const [activeFilter, setActiveFilter] = useState('todos');
+   177→  const [searchQuery, setSearchQuery] = useState('');
+   178→  const [expandedId, setExpandedId] = useState<string | null>(null);
+   179→  const [savingId, setSavingId] = useState<string | null>(null);
+   180→  const [page, setPage] = useState(1);
+   181→  const [totalPages, setTotalPages] = useState(1);
+   182→  const [subjects, setSubjects] = useState<Subject[]>([]);
+   183→
+   184→  // AI Generate dialog state
+   185→  const [showAIDialog, setShowAIDialog] = useState(false);
+   186→  const [aiType, setAiType] = useState('dica');
+   187→  const [aiSubject, setAiSubject] = useState('');
+   188→  const [aiDifficulty, setAiDifficulty] = useState('medio');
+   189→  const [aiGenerating, setAiGenerating] = useState(false);
+   190→
+   191→  // Subject selector state
+   192→  const [showSubjectDialog, setShowSubjectDialog] = useState(false);
+   193→  const [subjectSelectItemId, setSubjectSelectItemId] = useState<string | null>(null);
+   194→  const [selectedSubjectId, setSelectedSubjectId] = useState<string | '');
+   195→
+   196→  const filterRef = useRef<HTMLDivElement>(null);
+   197→
+   198→  // ===== DATA FETCHING =====
+   199→  const fetchItems = useCallback(async (pageNum: number, type?: string) => {
+   200→    try {
+   201→      const params = new URLSearchParams({ page: String(pageNum), limit: '20' });
+   202→      if (type && type !== 'todos') params.set('type', type);
+   203→      const res = await fetch(`/api/discover?${params.toString()}`);
+   204→      if (!res.ok) throw new Error('Failed to fetch');
+   205→      const data = await res.json();
+   206→      if (pageNum === 1) {
+   207→        setItems(data.items || []);
+   208→      } else {
+   209→        setItems(prev => [...prev, ...(data.items || [])]);
+   210→      }
+   211→      setTotalPages(data.pagination?.totalPages || 1);
+   212→    } catch {
+   213→      toast({ title: 'Erro ao carregar conteúdo', description: 'Tente novamente mais tarde.' });
+   214→    }
+   215→  }, []);
+   216→
+   217→  const fetchSubjects = useCallback(async () => {
+   218→    try {
+   219→      const res = await fetch('/api/subjects');
+   220→      if (!res.ok) return;
+   221→      const data = await res.json();
+   222→      setSubjects(Array.isArray(data) ? data : data.subjects || []);
+   223→    } catch {
+   224→      // Silent fail
+   225→    }
+   226→  }, []);
+   227→
+   228→  useEffect(() => {
+   229→    const load = async () => {
+   230→      setLoading(true);
+   231→      setPage(1);
+   232→      await fetchItems(1, activeFilter);
+   233→      setLoading(false);
+   234→    };
+   235→    load();
+   236→  }, [activeFilter, fetchItems]);
+   237→
+   238→  useEffect(() => {
+   239→    fetchSubjects();
+   240→  }, [fetchSubjects]);
+   241→
+   242→  // Infinite scroll
+   243→  const loadMore = useCallback(async () => {
+   244→    if (loading || page >= totalPages) return;
+   245→    const nextPage = page + 1;
+   246→    setPage(nextPage);
+   247→    await fetchItems(nextPage, activeFilter);
+   248→  }, [loading, page, totalPages, activeFilter, fetchItems]);
+   249→
+   250→  // ===== FILTERED ITEMS =====
+   251→  const filteredItems = useMemo(() => {
+   252→    if (!searchQuery.trim()) return items;
+   253→    const q = searchQuery.toLowerCase();
+   254→    return items.filter(
+   255→      item =>
+   256→        item.title.toLowerCase().includes(q) ||
+   257→        item.content.toLowerCase().includes(q) ||
+   258→        item.summary?.toLowerCase().includes(q) ||
+   259→        item.subject?.toLowerCase().includes(q) ||
+   260→        item.tags?.toLowerCase().includes(q)
+   261→    );
+   262→  }, [items, searchQuery]);
+   263→
+   264→  // ===== SAVE/UNSAVE =====
+   265→  const handleSave = async (e: React.MouseEvent, itemId: string) => {
+   266→    e.stopPropagation();
+   267→    setSavingId(itemId);
+   268→    try {
+   269→      const res = await fetch(`/api/discover/${itemId}/save`, { method: 'POST' });
+   270→      if (!res.ok) throw new Error('Failed');
+   271→      const data = await res.json();
+   272→      setItems(prev =>
+   273→        prev.map(item =>
+   274→          item.id === itemId ? { ...item, isSaved: data.isSaved, saves: data.isSaved ? item.saves + 1 : Math.max(0, item.saves - 1) } : item
+   275→        )
+   276→      );
+   277→      toast({
+   278→        title: data.isSaved ? 'Salvo!' : 'Removido dos salvos',
+   279→        description: data.isSaved ? 'Conteúdo adicionado aos seus salvos.' : 'Conteúdo removido dos salvos.',
+   280→      });
+   281→    } catch {
+   282→      toast({ title: 'Erro', description: 'Não foi possível salvar o conteúdo.' });
+   283→    } finally {
+   284→      setSavingId(null);
+   285→    }
+   286→  };
+   287→
+   288→  // ===== AI GENERATE =====
+   289→  const handleAIGenerate = async () => {
+   290→    if (!aiSubject.trim()) {
+   291→      toast({ title: 'Informe o assunto', description: 'Digite um assunto para gerar conteúdo.' });
+   292→      return;
+   293→    }
+   294→    setAiGenerating(true);
+   295→    try {
+   296→      const res = await fetch('/api/discover', {
+   297→        method: 'POST',
+   298→        headers: { 'Content-Type': 'application/json' },
+   299→        body: JSON.stringify({
+   300→          type: aiType,
+   301→          subject: aiSubject.trim(),
+   302→          difficulty: aiDifficulty,
+   303→          generateWithAI: true,
+   304→        }),
+   305→      });
+   306→      if (!res.ok) {
+   307→        const err = await res.json().catch(() => ({}));
+   308→        throw new Error(err.error || 'Failed to generate');
+   309→      }
+   310→      const data = await res.json();
+   311→      if (data.item) {
+   312→        setItems(prev => [data.item, ...prev]);
+   313→        toast({ title: 'Conteúdo gerado! ✨', description: data.item.title });
+   314→      }
+   315→      setShowAIDialog(false);
+   316→      setAiSubject('');
+   317→    } catch (err: any) {
+   318→      toast({ title: 'Erro ao gerar', description: err.message || 'Tente novamente.' });
+   319→    } finally {
+   320→      setAiGenerating(false);
+   321→    }
+   322→  };
+   323→
+   324→  // ===== ADD TO SUBJECT =====
+   325→  const openSubjectSelector = (e: React.MouseEvent, itemId: string) => {
+   326→    e.stopPropagation();
+   327→    setSubjectSelectItemId(itemId);
+   328→    setSelectedSubjectId('');
+   329→    setShowSubjectDialog(true);
+   330→  };
+   331→
+   332→  const handleAddToSubject = async () => {
+   333→    if (!selectedSubjectId || !subjectSelectItemId) return;
+   334→    try {
+   335→      const item = items.find(i => i.id === subjectSelectItemId);
+   336→      if (!item) return;
+   337→      // Create a note in the subject with the discover content
+   338→      const res = await fetch('/api/notes', {
+   339→        method: 'POST',
+   340→        headers: { 'Content-Type': 'application/json' },
+   341→        body: JSON.stringify({
+   342→          title: `[Discover] ${item.title}`,
+   343→          content: item.content,
+   344→          subjectId: selectedSubjectId,
+   345→        }),
+   346→      });
+   347→      if (res.ok) {
+   348→        toast({ title: 'Adicionado à matéria! 📚', description: 'Conteúdo salvo na matéria selecionada.' });
+   349→        setShowSubjectDialog(false);
+   350→      } else {
+   351→        throw new Error('Failed');
+   352→      }
+   353→    } catch {
+   354→      toast({ title: 'Erro', description: 'Não foi possível adicionar à matéria.' });
+   355→    }
+   356→  };
+   357→
+   358→  // ===== ACTION BUTTONS =====
+   359→  const handleGenerateFlashcards = (e: React.MouseEvent, item: DiscoverItem) => {
+   360→    e.stopPropagation();
+   361→    toast({ title: 'Flashcards em breve!', description: 'Funcionalidade de gerar flashcards será liberada em breve.' });
+   362→  };
+   363→
+   364→  const handleGenerateQuestions = (e: React.MouseEvent, item: DiscoverItem) => {
+   365→    e.stopPropagation();
+   366→    toast({ title: 'Questões em breve!', description: 'Funcionalidade de gerar questões será liberada em breve.' });
+   367→  };
+   368→
+   369→  // ===== HELPERS =====
+   370→  const getTypeConfig = (type: string) => CARD_TYPES[type] || CARD_TYPES.dica;
+   371→  const getDifficultyConfig = (d: string) => DIFFICULTY_CONFIG[d] || DIFFICULTY_CONFIG.medio;
+   372→  const formatDuration = (seconds: number | null) => {
+   373→    if (!seconds) return null;
+   374→    if (seconds < 60) return `${seconds}s`;
+   375→    const m = Math.floor(seconds / 60);
+   376→    const s = seconds % 60;
+   377→    return s > 0 ? `${m}m ${s}s` : `${m}min`;
+   378→  };
+   379→
+   380→  // ===== RENDER =====
+   381→  return (
+   382→    <div className="relative min-h-full pb-24">
+   383→      {/* Header */}
+   384→      <div className="mb-6">
+   385→        <h1
+   386→          className="font-serif-jp text-2xl font-bold mb-1"
+   387→          style={{ color: 'var(--ws-text-primary)' }}
+   388→        >
+   389→          Discover
+   390→        </h1>
+   391→        <p className="text-sm" style={{ color: 'var(--ws-text-tertiary)' }}>
+   392→          Explore conteúdo educacional gerado pela comunidade e IA
+   393→        </p>
+   394→      </div>
+   395→
+   396→      {/* Search Bar */}
+   397→      <div className="relative mb-4">
+   398→        <Search
+   399→          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+   400→          style={{ color: 'var(--ws-text-tertiary)' }}
+   401→        />
+   402→        <Input
+   403→          placeholder="Buscar conteúdo..."
+   404→          value={searchQuery}
+   405→          onChange={e => setSearchQuery(e.target.value)}
+   406→          className="pl-10 pr-4 h-11 w-full rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus-visible:ring-[var(--ws-accent)]/30 focus-visible:border-[var(--ws-accent)]/40"
+   407→          style={{ fontSize: '14px' }}
+   408→        />
+   409→        {searchQuery && (
+   410→          <button
+   411→            onClick={() => setSearchQuery('')}
+   412→            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 transition-ws"
+   413→            style={{ color: 'var(--ws-text-tertiary)' }}
+   414→            aria-label="Limpar busca"
+   415→          >
+   416→            <X className="h-4 w-4" />
+   417→          </button>
+   418→        )}
+   419→      </div>
+   420→
+   421→      {/* Filter Bar */}
+   422→      <div
+   423→        ref={filterRef}
+   424→        className="mb-6 -mx-4 px-4 overflow-x-auto no-scrollbar"
+   425→      >
+   426→        <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
+   427→          {FILTER_OPTIONS.map(opt => {
+   428→            const isActive = activeFilter === opt.key;
+   429→            const typeConf = opt.key !== 'todos' ? CARD_TYPES[opt.key] : null;
+   430→            return (
+   431→              <button
+   432→                key={opt.key}
+   433→                onClick={() => {
+   434→                  setActiveFilter(opt.key);
+   435→                  setPage(1);
+   436→                }}
+   437→                className="flex items-center gap-1.5 whitespace-nowrap rounded-ws-button px-3.5 py-2 text-xs font-medium transition-ws"
+   438→                style={{
+   439→                  background: isActive
+   440→                    ? typeConf
+   441→                      ? typeConf.accentBg
+   442→                      : 'color-mix(in srgb, var(--ws-accent) 10%, transparent)'
+   443→                    : 'var(--ws-glass)',
+   444→                  color: isActive
+   445→                    ? typeConf
+   446→                      ? typeConf.accent
+   447→                      : 'var(--ws-accent)'
+   448→                    : 'var(--ws-text-secondary)',
+   449→                  border: `1px solid ${isActive
+   450→                    ? typeConf
+   451→                      ? typeConf.accentBorder
+   452→                      : 'color-mix(in srgb, var(--ws-accent) 25%, transparent)'
+   453→                    : 'var(--ws-glass-border)'}`,
+   454→                  boxShadow: isActive ? 'var(--ws-shadow-soft)' : 'none',
+   455→                }}
+   456→                aria-pressed={isActive}
+   457→              >
+   458→                <span>{opt.emoji}</span>
+   459→                <span>{opt.label}</span>
+   460→              </button>
+   461→            );
+   462→          })}
+   463→        </div>
+   464→      </div>
+   465→
+   466→      {/* Content Feed */}
+   467→      {loading && items.length === 0 ? (
+   468→        <div className="space-y-4">
+   469→          {Array.from({ length: 4 }).map((_, i) => (
+   470→            <SkeletonCard key={i} />
+   471→          ))}
+   472→        </div>
+   473→      ) : filteredItems.length === 0 ? (
+   474→        <EmptyState hasFilter={activeFilter !== 'todos' || !!searchQuery.trim()} />
+   475→      ) : (
+   476→        <div className="space-y-4">
+   477→          <AnimatePresence mode="popLayout">
+   478→            {filteredItems.map((item, index) => {
+   479→              const typeConf = getTypeConfig(item.type);
+   480→              const diffConf = getDifficultyConfig(item.difficulty);
+   481→              const isExpanded = expandedId === item.id;
+   482→              const duration = formatDuration(item.duration);
+   483→
+   484→              return (
+   485→                <motion.div
+   486→                  key={item.id}
+   487→                  layout
+   488→                  initial={{ opacity: 0, y: 16 }}
+   489→                  animate={{ opacity: 1, y: 0 }}
+   490→                  exit={{ opacity: 0, y: -10 }}
+   491→                  transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.2), ease: [0.4, 0, 0.2, 1] }}
+   492→                  className="hover-lift cursor-pointer"
+   493→                  style={{ borderRadius: 'var(--ws-radius-card)' }}
+   494→                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+   495→                >
+   496→                  <div
+   497→                    className="border backdrop-blur-xl p-5 transition-ws"
+   498→                    style={{
+   499→                      borderRadius: 'var(--ws-radius-card)',
+   500→                      borderColor: isExpanded ? typeConf.accentBorder : 'var(--ws-glass-border)',
+   501→                      background: isExpanded
+   502→                        ? `color-mix(in srgb, ${typeConf.accent} 3%, var(--ws-glass))`
+   503→                        : 'var(--ws-glass)',
+   504→                      boxShadow: isExpanded
+   505→                        ? `0 8px 40px color-mix(in srgb, ${typeConf.accent} 8%, transparent)`
+   506→                        : 'var(--ws-shadow-soft)',
+   507→                    }}
+   508→                  >
+   509→                    {/* Card Header */}
+   510→                    <div className="flex items-start gap-3 mb-3">
+   511→                      {/* Emoji Avatar */}
+   512→                      <div
+   513→                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center text-lg"
+   514→                        style={{
+   515→                          background: typeConf.accentBg,
+   516→                          borderRadius: '12px 11px 13px 10px',
+   517→                        }}
+   518→                      >
+   519→                        {item.emoji || typeConf.emoji}
+   520→                      </div>
+   521→
+   522→                      <div className="flex-1 min-w-0">
+   523→                        {/* Type Badge */}
+   524→                        <div className="flex items-center gap-2 flex-wrap">
+   525→                          <span
+   526→                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+   527→                            style={{
+   528→                              background: typeConf.accentBg,
+   529→                              color: typeConf.accent,
+   530→                            }}
+   531→                          >
+   532→                            {typeConf.label}
+   533→                          </span>
+   534→                          {/* Difficulty */}
+   535→                          <span
+   536→                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+   537→                            style={{
+   538→                              background: diffConf.bg,
+   539→                              color: diffConf.color,
+   540→                            }}
+   541→                          >
+   542→                            {diffConf.label}
+   543→                          </span>
+   544→                          {/* Duration */}
+   545→                          {duration && (
+   546→                            <span
+   547→                              className="inline-flex items-center gap-1 text-[10px]"
+   548→                              style={{ color: 'var(--ws-text-tertiary)' }}
+   549→                            >
+   550→                              <Clock className="h-2.5 w-2.5" />
+   551→                              {duration}
+   552→                            </span>
+   553→                          )}
+   554→                        </div>
+   555→                      </div>
+   556→
+   557→                      {/* Save Button */}
+   558→                      <button
+   559→                        onClick={(e) => handleSave(e, item.id)}
+   560→                        className="flex-shrink-0 rounded-full p-1.5 transition-ws hover:scale-110"
+   561→                        style={{ color: item.isSaved ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }}
+   562→                        disabled={savingId === item.id}
+   563→                        aria-label={item.isSaved ? 'Remover dos salvos' : 'Salvar conteúdo'}
+   564→                      >
+   565→                        {savingId === item.id ? (
+   566→                          <Loader2 className="h-4 w-4 animate-spin" />
+   567→                        ) : item.isSaved ? (
+   568→                          <BookmarkCheck className="h-4 w-4" />
+   569→                        ) : (
+   570→                          <Bookmark className="h-4 w-4" />
+   571→                        )}
+   572→                      </button>
+   573→                    </div>
+   574→
+   575→                    {/* Title */}
+   576→                    <h3
+   577→                      className="font-semibold text-[15px] leading-snug mb-2"
+   578→                      style={{ color: 'var(--ws-text-primary)' }}
+   579→                    >
+   580→                      {item.title}
+   581→                    </h3>
+   582→
+   583→                    {/* Summary (collapsed) */}
+   584→                    {!isExpanded && (
+   585→                      <p
+   586→                        className="text-sm leading-relaxed line-clamp-2 mb-3"
+   587→                        style={{ color: 'var(--ws-text-secondary)' }}
+   588→                      >
+   589→                        {item.summary || item.content.replace(/[#*_`]/g, '').substring(0, 150)}
+   590→                      </p>
+   591→                    )}
+   592→
+   593→                    {/* Expanded Content */}
+   594→                    <AnimatePresence>
+   595→                      {isExpanded && (
+   596→                        <motion.div
+   597→                          initial={{ height: 0, opacity: 0 }}
+   598→                          animate={{ height: 'auto', opacity: 1 }}
+   599→                          exit={{ height: 0, opacity: 0 }}
+   600→                          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+   601→                          className="overflow-hidden"
+   602→                        >
+   603→                          <div
+   604→                            className="markdown-content text-sm leading-relaxed mb-4 pt-1"
+   605→                            style={{ color: 'var(--ws-text-secondary)' }}
+   606→                          >
+   607→                            <ReactMarkdown>{item.content}</ReactMarkdown>
+   608→                          </div>
+   609→
+   610→                          {/* Action Buttons */}
+   611→                          <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--ws-glass-border)' }}>
+   612→                            <button
+   613→                              onClick={(e) => openSubjectSelector(e, item.id)}
+   614→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   615→                              style={{
+   616→                                background: typeConf.accentBg,
+   617→                                color: typeConf.accent,
+   618→                                border: `1px solid ${typeConf.accentBorder}`,
+   619→                              }}
+   620→                            >
+   621→                              <BookPlus className="h-3 w-3" />
+   622→                              Adicionar à matéria
+   623→                            </button>
+   624→                            <button
+   625→                              onClick={(e) => handleGenerateFlashcards(e, item)}
+   626→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   627→                              style={{
+   628→                                background: 'var(--ws-glass)',
+   629→                                color: 'var(--ws-text-secondary)',
+   630→                                border: '1px solid var(--ws-glass-border)',
+   631→                              }}
+   632→                            >
+   633→                              <Brain className="h-3 w-3" />
+   634→                              Gerar flashcards
+   635→                            </button>
+   636→                            <button
+   637→                              onClick={(e) => handleGenerateQuestions(e, item)}
+   638→                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+   639→                              style={{
+   640→                                background: 'var(--ws-glass)',
+   641→                                color: 'var(--ws-text-secondary)',
+   642→                                border: '1px solid var(--ws-glass-border)',
+   643→                              }}
+   644→                            >
+   645→                              <FileQuestion className="h-3 w-3" />
+   646→                              Gerar questões
+   647→                            </button>
+   648→                          </div>
+   649→                        </motion.div>
+   650→                      )}
+   651→                    </AnimatePresence>
+   652→
+   653→                    {/* Footer: tags, subject, saves */}
+   654→                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+   655→                      {item.subject && (
+   656→                        <Badge
+   657→                          variant="outline"
+   658→                          className="text-[10px] font-normal rounded-full px-2 py-0"
+   659→                          style={{
+   660→                            borderColor: 'var(--ws-glass-border)',
+   661→                            color: 'var(--ws-text-tertiary)',
+   662→                          }}
+   663→                        >
+   664→                          📚 {item.subject}
+   665→                        </Badge>
+   666→                      )}
+   667→                      <span
+   668→                        className="inline-flex items-center gap-1 text-[10px]"
+   669→                        style={{ color: 'var(--ws-text-tertiary)' }}
+   670→                      >
+   671→                        <Bookmark className="h-2.5 w-2.5" />
+   672→                        {item.saves}
+   673→                      </span>
+   674→                      {/* Expand indicator */}
+   675→                      <div className="ml-auto">
+   676→                        {isExpanded ? (
+   677→                          <ChevronUp className="h-4 w-4" style={{ color: typeConf.accent }} />
+   678→                        ) : (
+   679→                          <ChevronDown className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />
+   680→                        )}
+   681→                      </div>
+   682→                    </div>
+   683→                  </div>
+   684→                </motion.div>
+   685→              );
+   686→            })}
+   687→          </AnimatePresence>
+   688→
+   689→          {/* Load More */}
+   690→          {page < totalPages && (
+   691→            <div className="flex justify-center pt-4 pb-2">
+   692→              <Button
+   693→                variant="outline"
+   694→                onClick={loadMore}
+   695→                disabled={loading}
+   696→                className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)] hover:bg-[var(--ws-glass)] hover:text-[var(--ws-text-primary)]"
+   697→              >
+   698→                {loading ? (
+   699→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   700→                ) : null}
+   701→                Carregar mais
+   702→              </Button>
+   703→            </div>
+   704→          )}
+   705→        </div>
+   706→      )}
+   707→
+   708→      {/* FAB: AI Generate */}
+   709→      <motion.button
+   710→        initial={{ scale: 0, opacity: 0 }}
+   711→        animate={{ scale: 1, opacity: 1 }}
+   712→        transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 20 }}
+   713→        onClick={() => setShowAIDialog(true)}
+   714→        className="fixed bottom-24 right-4 sm:right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95"
+   715→        style={{
+   716→          background: 'var(--ws-accent)',
+   717→          color: 'var(--ws-text-on-dark)',
+   718→          boxShadow: 'var(--ws-shadow-enso), var(--ws-shadow-medium)',
+   719→        }}
+   720→        aria-label="Gerar conteúdo com IA"
+   721→      >
+   722→        <Sparkles className="h-6 w-6" />
+   723→      </motion.button>
+   724→
+   725→      {/* ===== AI GENERATE DIALOG ===== */}
+   726→      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+   727→        <DialogContent
+   728→          className="sm:max-w-md rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+   729→          style={{ boxShadow: 'var(--ws-shadow-medium)' }}
+   730→        >
+   731→          <DialogHeader>
+   732→            <DialogTitle className="font-serif-jp text-lg" style={{ color: 'var(--ws-text-primary)' }}>
+   733→              <span className="mr-2">✨</span>Gerar conteúdo com IA
+   734→            </DialogTitle>
+   735→          </DialogHeader>
+   736→
+   737→          <div className="space-y-5 mt-2">
+   738→            {/* Type Selection */}
+   739→            <div>
+   740→              <label
+   741→                className="block text-xs font-medium mb-2"
+   742→                style={{ color: 'var(--ws-text-secondary)' }}
+   743→              >
+   744→                Tipo de conteúdo
+   745→              </label>
+   746→              <div className="grid grid-cols-3 gap-2">
+   747→                {Object.entries(CARD_TYPES).map(([key, val]) => {
+   748→                  const isActive = aiType === key;
+   749→                  return (
+   750→                    <button
+   751→                      key={key}
+   752→                      onClick={() => setAiType(key)}
+   753→                      className="flex flex-col items-center gap-1 rounded-ws-button p-2.5 text-center transition-ws"
+   754→                      style={{
+   755→                        background: isActive ? val.accentBg : 'var(--ws-glass)',
+   756→                        border: `1px solid ${isActive ? val.accentBorder : 'var(--ws-glass-border)'}`,
+   757→                        color: isActive ? val.accent : 'var(--ws-text-secondary)',
+   758→                      }}
+   759→                    >
+   760→                      <span className="text-base">{val.emoji}</span>
+   761→                      <span className="text-[10px] font-medium leading-tight">{val.label}</span>
+   762→                    </button>
+   763→                  );
+   764→                })}
+   765→              </div>
+   766→            </div>
+   767→
+   768→            {/* Subject Input */}
+   769→            <div>
+   770→              <label
+   771→                className="block text-xs font-medium mb-2"
+   772→                style={{ color: 'var(--ws-text-secondary)' }}
+   773→              >
+   774→                Assunto
+   775→              </label>
+   776→              <Input
+   777→                placeholder="Ex: Termodinâmica, literatura brasileira..."
+   778→                value={aiSubject}
+   779→                onChange={e => setAiSubject(e.target.value)}
+   780→                className="h-10 rounded-ws-button border-[var(--ws-glass-border)] bg-[var(--ws-glass)] text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)]"
+   781→              />
+   782→              {/* Subject suggestions */}
+   783→              <div className="flex flex-wrap gap-1.5 mt-2">
+   784→                {AI_SUBJECTS.slice(0, 8).map(sub => (
+   785→                  <button
+   786→                    key={sub}
+   787→                    onClick={() => setAiSubject(sub)}
+   788→                    className="rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-ws"
+   789→                    style={{
+   790→                      background: aiSubject === sub
+   791→                        ? 'color-mix(in srgb, var(--ws-accent) 10%, transparent)'
+   792→                        : 'var(--ws-glass)',
+   793→                      color: aiSubject === sub
+   794→                        ? 'var(--ws-accent)'
+   795→                        : 'var(--ws-text-tertiary)',
+   796→                      border: `1px solid ${aiSubject === sub
+   797→                        ? 'color-mix(in srgb, var(--ws-accent) 25%, transparent)'
+   798→                        : 'var(--ws-glass-border)'}`,
+   799→                    }}
+   800→                  >
+   801→                    {sub}
+   802→                  </button>
+   803→                ))}
+   804→              </div>
+   805→            </div>
+   806→
+   807→            {/* Difficulty Selection */}
+   808→            <div>
+   809→              <label
+   810→                className="block text-xs font-medium mb-2"
+   811→                style={{ color: 'var(--ws-text-secondary)' }}
+   812→              >
+   813→                Dificuldade
+   814→              </label>
+   815→              <div className="flex gap-2">
+   816→                {AI_DIFFICULTIES.map(d => {
+   817→                  const dConf = DIFFICULTY_CONFIG[d.key];
+   818→                  const isActive = aiDifficulty === d.key;
+   819→                  return (
+   820→                    <button
+   821→                      key={d.key}
+   822→                      onClick={() => setAiDifficulty(d.key)}
+   823→                      className="flex-1 rounded-ws-button py-2 text-xs font-medium transition-ws"
+   824→                      style={{
+   825→                        background: isActive ? dConf.bg : 'var(--ws-glass)',
+   826→                        color: isActive ? dConf.color : 'var(--ws-text-secondary)',
+   827→                        border: `1px solid ${isActive ? dConf.color + '33' : 'var(--ws-glass-border)'}`,
+   828→                      }}
+   829→                    >
+   830→                      {d.label}
+   831→                    </button>
+   832→                  );
+   833→                })}
+   834→              </div>
+   835→            </div>
+   836→          </div>
+   837→
+   838→          <DialogFooter className="mt-6 gap-2">
+   839→            <Button
+   840→              variant="outline"
+   841→              onClick={() => setShowAIDialog(false)}
+   842→              className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)]"
+   843→              disabled={aiGenerating}
+   844→            >
+   845→              Cancelar
+   846→            </Button>
+   847→            <Button
+   848→              onClick={handleAIGenerate}
+   849→              disabled={aiGenerating || !aiSubject.trim()}
+   850→              className="rounded-ws-button"
+   851→              style={{ background: 'var(--ws-accent)' }}
+   852→            >
+   853→              {aiGenerating ? (
+   854→                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   855→              ) : (
+   856→                <Sparkles className="mr-2 h-4 w-4" />
+   857→              )}
+   858→              Gerar
+   859→            </Button>
+   860→          </DialogFooter>
+   861→        </DialogContent>
+   862→      </Dialog>
+   863→
+   864→      {/* ===== SUBJECT SELECTOR DIALOG ===== */}
+   865→      <Dialog open={showSubjectDialog} onOpenChange={setShowSubjectDialog}>
+   866→        <DialogContent
+   867→          className="sm:max-w-sm rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+   868→          style={{ boxShadow: 'var(--ws-shadow-medium)' }}
+   869→        >
+   870→          <DialogHeader>
+   871→            <DialogTitle className="font-serif-jp text-lg" style={{ color: 'var(--ws-text-primary)' }}>
+   872→              <span className="mr-2">📚</span>Adicionar à matéria
+   873→            </DialogTitle>
+   874→          </DialogHeader>
+   875→
+   876→          {subjects.length === 0 ? (
+   877→            <div className="text-center py-6">
+   878→              <p className="text-sm mb-3" style={{ color: 'var(--ws-text-tertiary)' }}>
+   879→                Nenhuma matéria encontrada. Crie uma matéria primeiro.
+   880→              </p>
+   881→              <Button
+   882→                variant="outline"
+   883→                onClick={() => {
+   884→                  setShowSubjectDialog(false);
+   885→                  onNavigate('subjects');
+   886→                }}
+   887→                className="rounded-ws-button border-[var(--ws-glass-border)] text-[var(--ws-text-secondary)]"
+   888→              >
+   889→                <Plus className="mr-2 h-4 w-4" />
+   890→                Criar matéria
+   891→              </Button>
+   892→            </div>
+   893→          ) : (
+   894→            <>
+   895→              <div className="max-h-64 overflow-y-auto space-y-2 mt-2">
+   896→                {subjects.map(sub => (
+   897→                  <button
+   898→                    key={sub.id}
+   899→                    onClick={() => setSelectedSubjectId(sub.id)}
+   900→                    className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-ws"
+   901→                    style={{
+   902→                      background: selectedSubjectId === sub.id
+   903→                        ? 'color-mix(in srgb, var(--ws-accent) 8%, transparent)'
+   904→                        : 'var(--ws-glass)',
+   905→                      border: `1px solid ${selectedSubjectId === sub.id
+   906→                        ? 'color-mix(in srgb, var(--ws-accent) 30%, transparent)'
+   907→                        : 'var(--ws-glass-border)'}`,
+   908→                    }}
+   909→                  >
+   910→                    <div
+   911→                      className="h-3 w-3 rounded-full flex-shrink-0"
+   912→                      style={{ background: sub.color }}
+   913→                    />\n                    <span
+   914→                      className="text-sm font-medium"
+   915→                      style={{ color: 'var(--ws-text-primary)' }}
+   916→                    >
+   917→                      {sub.name}
+   918→                    </span>
+   919→                    {selectedSubjectId === sub.id && (
+   920→                      <Check className=
