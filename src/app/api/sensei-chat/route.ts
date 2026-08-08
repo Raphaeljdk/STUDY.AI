@@ -152,7 +152,14 @@ export async function POST(request: Request) {
       }, { status: 429 });
     }
 
-    const { message } = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
+    }
+
+    const { message } = body;
     if (!message || typeof message !== 'string' || message.length > 10000) {
       return NextResponse.json({ error: 'Mensagem invalida' }, { status: 400 });
     }

@@ -16,7 +16,7 @@ import {
   List, ListOrdered, CheckSquare, Type,
   ChevronDown, Undo2, Redo2, Heading1, Heading2, Heading3, Pilcrow,
   Palette, Highlighter, Code, Minus, Quote, RemoveFormatting,
-  FileText, Printer,
+  FileText, Printer, Save,
 } from 'lucide-react';
 
 /* ========================================================================
@@ -116,6 +116,13 @@ export default function DocumentEditor({
   const colorRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
 
+  /* ---- Word/char count ---- */
+  const updateCounts = useCallback((ed: any) => {
+    const text = ed?.getText() || '';
+    setCharCount(text.length);
+    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -149,6 +156,34 @@ export default function DocumentEditor({
     editorRef.current = editor;
   }, [editor]);
 
+  /* ---- Sync content when page switches ---- */
+  const prevContentRef = useRef(content);
+  useEffect(() => {
+    if (!editor) return;
+    // Only update if the content prop actually changed (different page selected)
+    if (content !== prevContentRef.current) {
+      prevContentRef.current = content;
+      const currentHTML = editor.getHTML();
+      // Normalize both for comparison (empty string vs <p></p>)
+      const normalizedCurrent = currentHTML.replace(/<p><\/p>/g, '').trim();
+      const normalizedNew = (content || '').replace(/<p><\/p>/g, '').trim();
+      if (normalizedCurrent !== normalizedNew) {
+        editor.commands.setContent(content || '', true);
+      }
+    }
+  }, [content, editor]);
+
+  /* ---- Initial word/char count ---- */
+  useEffect(() => {
+    if (editor) {
+      const text = editor.getText() || '';
+      requestAnimationFrame(() => {
+        setCharCount(text.length);
+        setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+      });
+    }
+  }, [editor]);
+
   /* ---- Close dropdowns on outside click ---- */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -160,17 +195,6 @@ export default function DocumentEditor({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  /* ---- Word/char count ---- */
-  const updateCounts = useCallback((ed: any) => {
-    const text = ed?.getText() || '';
-    setCharCount(text.length);
-    setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
-  }, []);
-
-  useEffect(() => {
-    if (editor) updateCounts(editor);
-  }, [editor, updateCounts]);
 
   /* ---- Font family ---- */
   const applyFontFamily = useCallback((font: string) => {
@@ -220,6 +244,23 @@ export default function DocumentEditor({
     printWindow.document.close();
     printWindow.print();
   }, [editor]);
+
+  /* ---- Keyboard shortcuts: Ctrl+S save, Ctrl+Shift+S print ---- */
+  useEffect(() => {
+    if (!editor) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handlePrint();
+        } else {
+          onChange?.(editor.getHTML());
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editor, onChange, handlePrint]);
 
   /* ---- Indent/Outdent ---- */
   const handleIndent = useCallback(() => {
@@ -469,8 +510,13 @@ export default function DocumentEditor({
             <RemoveFormatting size={15} />
           </TBtn>
 
+          {/* Save */}
+          <TBtn title="Salvar (Ctrl+S)" onClick={() => onChange?.(editor.getHTML())} className="ml-auto">
+            <Save size={15} />
+          </TBtn>
+
           {/* Print */}
-          <TBtn title="Imprimir" onClick={handlePrint} className="ml-auto">
+          <TBtn title="Imprimir (Ctrl+Shift+S)" onClick={handlePrint}>
             <Printer size={15} />
           </TBtn>
         </div>
@@ -514,25 +560,26 @@ export default function DocumentEditor({
       </div>
 
       {/* ====== DOCUMENT CONTENT AREA ====== */}
-      <div className="flex-1 overflow-auto flex justify-center p-4 sm:p-8">
+      <div className="flex-1 overflow-auto flex justify-center p-4 sm:p-6 bg-[#e8e8e8]">
         <div
-          className="w-full max-w-[816px] min-h-[1056px] rounded-sm shadow-xl"
+          className="w-full max-w-[210mm] min-h-[297mm] rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.05)] bg-white border border-gray-200/60"
           style={{
             backgroundColor: paperBg,
             backgroundImage: paperStyle === 'lined'
-              ? 'repeating-linear-gradient(transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)'
+              ? 'repeating-linear-gradient(transparent, transparent 31px, #d1d5db 31px, #d1d5db 32px)'
               : paperStyle === 'grid'
-                ? 'repeating-linear-gradient(0deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)'
+                ? 'repeating-linear-gradient(0deg, transparent, transparent 31px, #d1d5db 31px, #d1d5db 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #d1d5db 31px, #d1d5db 32px)'
                 : paperStyle === 'dotted'
-                  ? 'radial-gradient(circle, #d1d5db 1px, transparent 1px)'
+                  ? 'radial-gradient(circle, #c4c4c4 0.8px, transparent 0.8px)'
                   : 'none',
-            backgroundSize: paperStyle === 'dotted' ? '32px 32px' : 'auto',
+            backgroundSize: paperStyle === 'dotted' ? '24px 24px' : 'auto',
+            backgroundPosition: paperStyle !== 'blank' ? '0 0' : undefined,
           }}
         >
           <div
-            className={`${contentClass} p-8 sm:p-12 document-editor-content`}
+            className={`${contentClass} px-16 py-14 document-editor-content`}
             style={{
-              minHeight: '1056px',
+              minHeight: '297mm',
               fontFamily: 'Inter, sans-serif',
               fontSize: '16px',
               lineHeight: '1.6',
@@ -700,12 +747,13 @@ export default function DocumentEditor({
           border-radius: 2px;
         }
         /* Placeholder */
-        .document-editor-content p.is-editor-empty:first-child::before {
+        .document-editor-content .tiptap.is-editor-empty > p:first-child::before {
           content: attr(data-placeholder);
           float: left;
           color: #9ca3af;
           pointer-events: none;
           height: 0;
+          font-style: italic;
         }
         /* Selection */
         .document-editor-content ::selection {

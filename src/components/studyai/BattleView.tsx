@@ -146,7 +146,7 @@ function ProgressDots({ current, total, answers }: { current: number; total: num
 }
 
 // ===== SUBJECT SELECTION =====
-function SubjectSelection({ onStart }: { onStart: (subject: string) => void }) {
+function SubjectSelection({ onStart }: { onStart: (subject: string) => Promise<void> }) {
   const [customSubject, setCustomSubject] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -159,7 +159,9 @@ function SubjectSelection({ onStart }: { onStart: (subject: string) => void }) {
     }
     setLoading(true);
     try {
-      onStart(subject);
+      await onStart(subject);
+    } catch {
+      // Error handled by parent
     } finally {
       setLoading(false);
     }
@@ -313,23 +315,27 @@ function BattleScreen({
     }, 600);
   }, [currentIndex]);
 
-  // Timer
+  // Timer tick
   useEffect(() => {
     if (showConfidence || showResult) return;
     timerRef.current = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          // Time's up - auto wrong answer
-          handleTimeout();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimer((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [currentIndex, showConfidence, showResult, handleTimeout]);
+  }, [currentIndex, showConfidence, showResult]);
+
+  // Handle timeout when timer reaches 0
+  useEffect(() => {
+    if (timer === 0 && !showConfidence && !showResult) {
+      const id = setTimeout(() => {
+        handleTimeout();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [timer, showConfidence, showResult, handleTimeout]);
 
   const handleSelectOption = (optionIndex: number) => {
     if (selectedOption !== null || showConfidence) return;
@@ -850,6 +856,7 @@ export function BattleView() {
         }
       }
     } catch {
+      toast({ title: 'Erro ao salvar resultado', description: 'Seu resultado foi calculado localmente.' });
       // If API fails, compute locally
       const score = answers.filter((a) => a.correct).length;
       const localResult: BattleResult = {

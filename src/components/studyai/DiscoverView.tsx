@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import {
   Search, Bookmark, BookmarkCheck, Sparkles,
   Loader2, Clock, ChevronDown, ChevronUp,
-  BookPlus, Brain, FileQuestion, X, Plus, Check,
+  BookPlus, Brain, FileQuestion, X, Plus, Check, RotateCcw,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -179,6 +179,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [fetchError, setFetchError] = useState(false);
 
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [aiType, setAiType] = useState('dica');
@@ -205,6 +206,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       }
       setTotalPages(data.pagination?.totalPages || 1);
     } catch {
+      setFetchError(true);
       toast({ title: 'Erro ao carregar conteudo', description: 'Tente novamente mais tarde.' });
     }
   }, []);
@@ -220,8 +222,17 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     }
   }, []);
 
+  const retryFetch = useCallback(async () => {
+    setFetchError(false);
+    setLoading(true);
+    setPage(1);
+    await fetchItems(1, activeFilter);
+    setLoading(false);
+  }, [activeFilter, fetchItems]);
+
   useEffect(() => {
- const load = async () => {
+    const load = async () => {
+      setFetchError(false);
       setLoading(true);
       setPage(1);
       await fetchItems(1, activeFilter);
@@ -440,6 +451,47 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
             <SkeletonCard key={i} />
           ))}
         </div>
+      ) : fetchError && items.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center py-16 px-6 text-center"
+        >
+          <div
+            className="mb-6 flex h-20 w-20 items-center justify-center text-4xl"
+            style={{
+              background: 'rgba(220, 38, 38, 0.08)',
+              borderRadius: '50%',
+              border: '1px solid rgba(220, 38, 38, 0.2)',
+            }}
+          >
+            {'\uD83D\uDE13'}
+          </div>
+          <h3
+            className="font-serif-jp text-xl font-semibold mb-2"
+            style={{ color: 'var(--ws-text-primary)' }}
+          >
+            Erro ao carregar
+          </h3>
+          <p
+            className="text-sm max-w-xs mb-6"
+            style={{ color: 'var(--ws-text-tertiary)' }}
+          >
+            Nao foi possivel carregar o conteudo. Verifique sua conexao e tente novamente.
+          </p>
+          <button
+            onClick={retryFetch}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws"
+            style={{
+              background: 'var(--ws-accent)',
+              boxShadow: 'var(--ws-shadow-soft)',
+            }}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            Tentar novamente
+          </button>
+        </motion.div>
       ) : filteredItems.length === 0 ? (
         <EmptyState hasFilter={hasActiveFilter} onGenerateClick={() => setShowAIDialog(true)} />
       ) : (

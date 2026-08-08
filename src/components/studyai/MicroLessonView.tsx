@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader2, Sparkles, BookOpen, Brain,
+  Sparkles, BookOpen, Brain,
   ChevronRight, ArrowRight, RotateCcw, Check, X,
   Zap, Clock,
 } from 'lucide-react';
@@ -51,7 +51,6 @@ const TOTAL_SECONDS = 60;
 // ===== TOPIC INPUT SCREEN =====
 function TopicInputScreen({ onGenerate }: { onGenerate: (topic: string) => void }) {
   const [topic, setTopic] = useState('');
-  const [generating, setGenerating] = useState(false);
   const [suggestions] = useState(() => {
     // Shuffle and pick 8
     const shuffled = [...TOPIC_SUGGESTIONS].sort(() => Math.random() - 0.5);
@@ -124,7 +123,7 @@ function TopicInputScreen({ onGenerate }: { onGenerate: (topic: string) => void 
         />
         <button
           onClick={handleSubmit}
-          disabled={!topic.trim() || generating}
+          disabled={!topic.trim()}
           className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full transition-ws"
           style={{
             background: topic.trim() ? 'var(--ws-accent)' : 'var(--ws-glass-border)',
@@ -132,7 +131,7 @@ function TopicInputScreen({ onGenerate }: { onGenerate: (topic: string) => void 
           }}
           aria-label="Gerar microaula"
         >
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 

@@ -54,7 +54,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'userId obrigatório' }, { status: 400 });
     }
 
-    const validPlans = ['FREE', 'SAMURAI', 'SENSEI'] as const;
+    const validPlans = ['FREE', 'PREMIUM', 'SENSEI', 'ADMIN_PLAN'] as const;
     const validRoles = ['USER', 'ADMIN'] as const;
 
     const data: any = {};

@@ -248,7 +248,7 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
     }
     setAutopilotLoading(true);
     try {
-      const res = await fetch('/api/autpilot', {
+      const res = await fetch('/api/autopilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exam: autopilotExam.trim(), date: autopilotDate || undefined, studyHoursPerDay: parseInt(autopilotHours) || 3 }),
