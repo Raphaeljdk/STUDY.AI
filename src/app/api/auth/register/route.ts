@@ -8,34 +8,40 @@ function isPostgres(): boolean {
   return url.startsWith('postgres://') || url.startsWith('postgresql://');
 }
 
-// Ensure DB schema is up-to-date (creates tables/columns if missing)
+/**
+ * Ensure DB schema is up-to-date on PostgreSQL (creates columns/tables if missing).
+ * On SQLite this is a no-op – schema is managed by prisma db push.
+ *
+ * NOTE: SENSEI is a valid Plan enum value. The migration code below only fixes
+ * rows whose `plan` column contains values that do NOT match any current enum
+ * member (e.g. legacy 'SAMURAI' values from an earlier codebase version).
+ */
 async function ensureDBSchema() {
-  if (!isPostgres()) return; // Only run raw SQL on PostgreSQL
+  if (!isPostgres()) return;
 
-  // CRITICAL: Fix invalid enum values from old code ('SENSEI' -> 'FREE')
-  // Prisma crashes on ANY user read if they have an invalid Plan enum value
+  // Fix rows with plan values that no longer exist in the Plan enum.
+  // Current valid values: FREE, PREMIUM, SENSEI, ADMIN_PLAN
   try {
-    const result = await db.$executeRawUnsafe(`UPDATE "User" SET "plan" = 'FREE' WHERE "plan" NOT IN ('FREE', 'PREMIUM', 'ADMIN_PLAN')`);
+    await db.$executeRawUnsafe(`
+      UPDATE "User" SET "plan" = 'FREE'
+      WHERE "plan" NOT IN ('FREE', 'PREMIUM', 'SENSEI', 'ADMIN_PLAN')
+    `);
     console.log('[Schema] Fixed invalid plan values');
   } catch (e: any) {
     console.warn('[Schema] Could not fix plan values:', e?.message);
   }
 
-  // Also fix the Plan enum type if SENSEI still exists
-  try {
-    await db.$executeRawUnsafe(`ALTER TYPE "Plan" RENAME VALUE 'SENSEI' TO 'FREE'`);
-  } catch {
-    // SENSEI might not exist in enum anymore - that's fine
-  }
-
+  // Ensure Stripe columns exist (added after initial deployment)
   try {
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT`);
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT`);
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripePriceId" TEXT`);
     await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCurrentPeriodEnd" TIMESTAMP(3)`);
   } catch {
-    // Columns might already exist or table structure different - continue anyway
+    // Columns might already exist or table structure different – continue
   }
+
+  // Ensure late-added tables exist
   try {
     await db.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "NotebookPage" (
@@ -53,7 +59,8 @@ async function ensureDBSchema() {
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
-  } catch { /* ignore */ }
+  } catch { /* table may already exist */ }
+
   try {
     await db.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "NotebookTag" (
@@ -64,7 +71,8 @@ async function ensureDBSchema() {
         "userId" TEXT NOT NULL,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
-  } catch { /* ignore */ }
+  } catch { /* table may already exist */ }
+
   try {
     await db.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "DailyUsage" (
@@ -74,7 +82,7 @@ async function ensureDBSchema() {
         "chatMessages" INTEGER NOT NULL DEFAULT 0,
         "flashcards" INTEGER NOT NULL DEFAULT 0
       )`);
-  } catch { /* ignore */ }
+  } catch { /* table may already exist */ }
 }
 
 export async function POST(request: Request) {

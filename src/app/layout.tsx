@@ -36,8 +36,9 @@ export const metadata: Metadata = {
   ],
   icons: {
     icon: "/favicon.ico",
-    apple: "/logo.png",
+    apple: "/icons/icon-192x192.png",
   },
+  manifest: "/manifest.json",
   openGraph: {
     title: "StudyAI — A beleza de aprender na imperfeição",
     description:
@@ -54,6 +55,16 @@ export const metadata: Metadata = {
       "Revolucione seus estudos com IA. Wabi-Sabi: a perfeicao esta na jornada.",
     images: ["/logo.png"],
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-title": "StudyAI",
+    "application-name": "StudyAI",
+    "msapplication-TileColor": "#fafaf9",
+    "msapplication-tap-highlight": "no",
+    "theme-color": "#92400e",
+  },
   robots: {
     index: true,
     follow: true,
@@ -68,6 +79,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <meta name="theme-color" content="#92400e" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="StudyAI" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

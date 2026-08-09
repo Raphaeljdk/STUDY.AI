@@ -706,3 +706,54 @@ Stage Summary:
 - BattleView: Fixed critical bug where battle creation loading state was broken; cleaned up timer side-effect pattern; added error toast for result submission failures
 - MicroLessonView: Cleaned up dead code (unused state and import)
 - All changes pass lint clean with zero errors
+
+---
+Task ID: 7
+Agent: main
+Task: Fix Prisma database setup for dual SQLite/PostgreSQL (local dev + Vercel deployment)
+
+Work Log:
+- Read worklog and assessed all prior schema/route changes
+- Created `prisma/schema.postgresql.prisma` – identical to schema.prisma but with `provider = "postgresql"` (only difference confirmed via diff)
+- Created `scripts/vercel-build.js` – detects DATABASE_URL protocol; if postgres, temporarily swaps schema.prisma with postgresql variant for `prisma generate`, then restores original SQLite schema
+- Updated `package.json`: `postinstall` and new `vercel-build` script both point to `scripts/vercel-build.js` so Vercel's `npm install` + build both work correctly
+- Updated `src/lib/db.ts`: wrapped PrismaClient creation in try/catch with descriptive error messages for missing DATABASE_URL or instantiation failure
+- Updated `src/app/api/auth/register/route.ts`:
+  - Removed dangerous `ALTER TYPE "Plan" RENAME VALUE 'SENSEI' TO 'FREE'` (SENSEI is a valid enum value; renaming would break Prisma client)
+  - Updated the invalid-plan UPDATE to include SENSEI in the valid-values list
+  - Added clarifying comments explaining SENSEI is valid and only truly invalid values (e.g. legacy SAMURAI) are fixed
+  - Removed unused `result` variable that would cause lint errors
+- Added `scripts/**` to ESLint ignore list (Node.js build scripts don't need TS linting)
+- Verified: lint passes clean, dev server compiles successfully, only difference between schemas is provider line
+
+Stage Summary:
+- Dual-schema approach: SQLite for local dev, PostgreSQL for Vercel, auto-detected by DATABASE_URL protocol
+- `vercel-build` script handles schema swap transparently (backup → swap → generate → restore)
+- `postinstall` also uses the smart script, preventing protocol mismatch errors during Vercel's npm install
+- SENSEI enum handling fixed: no longer attempts to rename a valid enum value
+- db.ts provides clear error messages on connection failure
+- Zero lint errors, dev server healthy
+
+---
+Task ID: pwa-support
+Agent: main
+Task: Add PWA (Progressive Web App) support for installability on phones and desktops
+
+Work Log:
+- Created `/public/manifest.json` with full PWA manifest: name (StudyAI), short_name, description, start_url, display (standalone), theme_color (#92400e amber), background_color (#fafaf9 stone), orientation (any), icons (8 sizes from 72x72 to 512x512 all maskable+any), screenshot, shortcuts, and categories (education, productivity)
+- Generated 8 PWA app icons (72, 96, 128, 144, 152, 192, 384, 512px) from existing `public/logo.png` using sharp with stone background
+- Generated `screenshot-wide.png` (1280x720) placeholder for manifest screenshots
+- Created `/public/sw.js` service worker with network-first + cache fallback strategy: pre-caches critical assets on install, skips API/Next.js data routes, cleans old caches on activate, serves offline page for navigation failures
+- Updated `src/app/layout.tsx`: added manifest link, apple-touch-icon link, theme-color meta, apple-mobile-web-app-* meta tags, and `manifest` + `other` metadata fields for mobile-web-app-capable, apple settings, msapplication tiles, and theme-color
+- Created `src/hooks/useServiceWorker.ts` — custom hook that registers `/sw.js` on mount, listens for `updatefound` events, logs when new SW activates
+- Created `src/components/PWAInstallPrompt.tsx` — client component with Framer Motion animated install banner: listens for `beforeinstallprompt`, shows after 3s delay, Install + "Agora não" buttons, X close, persists dismissal in localStorage for 7 days, handles `appinstalled` event to auto-hide
+- Updated `src/components/Providers.tsx` — wrapped children with `PWAProvider` that calls `useServiceWorker()` and renders `PWAInstallPrompt`
+- All files lint clean (0 errors), dev server compiles and serves 200
+
+Stage Summary:
+- PWA fully configured: manifest.json + 8 icons + service worker + meta tags + install prompt UI
+- Users on Chrome/Edge/Samsung Internet will see install prompt automatically; can install to homescreen (mobile) or taskbar/desktop (desktop)
+- Service worker enables offline caching with network-first strategy — API routes always go to network, static assets cached on success
+- Install prompt dismissible with 7-day persistence, re-shows after expiry
+- App runs in standalone mode when installed (no browser chrome)
+- Apple/iOS supported via apple-touch-icon and apple-mobile-web-app meta tags

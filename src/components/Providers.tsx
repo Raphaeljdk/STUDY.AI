@@ -3,6 +3,18 @@
 import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider } from 'next-themes';
 import { ReactNode } from 'react';
+import { useServiceWorker } from '@/hooks/useServiceWorker';
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
+
+function PWAProvider({ children }: { children: ReactNode }) {
+  useServiceWorker();
+  return (
+    <>
+      {children}
+      <PWAInstallPrompt />
+    </>
+  );
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +25,7 @@ export function Providers({ children }: { children: ReactNode }) {
         themes={['washi-paper', 'sumi-ink', 'koke-ishi', 'momiji', 'sakura']}
         enableSystem={false}
       >
-        {children}
+        <PWAProvider>{children}</PWAProvider>
       </ThemeProvider>
     </SessionProvider>
   );

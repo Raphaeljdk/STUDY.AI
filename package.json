@@ -11,7 +11,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "postinstall": "prisma generate"
+    "postinstall": "node scripts/vercel-build.js",
+    "vercel-build": "node scripts/vercel-build.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
