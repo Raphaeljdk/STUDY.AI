@@ -757,3 +757,24 @@ Stage Summary:
 - Install prompt dismissible with 7-day persistence, re-shows after expiry
 - App runs in standalone mode when installed (no browser chrome)
 - Apple/iOS supported via apple-touch-icon and apple-mobile-web-app meta tags
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix P2021 table-not-found error, fix password error, ensure all features work
+
+Work Log:
+- Diagnosed root cause: execSync("npx prisma db push") in db.ts failed on Vercel because Prisma CLI is not included in standalone output
+- Rewrote db.ts to use raw SQL CREATE TABLE IF NOT EXISTS for all 24 tables from the Prisma schema
+- Used Prisma v6 $extends client extension (not $use which was removed in v6) to auto-create tables before first query
+- The extension uses the base PrismaClient for raw SQL to avoid infinite recursion
+- Cleaned up register route to remove PostgreSQL-specific migration code
+- Tested: registration works, login returns 302 (success), dashboard loads with all 14 sections
+- Verified via browser: landing page, auth modal, registration, full dashboard all working
+- Pushed to GitHub: e5456bb
+
+Stage Summary:
+- P2021 error completely resolved with auto table creation via $extends
+- All 24 tables created via raw SQL on first query - works on Vercel without CLI
+- Password error was caused by DB failure (tables missing) - now fixed
+- Registration, login, and full dashboard verified working
+
