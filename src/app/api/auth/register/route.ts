@@ -2,94 +2,8 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
-// Detect if we're running on PostgreSQL vs SQLite
-function isPostgres(): boolean {
-  const url = process.env.DATABASE_URL || '';
-  return url.startsWith('postgres://') || url.startsWith('postgresql://');
-}
-
-/**
- * Ensure DB schema is up-to-date on PostgreSQL (creates columns/tables if missing).
- * On SQLite this is a no-op – schema is managed by prisma db push.
- *
- * NOTE: SENSEI is a valid Plan enum value. The migration code below only fixes
- * rows whose `plan` column contains values that do NOT match any current enum
- * member (e.g. legacy 'SAMURAI' values from an earlier codebase version).
- */
-async function ensureDBSchema() {
-  if (!isPostgres()) return;
-
-  // Fix rows with plan values that no longer exist in the Plan enum.
-  // Current valid values: FREE, PREMIUM, SENSEI, ADMIN_PLAN
-  try {
-    await db.$executeRawUnsafe(`
-      UPDATE "User" SET "plan" = 'FREE'
-      WHERE "plan" NOT IN ('FREE', 'PREMIUM', 'SENSEI', 'ADMIN_PLAN')
-    `);
-    console.log('[Schema] Fixed invalid plan values');
-  } catch (e: any) {
-    console.warn('[Schema] Could not fix plan values:', e?.message);
-  }
-
-  // Ensure Stripe columns exist (added after initial deployment)
-  try {
-    await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT`);
-    await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT`);
-    await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripePriceId" TEXT`);
-    await db.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCurrentPeriodEnd" TIMESTAMP(3)`);
-  } catch {
-    // Columns might already exist or table structure different – continue
-  }
-
-  // Ensure late-added tables exist
-  try {
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "NotebookPage" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "notebookId" TEXT NOT NULL,
-        "pageNumber" INTEGER NOT NULL DEFAULT 1,
-        "canvasData" TEXT,
-        "textContent" TEXT NOT NULL DEFAULT '',
-        "paperStyle" TEXT NOT NULL DEFAULT 'blank',
-        "paperColor" TEXT NOT NULL DEFAULT '#ffffff',
-        "lineColor" TEXT NOT NULL DEFAULT '#d1d5db',
-        "width" INTEGER NOT NULL DEFAULT 1200,
-        "height" INTEGER NOT NULL DEFAULT 1600,
-        "layers" TEXT,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`);
-  } catch { /* table may already exist */ }
-
-  try {
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "NotebookTag" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "color" TEXT NOT NULL DEFAULT '#6b7280',
-        "notebookId" TEXT NOT NULL,
-        "userId" TEXT NOT NULL,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`);
-  } catch { /* table may already exist */ }
-
-  try {
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "DailyUsage" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "userId" TEXT NOT NULL,
-        "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "chatMessages" INTEGER NOT NULL DEFAULT 0,
-        "flashcards" INTEGER NOT NULL DEFAULT 0
-      )`);
-  } catch { /* table may already exist */ }
-}
-
 export async function POST(request: Request) {
   try {
-    // Ensure DB schema is up-to-date before any operations
-    await ensureDBSchema();
-
     // JSON parse safety
     let body: any;
     try {
@@ -138,9 +52,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Always create as FREE - premium is handled via Stripe, not registration
-    const userPlan = 'FREE' as const;
-
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await db.user.create({
@@ -148,7 +59,7 @@ export async function POST(request: Request) {
         name: trimmedName,
         email: normalizedEmail,
         password: hashedPassword,
-        plan: userPlan,
+        plan: 'FREE',
       },
     });
 
@@ -160,7 +71,6 @@ export async function POST(request: Request) {
     const msg = error?.message || 'Unknown error';
     const code = error?.code || '';
     console.error('[Register] Full error:', msg, code, error?.meta);
-    // Return real error details so frontend can display them
     return NextResponse.json(
       { error: 'Erro interno do servidor', details: `${code || 'ERR'}: ${msg}` },
       { status: 500 }
