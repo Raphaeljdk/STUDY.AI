@@ -505,9 +505,10 @@ export function buildWhere(where: Record<string, any>, params: any[] = [], table
         }
       }
     } else {
-      // Simple equality
+      // Simple equality — convert booleans to 0/1 for SQLite
+      const paramValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
       clauses.push(`${col} = ?`)
-      params.push(value)
+      params.push(paramValue)
     }
   }
 

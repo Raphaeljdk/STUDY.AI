@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, nowISO } from '@/lib/db';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ pageId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { pageId } = await params;
 
@@ -43,14 +37,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pag
 
 export async function PUT(request: Request, { params }: { params: Promise<{ pageId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { pageId } = await params;
 
@@ -106,14 +95,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ pageId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { pageId } = await params;
 

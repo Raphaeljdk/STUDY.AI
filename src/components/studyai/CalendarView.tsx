@@ -73,6 +73,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 
 // ===== TYPES =====
 interface CalendarViewProps {
@@ -109,54 +110,46 @@ interface SubjectOption {
 }
 
 // ===== CONSTANTS =====
-const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; colorClass: string; bgClass: string }> = {
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   EXAM: {
     label: 'Prova',
     icon: <GraduationCap className="h-3.5 w-3.5" />,
-    colorClass: 'text-rose-700',
-    bgClass: 'bg-rose-50 border-rose-200',
+    color: '#f43f5e',
   },
   HOMEWORK: {
     label: 'Trabalho',
     icon: <FileText className="h-3.5 w-3.5" />,
-    colorClass: 'text-amber-700',
-    bgClass: 'bg-amber-50 border-amber-200',
+    color: '#f59e0b',
   },
   SEMINAR: {
     label: 'Seminário',
     icon: <Presentation className="h-3.5 w-3.5" />,
-    colorClass: 'text-purple-700',
-    bgClass: 'bg-purple-50 border-purple-200',
+    color: '#a855f7',
   },
   DELIVERY: {
     label: 'Entrega',
     icon: <Package className="h-3.5 w-3.5" />,
-    colorClass: 'text-orange-700',
-    bgClass: 'bg-orange-50 border-orange-200',
+    color: '#f97316',
   },
   CLASS: {
     label: 'Aula',
     icon: <BookOpen className="h-3.5 w-3.5" />,
-    colorClass: 'text-teal-700',
-    bgClass: 'bg-teal-50 border-teal-200',
+    color: '#14b8a6',
   },
   REVIEW: {
     label: 'Revisão',
     icon: <RefreshCw className="h-3.5 w-3.5" />,
-    colorClass: 'text-emerald-700',
-    bgClass: 'bg-emerald-50 border-emerald-200',
+    color: '#10b981',
   },
   STUDY_SESSION: {
     label: 'Sessão',
     icon: <Brain className="h-3.5 w-3.5" />,
-    colorClass: 'text-sky-700',
-    bgClass: 'bg-sky-50 border-sky-200',
+    color: '#0ea5e9',
   },
   OTHER: {
     label: 'Outro',
     icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-    colorClass: 'text-gray-700',
-    bgClass: 'bg-gray-50 border-gray-200',
+    color: '#6b7280',
   },
 };
 
@@ -490,7 +483,12 @@ function EventCard({
                 {event.title}
               </h4>
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${typeConfig.bgClass} ${typeConfig.colorClass}`}
+                className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${typeConfig.color} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${typeConfig.color} 20%, transparent)`,
+                  color: typeConfig.color,
+                }}
               >
                 {typeConfig.icon}
                 {typeConfig.label}
@@ -671,21 +669,15 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
     try {
       setLoading(true);
       const monthStr = format(currentMonth, 'yyyy-MM');
-      const [eventsRes, subjectsRes] = await Promise.all([
-        fetch(`/api/calendar?month=${monthStr}`),
-        fetch('/api/subjects'),
+      const [eventsData, subjectsData] = await Promise.all([
+        apiFetch(`/api/calendar?month=${monthStr}`),
+        apiFetch('/api/subjects'),
       ]);
-
-      if (!eventsRes.ok || !subjectsRes.ok) {
-        throw new Error('Erro ao carregar dados');
-      }
-
-      const eventsData = await eventsRes.json();
-      const subjectsData = await subjectsRes.json();
 
       setEvents(eventsData.events || []);
       setSubjects(subjectsData.subjects || []);
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao buscar eventos:', error);
       toast({
         title: 'Erro',
@@ -773,27 +765,24 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
       };
 
       if (editingEvent) {
-        const res = await fetch(`/api/calendar/${editingEvent.id}`, {
+        await apiFetch(`/api/calendar/${editingEvent.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error('Erro ao atualizar evento');
         toast({ title: 'Evento atualizado', description: 'Suas alterações foram salvas.' });
       } else {
-        const res = await fetch('/api/calendar', {
+        await apiFetch('/api/calendar', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error('Erro ao criar evento');
         toast({ title: 'Evento criado!', description: 'Seu evento foi adicionado ao calendário.' });
       }
 
       setFormOpen(false);
       resetForm();
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao salvar evento:', error);
       toast({
         title: 'Erro',
@@ -810,13 +799,13 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
     if (!deleteId) return;
 
     try {
-      const res = await fetch(`/api/calendar/${deleteId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Erro ao excluir evento');
+      await apiFetch(`/api/calendar/${deleteId}`, { method: 'DELETE' });
 
       setEvents((prev) => prev.filter((e) => e.id !== deleteId));
       setDeleteId(null);
       toast({ title: 'Evento excluído', description: 'O evento foi removido com sucesso.' });
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao excluir evento:', error);
       toast({
         title: 'Erro',

@@ -10,6 +10,7 @@ import {
   Battery, BarChart3, Heart, Link2, Eye,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -143,9 +144,7 @@ export function BrainView({ onNavigate }: BrainViewProps) {
   const discoverGaps = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/brain');
-      if (!res.ok) throw new Error('Erro ao buscar dados');
-      const data = await res.json();
+      const data = await apiFetch('/api/brain');
       setBrainData(data);
 
       // Compute retention topics (low mastery = needs review)
@@ -153,7 +152,8 @@ export function BrainView({ onNavigate }: BrainViewProps) {
       setRetentionTopics(lowMastery.slice(0, 5));
 
       toast({ title: 'Analise concluida', description: 'Seu cerebro foi mapeado com sucesso.' });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel analisar seus dados.', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -164,9 +164,8 @@ export function BrainView({ onNavigate }: BrainViewProps) {
   useEffect(() => {
     async function fetchSubjects() {
       try {
-        const res = await fetch('/api/subjects');
-        if (res.ok) {
-          const data = await res.json();
+        const data = await apiFetch('/api/subjects').catch(() => null);
+        if (data) {
           setSubjects(data.subjects || []);
         }
       } catch { /* ignore */ }
@@ -182,17 +181,14 @@ export function BrainView({ onNavigate }: BrainViewProps) {
     }
     setPreTestLoading(true);
     try {
-      const res = await fetch('/api/pretest', {
+      const data = await apiFetch('/api/pretest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: preTestTopic.trim(),
           subjectId: preTestSubjectId || undefined,
           numQuestions: 5,
         }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setPreTestQuestions(data.questions || []);
       setPreTestId(data.preTest?.id || '');
       setCurrentQIndex(0);
@@ -211,13 +207,10 @@ export function BrainView({ onNavigate }: BrainViewProps) {
     if (!preTestId) return;
     setPreTestLoading(true);
     try {
-      const res = await fetch('/api/pretest/finish', {
+      const data = await apiFetch('/api/pretest/finish', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preTestId, answers }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setPreTestScore(data.score);
       setPreTestCorrect(data.correct);
       setPreTestTotal(data.total);

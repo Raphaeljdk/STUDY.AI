@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import { EnsoCircle } from './EnsoCircle';
+import { apiFetch, ApiError } from '@/lib/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -41,14 +42,13 @@ export function AIChatPanel() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/sensei-chat', {
+      const data = await apiFetch('/api/sensei-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg }),
       });
-      const data = await res.json();
       setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       setMessages([
         ...newMessages,
         { role: 'assistant', content: 'Desculpe, ocorreu um erro. Por favor, tente novamente.' },

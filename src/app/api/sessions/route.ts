@@ -1,25 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['pomodoro', 'break', 'focus'] as const;
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    // Verify user exists in DB
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const sessions = db.studySession.findMany({
       where: { userId },
@@ -36,19 +25,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    // Verify user exists in DB
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     // JSON parse safety
     let body: any;

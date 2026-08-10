@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 
 // ===== TYPES =====
 interface TasksViewProps {
@@ -103,11 +104,11 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'COMPLETED', label: 'Concluidas' },
 ];
 
-const PRIORITY_CONFIG: Record<string, { label: string; colorClass: string; bgClass: string; weight: number }> = {
-  LOW: { label: 'Baixa', colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200', weight: 0 },
-  MEDIUM: { label: 'Media', colorClass: 'text-amber-700', bgClass: 'bg-amber-50 border-amber-200', weight: 1 },
-  HIGH: { label: 'Alta', colorClass: 'text-red-700', bgClass: 'bg-red-50 border-red-200', weight: 2 },
-  URGENT: { label: 'Urgente', colorClass: 'text-orange-700', bgClass: 'bg-orange-50 border-orange-200', weight: 3 },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; weight: number }> = {
+  LOW: { label: 'Baixa', color: '#10b981', weight: 0 },
+  MEDIUM: { label: 'Media', color: '#f59e0b', weight: 1 },
+  HIGH: { label: 'Alta', color: '#ef4444', weight: 2 },
+  URGENT: { label: 'Urgente', color: '#f97316', weight: 3 },
 };
 
 const PRIORITY_OPTIONS = [
@@ -456,11 +457,10 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
       if (activeFilter !== 'ALL') {
         params.set('status', activeFilter);
       }
-      const res = await fetch(`/api/tasks?${params.toString()}`);
-      if (!res.ok) throw new Error('Erro ao buscar tarefas');
-      const data = await res.json();
+      const data = await apiFetch(`/api/tasks?${params.toString()}`);
       setTasks(data.tasks || []);
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel carregar as tarefas.', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -469,9 +469,7 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
 
   const fetchSubjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/subjects');
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await apiFetch('/api/subjects');
       setSubjects(
         (data.subjects || []).map((s: any) => ({
           id: s.id,
@@ -588,13 +586,10 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
     if (isCompleting) setCompletingTaskId(task.id);
 
     try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
+      const data = await apiFetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === task.id ? data.task : t)));
 
       if (isCompleting && data.xpAwarded) {
@@ -602,7 +597,8 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
         toast({ title: 'Tarefa concluida!', description: '+30 XP ganhos. Parabens pelo foco!' });
         setTimeout(() => setXpCelebrationTaskId(null), 2000);
       }
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel atualizar a tarefa.', variant: 'destructive' });
     } finally {
       setCompletingTaskId(null);
@@ -611,16 +607,14 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
 
   const handleStartTask = async (task: Task) => {
     try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
+      const data = await apiFetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'IN_PROGRESS' }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === task.id ? data.task : t)));
       toast({ title: 'Tarefa iniciada', description: 'Bom trabalho! Foco total.' });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel iniciar a tarefa.', variant: 'destructive' });
     }
   };
@@ -638,18 +632,16 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
       if (formDueDate) body.dueDate = formDueDate;
       if (formEstimatedMinutes) body.estimatedMinutes = parseInt(formEstimatedMinutes, 10);
 
-      const res = await fetch('/api/tasks', {
+      const data = await apiFetch('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setTasks((prev) => [data.task, ...prev]);
       setAddDialogOpen(false);
       resetForm();
       toast({ title: 'Tarefa criada', description: 'Sua tarefa foi adicionada com sucesso.' });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel criar a tarefa.', variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -669,19 +661,17 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
       body.dueDate = formDueDate || null;
       body.estimatedMinutes = formEstimatedMinutes ? parseInt(formEstimatedMinutes, 10) : null;
 
-      const res = await fetch(`/api/tasks/${taskToEdit.id}`, {
+      const data = await apiFetch(`/api/tasks/${taskToEdit.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === taskToEdit.id ? data.task : t)));
       setEditDialogOpen(false);
       setTaskToEdit(null);
       resetForm();
       toast({ title: 'Tarefa atualizada', description: 'Alteracoes salvas com sucesso.' });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel atualizar a tarefa.', variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -692,14 +682,14 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
     if (!taskToDelete) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
       setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
       setDeleteDialogOpen(false);
       setTaskToDelete(null);
       if (expandedTaskId === taskToDelete.id) setExpandedTaskId(null);
       toast({ title: 'Tarefa excluida', description: 'A tarefa foi removida.' });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel excluir a tarefa.', variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -921,7 +911,14 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
                                 {task.title}
                               </h3>
                               {/* Priority Badge */}
-                              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium ${pCfg.bgClass} ${pCfg.colorClass}`}>
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium"
+                                style={{
+                                  backgroundColor: `color-mix(in srgb, ${pCfg.color} 10%, transparent)`,
+                                  borderColor: `color-mix(in srgb, ${pCfg.color} 20%, transparent)`,
+                                  color: pCfg.color,
+                                }}
+                              >
                                 {task.priority === 'URGENT' ? <Zap className="h-3 w-3" /> : <Flag className="h-3 w-3" />}
                                 {pCfg.label}
                               </span>
@@ -976,7 +973,14 @@ export default function TasksView({ onNavigate: _onNavigate }: TasksViewProps) {
 
                           {/* Status badge */}
                           {isInProgress && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)',
+                                borderColor: 'color-mix(in srgb, #f59e0b 20%, transparent)',
+                                color: '#f59e0b',
+                              }}
+                            >
                               <Play className="h-3 w-3" />
                               Em andamento
                             </span>

@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 
 // ===== TYPES =====
 interface GoalsViewProps {
@@ -107,12 +108,12 @@ const FILTER_TABS: { key: FilterTab; label: string; icon: React.ReactNode }[] = 
   { key: 'EXAM', label: 'Prova', icon: <Trophy className="h-4 w-4" /> },
 ];
 
-const TYPE_CONFIG: Record<string, { label: string; colorClass: string; bgClass: string }> = {
-  DAILY: { label: 'Diária', colorClass: 'text-amber-700', bgClass: 'bg-amber-50 border-amber-200' },
-  WEEKLY: { label: 'Semanal', colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200' },
-  MONTHLY: { label: 'Mensal', colorClass: 'text-violet-700', bgClass: 'bg-violet-50 border-violet-200' },
-  SUBJECT: { label: 'Matéria', colorClass: 'text-teal-700', bgClass: 'bg-teal-50 border-teal-200' },
-  EXAM: { label: 'Prova', colorClass: 'text-rose-700', bgClass: 'bg-rose-50 border-rose-200' },
+const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  DAILY: { label: 'Diária', color: '#f59e0b' },
+  WEEKLY: { label: 'Semanal', color: '#10b981' },
+  MONTHLY: { label: 'Mensal', color: '#8b5cf6' },
+  SUBJECT: { label: 'Matéria', color: '#14b8a6' },
+  EXAM: { label: 'Prova', color: '#f43f5e' },
 };
 
 const TYPE_OPTIONS = [
@@ -550,7 +551,12 @@ function GoalCard({
                 {goal.title}
               </h3>
               <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${typeConfig.bgClass} ${typeConfig.colorClass}`}
+                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${typeConfig.color} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${typeConfig.color} 20%, transparent)`,
+                  color: typeConfig.color,
+                }}
               >
                 {typeConfig.label}
               </span>
@@ -822,21 +828,15 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [goalsRes, subjectsRes] = await Promise.all([
-        fetch('/api/goals'),
-        fetch('/api/subjects'),
+      const [goalsData, subjectsData] = await Promise.all([
+        apiFetch('/api/goals'),
+        apiFetch('/api/subjects'),
       ]);
-
-      if (!goalsRes.ok || !subjectsRes.ok) {
-        throw new Error('Erro ao carregar dados');
-      }
-
-      const goalsData = await goalsRes.json();
-      const subjectsData = await subjectsRes.json();
 
       setGoals(goalsData.goals || []);
       setSubjects(subjectsData.subjects || []);
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao buscar metas:', error);
       toast({
         title: 'Erro',
@@ -913,13 +913,10 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
 
       if (editingGoal) {
         // Update
-        const res = await fetch(`/api/goals/${editingGoal.id}`, {
+        const data = await apiFetch(`/api/goals/${editingGoal.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error('Erro ao atualizar meta');
-        const data = await res.json();
         toast({ title: 'Meta atualizada', description: 'Suas alterações foram salvas.' });
         // Check if XP was awarded
         if (data.xpAwarded) {
@@ -927,19 +924,18 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
         }
       } else {
         // Create
-        const res = await fetch('/api/goals', {
+        await apiFetch('/api/goals', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error('Erro ao criar meta');
         toast({ title: 'Meta criada!', description: 'Sua nova meta foi adicionada.' });
       }
 
       setFormOpen(false);
       resetForm();
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao salvar meta:', error);
       toast({
         title: 'Erro',
@@ -954,15 +950,11 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
   // Complete goal
   const handleComplete = async (id: string) => {
     try {
-      const res = await fetch(`/api/goals/${id}`, {
+      const data = await apiFetch(`/api/goals/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'COMPLETED' }),
       });
 
-      if (!res.ok) throw new Error('Erro ao concluir meta');
-
-      const data = await res.json();
       fetchData();
 
       if (data.xpAwarded) {
@@ -972,7 +964,8 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
           description: 'Meta concluída! +50 XP ganho.',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao concluir meta:', error);
       toast({
         title: 'Erro',
@@ -985,15 +978,11 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
   // Update progress
   const handleUpdateProgress = async (id: string, value: number) => {
     try {
-      const res = await fetch(`/api/goals/${id}`, {
+      const data = await apiFetch(`/api/goals/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentValue: value }),
       });
 
-      if (!res.ok) throw new Error('Erro ao atualizar progresso');
-
-      const data = await res.json();
       fetchData();
 
       if (data.xpAwarded) {
@@ -1003,7 +992,8 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
           description: 'Você atingiu o objetivo! +50 XP ganho.',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao atualizar progresso:', error);
       toast({
         title: 'Erro',
@@ -1018,13 +1008,13 @@ export function GoalsView({ onNavigate }: GoalsViewProps) {
     if (!deleteId) return;
 
     try {
-      const res = await fetch(`/api/goals/${deleteId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Erro ao excluir meta');
+      await apiFetch(`/api/goals/${deleteId}`, { method: 'DELETE' });
 
       setGoals((prev) => prev.filter((g) => g.id !== deleteId));
       setDeleteId(null);
       toast({ title: 'Meta excluída', description: 'A meta foi removida com sucesso.' });
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof ApiError && error.isSessionExpired) return;
       console.error('Erro ao excluir meta:', error);
       toast({
         title: 'Erro',

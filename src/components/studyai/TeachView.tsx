@@ -11,6 +11,7 @@ import {
   ArrowLeft, Flame, Eye,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -908,9 +909,8 @@ export function TeachView({ onNavigate }: TeachViewProps) {
   useEffect(() => {
     async function fetchSubjects() {
       try {
-        const res = await fetch('/api/subjects');
-        if (res.ok) {
-          const data = await res.json();
+        const data = await apiFetch('/api/subjects').catch(() => null);
+        if (data) {
           setSubjects((data.subjects || []).map((s: any) => ({
             id: s.id,
             name: s.name,
@@ -936,9 +936,8 @@ export function TeachView({ onNavigate }: TeachViewProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/teach', {
+      const data = await apiFetch('/api/teach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: selectedTopic,
           explanation,
@@ -946,13 +945,6 @@ export function TeachView({ onNavigate }: TeachViewProps) {
           difficulty,
         }),
       });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Erro ao analisar');
-      }
-
-      const data = await res.json();
       setAnalysis(data.analysis);
       setXpEarned(data.xpEarned || 0);
       setScreen('results');
@@ -960,10 +952,8 @@ export function TeachView({ onNavigate }: TeachViewProps) {
 
       // Refresh history
       try {
-        const histRes = await fetch('/api/teach');
-        if (histRes.ok) {
-          const histData = await histRes.json();
-          const teachings = (histData.teachings || []).map((t: any) => {
+        const histData = await apiFetch('/api/teach').catch(() => ({ teachings: [] }));
+        const teachings = (histData.teachings || []).map((t: any) => {
             try {
               const parsed = JSON.parse(t.content);
               return {
@@ -980,11 +970,11 @@ export function TeachView({ onNavigate }: TeachViewProps) {
             }
           }).filter(Boolean);
           setHistory(teachings);
-        }
       } catch {
         // ignore
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
       toast({ title: 'Erro', description: err instanceof Error ? err.message : 'Tente novamente.' });
       setScreen('explain');
@@ -1004,9 +994,7 @@ export function TeachView({ onNavigate }: TeachViewProps) {
   // Fetch history when switching to history tab
   const handleShowHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/teach');
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiFetch('/api/teach').catch(() => ({ teachings: [] }));
         const teachings = (data.teachings || []).map((t: any) => {
           try {
             const parsed = JSON.parse(t.content);
@@ -1024,7 +1012,6 @@ export function TeachView({ onNavigate }: TeachViewProps) {
           }
         }).filter(Boolean);
         setHistory(teachings);
-      }
     } catch {
       // ignore
     }

@@ -11,6 +11,7 @@ import {
   CheckCircle2, Pause,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -173,10 +174,8 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
   const startEmergency = async () => {
     setEmergencyLoading(true);
     try {
-      const brainRes = await fetch('/api/brain');
-      if (brainRes.ok) {
-        const brainData = await brainRes.json();
-        const weakTopics = brainData.weakTopics?.slice(0, 5) || [];
+      const brainData = await apiFetch('/api/brain').catch(() => null);
+        const weakTopics = brainData?.weakTopics?.slice(0, 5) || [];
         if (weakTopics.length > 0) {
           const activities: SessionActivity[] = weakTopics.map((t: { topic: string }, i: number) => ({
             id: `emerg-${i}`,
@@ -190,9 +189,6 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
         } else {
           setEmergencyPlan(generateSession(30));
         }
-      } else {
-        setEmergencyPlan(generateSession(30));
-      }
     } catch {
       setEmergencyPlan(generateSession(30));
     } finally {
@@ -209,10 +205,8 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
 
   const loadReviewCards = async () => {
     try {
-      const res = await fetch('/api/brain');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.weakTopics && data.weakTopics.length > 0) {
+      const data = await apiFetch('/api/brain').catch(() => null);
+        if (data?.weakTopics && data.weakTopics.length > 0) {
           const cards: ReviewCard[] = data.weakTopics.slice(0, 5).map((t: { topic: string; mastery: number }, i: number) => ({
             id: `rc-${i}`, topic: t.topic,
             concept: `Revisao rapida sobre ${t.topic} (${t.mastery}% dominio). Foco nos conceitos fundamentais.`,
@@ -222,7 +216,6 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
           setReviewCards(cards);
           return;
         }
-      }
     } catch { /* fallback */ }
     setReviewCards(MOCK_REVIEW_CARDS);
   };
@@ -248,13 +241,10 @@ export function EmergencyView({ onNavigate }: EmergencyViewProps) {
     }
     setAutopilotLoading(true);
     try {
-      const res = await fetch('/api/autopilot', {
+      const data = await apiFetch('/api/autopilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exam: autopilotExam.trim(), date: autopilotDate || undefined, studyHoursPerDay: parseInt(autopilotHours) || 3 }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
       setAutopilotPlan(data.plan);
       toast({ title: 'Plano gerado!', description: 'Seu plano de estudo personalizado esta pronto.' });
     } catch {

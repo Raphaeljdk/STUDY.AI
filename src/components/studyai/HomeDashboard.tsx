@@ -14,6 +14,7 @@ import { WabiSabiCard } from './WabiSabiCard';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { apiFetch } from '@/lib/api';
 
 // ===== TYPES =====
 interface HomeDashboardProps {
@@ -156,10 +157,10 @@ export function HomeDashboard({
     const month = format(new Date(), 'yyyy-MM');
 
     Promise.all([
-      fetch('/api/stats').then(r => r.json()).catch(() => null),
-      fetch('/api/tasks?status=PENDING&limit=5').then(r => r.json()).catch(() => null),
-      fetch(`/api/calendar?month=${month}`).then(r => r.json()).catch(() => null),
-      fetch('/api/goals?type=DAILY').then(r => r.json()).catch(() => null),
+      apiFetch('/api/stats').catch(() => null),
+      apiFetch('/api/tasks?status=PENDING&limit=5').catch(() => null),
+      apiFetch(`/api/calendar?month=${month}`).catch(() => null),
+      apiFetch('/api/goals?type=DAILY').catch(() => null),
     ]).then(([statsData, tasksData, eventsData, goalsData]) => {
       if (statsData) {
         setStats({

@@ -9,6 +9,7 @@ import {
   BookPlus, Brain, FileQuestion, X, Plus, Check, RotateCcw,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -196,16 +197,15 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     try {
       const params = new URLSearchParams({ page: String(pageNum), limit: '20' });
       if (type && type !== 'todos') params.set('type', type);
-      const res = await fetch(`/api/discover?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const data = await apiFetch(`/api/discover?${params.toString()}`);
       if (pageNum === 1) {
         setItems(data.items || []);
       } else {
         setItems(prev => [...prev, ...(data.items || [])]);
       }
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       setFetchError(true);
       toast({ title: 'Erro ao carregar conteudo', description: 'Tente novamente mais tarde.' });
     }
@@ -213,10 +213,10 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
 
   const fetchSubjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/subjects');
-      if (!res.ok) return;
-      const data = await res.json();
-      setSubjects(Array.isArray(data) ? data : data.subjects || []);
+      const data = await apiFetch('/api/subjects').catch(() => null);
+      if (data) {
+        setSubjects(Array.isArray(data) ? data : data.subjects || []);
+      }
     } catch {
       // silent
     }
@@ -271,9 +271,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     e.stopPropagation();
     setSavingId(itemId);
     try {
-      const res = await fetch(`/api/discover/${itemId}/save`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const data = await apiFetch(`/api/discover/${itemId}/save`, { method: 'POST' });
       setItems(prev =>
         prev.map(item =>
           item.id === itemId
@@ -285,7 +283,8 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
         title: data.isSaved ? 'Salvo!' : 'Removido dos salvos',
         description: data.isSaved ? 'Conteudo adicionado aos seus salvos.' : 'Conteudo removido dos salvos.',
       });
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possível salvar o conteudo.' });
     } finally {
       setSavingId(null);
@@ -300,16 +299,10 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     }
     setAiGenerating(true);
     try {
-      const res = await fetch('/api/discover', {
+      const data = await apiFetch('/api/discover', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: aiType, subject: aiSubject.trim(), difficulty: aiDifficulty, generateWithAI: true }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed');
-      }
-      const data = await res.json();
       if (data.item) {
         setItems(prev => [data.item, ...prev]);
         toast({ title: 'Conteudo gerado!', description: data.item.title });
@@ -317,6 +310,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       setShowAIDialog(false);
       setAiSubject('');
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao gerar', description: err.message || 'Tente novamente.' });
     } finally {
       setAiGenerating(false);
@@ -336,18 +330,14 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     try {
       const item = items.find(i => i.id === subjectSelectItemId);
       if (!item) return;
-      const res = await fetch('/api/notes', {
+      await apiFetch('/api/notes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: `[Discover] ${item.title}`, content: item.content, subjectId: selectedSubjectId }),
       });
-      if (res.ok) {
-        toast({ title: 'Adicionado a materia!', description: 'Conteudo salvo na materia selecionada.' });
-        setShowSubjectDialog(false);
-      } else {
-        throw new Error('Failed');
-      }
-    } catch {
+      toast({ title: 'Adicionado a materia!', description: 'Conteudo salvo na materia selecionada.' });
+      setShowSubjectDialog(false);
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel adicionar a materia.' });
     }
   };

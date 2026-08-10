@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 const VALID_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
@@ -12,11 +11,11 @@ function awardXP(userId: string, amount: number, source: any, description: strin
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
-  if (!user) return;
+  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  if (!userData) return;
 
-  const newXP = user.xp + amount;
-  let newLevel = user.level;
+  const newXP = userData.xp + amount;
+  let newLevel = userData.level;
   const levelXP = newLevel * 100;
 
   if (newXP >= levelXP) {
@@ -42,18 +41,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.task.findFirst({ where: { id, userId } });
@@ -119,18 +109,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.task.findFirst({ where: { id, userId } });

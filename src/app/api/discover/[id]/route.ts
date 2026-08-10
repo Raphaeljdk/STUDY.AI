@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, nowISO } from '@/lib/db';
 
 export async function GET(
@@ -8,18 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const item = db.discoverItem.findUnique({ where: { id } });
@@ -32,12 +22,12 @@ export async function GET(
     const saveCount = db.discoverSave.count({ where: { discoverItemId: id } });
 
     // Get user info separately (was include.user)
-    const user = item.userId ? db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
+    const author = item.userId ? db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
 
     // Check if user saved this item (composite unique → use AND)
     const save = db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
 
-    return NextResponse.json({ item: { ...item, _count: { discoverSaves: saveCount }, user, isSaved: !!save } });
+    return NextResponse.json({ item: { ...item, _count: { discoverSaves: saveCount }, user: author, isSaved: !!save } });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -49,18 +39,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.discoverItem.findFirst({ where: { id, userId } });
@@ -105,18 +86,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.discoverItem.findFirst({ where: { id, userId } });

@@ -1,26 +1,27 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
-  BookOpen, Brain, BarChart3, MessageCircle, Clock,
-  LogOut, Shield, ChevronRight, Star, Send,
-  Plus, Trash2, Edit3, X, Timer, RotateCcw,
+  BookOpen, Brain, MessageCircle, Clock,
+  ChevronRight, Star, Send,
+  Plus, Trash2, X, Timer, RotateCcw,
   Check, AlertCircle, Loader2, BookPlus, FolderOpen, Zap, ArrowLeft,
-  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy, Users, Crown,
-  ListTodo, Flag, Trophy, CalendarDays, Compass, Swords, Rocket, Route, Siren, Dna, GraduationCap
+  Sparkles, TrendingUp, Target, Calendar, Flame, Search, Trash, Filter, Hash, Copy
 } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { EnsoCircle } from './EnsoCircle';
 import { AdminPanel } from './AdminPanel';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { useUsage } from '@/hooks/useUsage';
-import { PremiumUpgrade, UsageBar } from './PremiumUpgrade';
+import { PremiumUpgrade } from './PremiumUpgrade';
+import { Sidebar } from './Sidebar';
+import { MobileNavBar } from './MobileNavBar';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 
 const CanvasNotebookView = dynamic(
   () => import('@/components/notebook/CanvasNotebookView'),
@@ -140,7 +141,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
+export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -198,7 +199,31 @@ const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'miss
 
 export function DashboardView() {
   const { data: session } = useSession();
-  const user = session?.user as any;
+  const sessionUser = session?.user as any;
+
+  // Fetch full user profile (xp, level, streaks, etc.) — session only has id/name/email/role/plan
+  const [fullUser, setFullUser] = useState<any>(null);
+  useEffect(() => {
+    if (!sessionUser?.id) return;
+    apiFetch('/api/stats').then((d: any) => {
+      if (d) setFullUser(d);
+    }).catch(() => {});
+  }, [sessionUser?.id]);
+
+  // Merge session user with full profile data
+  const user = {
+    name: sessionUser?.name || 'Estudante',
+    email: sessionUser?.email || '',
+    xp: fullUser?.xp ?? 0,
+    level: fullUser?.level ?? 1,
+    currentStreak: fullUser?.currentStreak ?? 0,
+    longestStreak: fullUser?.longestStreak ?? 0,
+    totalStudyMinutes: fullUser?.totalStudyMinutes ?? 0,
+    totalSessions: fullUser?.totalSessions ?? 0,
+    role: sessionUser?.role || 'USER',
+    plan: sessionUser?.plan || 'FREE',
+  };
+
   const isAdmin = user?.role === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [editNotebookId, setEditNotebookId] = useState<string | null>(null);
@@ -230,72 +255,33 @@ export function DashboardView() {
 
   return (
     <div className="min-h-screen bg-[var(--ws-bg)]" {...swipeHandlers}>
-      <header className="sticky top-0 z-50 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 lg:px-24">
-          <button onClick={() => activeTab !== 'dashboard' && setActiveTab('dashboard')} className="flex items-center gap-2 sm:gap-3">
-            <Image src="/logo.png" alt="StudyAI" width={32} height={32} className="rounded-full" />
-            <span className="font-serif-jp text-base font-bold text-[var(--ws-text-primary)] sm:text-lg">StudyAI</span>
-          </button>
-          <nav className="flex items-center gap-0.5 overflow-x-auto md:gap-1 no-scrollbar">
-            <TabBtn icon={BarChart3} label="Home" tooltip="Visao geral" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <TabBtn icon={Compass} label="Discover" tooltip="Feed de estudos" active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} />
-            <TabBtn icon={Swords} label="Batalha" tooltip="Duelo de conhecimento" active={activeTab === 'battle'} onClick={() => setActiveTab('battle')} />
-            <TabBtn icon={Zap} label="60s" tooltip="Aprenda em 60 segundos" active={activeTab === 'microlesson'} onClick={() => setActiveTab('microlesson')} />
-            <TabBtn icon={Rocket} label="Missoes" tooltip="Missoes de estudo" active={activeTab === 'missions'} onClick={() => setActiveTab('missions')} />
-            <TabBtn icon={GraduationCap} label="Ensinar" tooltip="Ensinar para IA" active={activeTab === 'teach'} onClick={() => setActiveTab('teach')} />
-            <TabBtn icon={BookOpen} label="Materias" tooltip="Suas materias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
-            <TabBtn icon={ListTodo} label="Tarefas" tooltip="Suas tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
-            <TabBtn icon={FolderOpen} label="Cadernos" tooltip="Seus cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
-            <TabBtn icon={Brain} label="Cards" tooltip="Revisao espacada" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
-            <TabBtn icon={Timer} label="Timer" tooltip="Timer de foco" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
-            <TabBtn icon={MessageCircle} label="Sensei" tooltip="Tutor IA" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
-            <TabBtn icon={Dna} label="Brain" tooltip="StudyAI Brain" active={activeTab === 'brain'} onClick={() => setActiveTab('brain')} />
-            <TabBtn icon={Route} label="Trilhas" tooltip="Trilhas de aprendizagem" active={activeTab === 'roadmap'} onClick={() => setActiveTab('roadmap')} />
-            <TabBtn icon={Siren} label="Emergencia" tooltip="Estudo de emergencia" active={activeTab === 'emergency'} onClick={() => setActiveTab('emergency')} />
-            <TabBtn icon={Trophy} label="Progresso" tooltip="Desempenho" active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} />
-            {isAdmin && <TabBtn icon={Shield} label="Admin" tooltip="Painel admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
-          </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="mr-1 hidden items-center gap-1.5 text-xs text-[var(--ws-text-tertiary)] lg:flex">
-              <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[var(--ws-verdigris)]" />
-              <Users size={10} />
-              <span>{activeUsers}</span>
-            </div>
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium text-[var(--ws-text-primary)]">{user?.name}</p>
-              <p className="text-xs text-[var(--ws-accent)]">{usage.isPremium ? 'Premium' : isAdmin ? 'Admin · Ilimitado' : 'Gratuito'}{isAdmin && ' · Admin'}</p>
-            </div>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] font-serif-jp text-xs font-bold text-[var(--ws-accent)] sm:h-9 sm:w-9 sm:text-sm">{user?.name?.charAt(0)?.toUpperCase()}</div>
-            <button onClick={() => signOut({ callbackUrl: '/' })} data-ws-tooltip="Sair" className="rounded-ws-button p-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-accent)]"><LogOut size={18} /></button>
-          </div>
-        </div>
-        <div className="flex overflow-x-auto md:hidden no-scrollbar px-1">
-          <TabBtn icon={BarChart3} label="Home" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <TabBtn icon={BookOpen} label="Matérias" active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} />
-          <TabBtn icon={ListTodo} label="Tarefas" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
-          <TabBtn icon={Target} label="Metas" active={activeTab === 'goals'} onClick={() => setActiveTab('goals')} />
-          <TabBtn icon={CalendarDays} label="Calend." active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
-          <TabBtn icon={Dna} label="Brain" active={activeTab === 'brain'} onClick={() => setActiveTab('brain')} />
-          <TabBtn icon={Route} label="Trilhas" active={activeTab === 'roadmap'} onClick={() => setActiveTab('roadmap')} />
-          <TabBtn icon={Siren} label="Emerg." active={activeTab === 'emergency'} onClick={() => setActiveTab('emergency')} />
-          <TabBtn icon={GraduationCap} label="Ensinar" active={activeTab === 'teach'} onClick={() => setActiveTab('teach')} />
-          <TabBtn icon={FolderOpen} label="Cadernos" active={activeTab === 'notebooks' || activeTab === 'notebook-edit'} onClick={() => setActiveTab('notebooks')} />
-          <TabBtn icon={Brain} label="Cards" active={activeTab === 'flashcards' || activeTab === 'flashcard-review'} onClick={() => setActiveTab('flashcards')} />
-          <TabBtn icon={Timer} label="Timer" active={activeTab === 'timer'} onClick={() => setActiveTab('timer')} />
-          <TabBtn icon={MessageCircle} label="Sensei" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
-          <TabBtn icon={Trophy} label="Progresso" active={activeTab === 'progress'} onClick={() => setActiveTab('progress')} />
-          {!usage.isPremium && !isAdmin && (
-            <TabBtn icon={Crown} label="Premium" active={false} onClick={() => openUpgrade('nav')} />
-          )}
-          {isAdmin && <TabBtn icon={Shield} label="Admin" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />}
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-4 sm:py-6 lg:px-24 lg:py-8">
-        {/* Usage bars — only for free users */}
+      {/* Desktop Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isAdmin={isAdmin}
+        usage={usage}
+        onUpgrade={() => openUpgrade('nav')}
+        activeUsers={activeUsers}
+      />
+
+      {/* Main content area */}
+      <main className="mx-auto max-w-[1440px] px-3 py-4 pb-24 sm:px-4 sm:py-6 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8">
+        {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
         {!usage.isPremium && !usage.loading && (
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <UsageBar type="chatMessages" used={usage.usage.chatMessages} limit={usage.limits.chatMessages} />
-            <UsageBar type="flashcards" used={usage.usage.flashcards} limit={usage.limits.flashcards} />
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-[var(--ws-text-tertiary)]">Chat</span>
+              <div className="flex-1">
+                <UsageBarInline used={usage.usage.chatMessages} limit={usage.limits.chatMessages} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-[var(--ws-text-tertiary)]">Cards</span>
+              <div className="flex-1">
+                <UsageBarInline used={usage.usage.flashcards} limit={usage.limits.flashcards} />
+              </div>
+            </div>
           </div>
         )}
         {activeTab === 'dashboard' && (
@@ -383,20 +369,31 @@ export function DashboardView() {
 
       {/* Premium upgrade modal */}
       <PremiumUpgrade isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} triggerType={upgradeTrigger} />
+
+      {/* Mobile Bottom Nav */}
+      <MobileNavBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
 
-function TabBtn({ icon: Icon, label, active, onClick, tooltip }: { icon: any; label: string; active: boolean; onClick: () => void; tooltip?: string }) {
+// ========== INLINE USAGE BAR (for mobile) ==========
+function UsageBarInline({ used, limit }: { used: number; limit: number }) {
+  const pct = Math.min(100, Math.round((used / limit) * 100));
   return (
-    <button 
-      onClick={onClick} 
-      {...(tooltip ? { 'data-ws-tooltip': tooltip } : {})}
-      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm ${active ? 'text-[var(--ws-accent)]' : 'text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]'}`}
-    >
-      <Icon size={16} /><span className="hidden sm:inline">{label}</span>
-      {active && <div className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[var(--ws-accent)]" />}
-    </button>
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--ws-ink)_8%,transparent)]">
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{
+          width: `${pct}%`,
+          backgroundColor: pct > 80 ? 'var(--ws-accent)' : 'var(--ws-accent)',
+          opacity: pct > 80 ? 1 : 0.6,
+        }}
+      />
+    </div>
   );
 }
 
@@ -451,8 +448,8 @@ function DashboardHome({ user, openNotebook, onNavigate }: { user: any; openNote
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/stats').then(r => r.json()),
-      fetch('/api/notebooks').then(r => r.json()),
+      apiFetch('/api/stats'),
+      apiFetch('/api/notebooks'),
     ]).then(([statsData, nbData]) => {
       if (statsData.notebooks !== undefined) setStats(statsData);
       if (nbData.notebooks) setRecentNBs(nbData.notebooks.slice(0, 3));
@@ -663,7 +660,7 @@ function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetch('/api/notebooks').then(r => r.json()).then(d => {
+    apiFetch('/api/notebooks').then(d => {
       if (d.notebooks) setNotebooks(d.notebooks);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -673,13 +670,7 @@ function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
     if (!newTitle.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/notebooks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle, color: newColor }) });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: 'Erro ao criar caderno', description: data.error || 'Tente novamente.', variant: 'destructive' });
-        setCreating(false);
-        return;
-      }
+      const data = await apiFetch('/api/notebooks', { method: 'POST', body: JSON.stringify({ title: newTitle, color: newColor }) });
       if (data.notebook) {
         setNotebooks(prev => [data.notebook, ...prev]);
         setNewTitle('');
@@ -687,7 +678,8 @@ function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
         onOpen(data.notebook.id);
         toast({ title: 'Caderno criado!', description: `"${data.notebook.title}" esta pronto.` });
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       console.error('[NotebooksList] create error:', err);
       toast({ title: 'Erro de conexao', description: 'Nao foi possivel criar o caderno. Verifique sua conexao.', variant: 'destructive' });
     } 
@@ -697,15 +689,11 @@ function NotebooksList({ onOpen }: { onOpen: (id: string) => void }) {
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Deletar "${title}"?`)) return;
     try {
-      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setNotebooks(prev => prev.filter(n => n.id !== id));
-        toast({ title: 'Caderno deletado', description: `"${title}" foi removido.` });
-      } else {
-        const d = await res.json();
-        toast({ title: 'Erro ao deletar', description: d.error || 'Tente novamente.', variant: 'destructive' });
-      }
-    } catch (err) {
+      await apiFetch(`/api/notebooks/${id}`, { method: 'DELETE' });
+      setNotebooks(prev => prev.filter(n => n.id !== id));
+      toast({ title: 'Caderno deletado', description: `"${title}" foi removido.` });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       console.error('[NotebooksList] delete error:', err);
       toast({ title: 'Erro de conexao', description: 'Nao foi possivel deletar.', variant: 'destructive' });
     }
@@ -810,8 +798,8 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     Promise.all([
-      fetch('/api/flashcards').then(r => r.json()),
-      fetch('/api/flashcards?due=true').then(r => r.json()),
+      apiFetch('/api/flashcards'),
+      apiFetch('/api/flashcards?due=true'),
     ]).then(([allData, dueData]) => {
       if (allData.flashcards) setFlashcards(allData.flashcards);
       if (dueData.flashcards) setDueCount(dueData.flashcards.length);
@@ -827,10 +815,10 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
     if (!front.trim() || !back.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front, back }) });
-      const data = await res.json();
+      const data = await apiFetch('/api/flashcards', { method: 'POST', body: JSON.stringify({ front, back }) });
       if (data.flashcard) { setFlashcards(prev => [data.flashcard, ...prev]); setFront(''); setBack(''); setShowForm(false); }
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       console.error('[FlashcardsManager] create error:', err);
       toast({ title: 'Erro ao criar flashcard', description: 'Tente novamente.', variant: 'destructive' });
     }
@@ -838,7 +826,7 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/flashcards/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/flashcards/${id}`, { method: 'DELETE' });
     setFlashcards(prev => prev.filter(f => f.id !== id));
   };
 
@@ -847,8 +835,7 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
     if (!genContent.trim()) return;
     setGenerating(true);
     try {
-      const res = await fetch('/api/generate-flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: genContent, count: 5 }) });
-      const data = await res.json();
+      const data = await apiFetch('/api/generate-flashcards', { method: 'POST', body: JSON.stringify({ content: genContent, count: 5 }) });
 
       if (data.code === 'USAGE_LIMIT') {
         toast({ title: 'Limite diario atingido', description: `Voce ja usou suas ${data.usage.limit} geracoes de flashcards hoje. Upgrade para Premium!`, variant: 'destructive' });
@@ -858,8 +845,7 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
 
       if (data.flashcards && data.flashcards.length > 0) {
         for (const fc of data.flashcards) {
-          const r = await fetch('/api/flashcards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: fc.front, back: fc.back }) });
-          const d = await r.json();
+          const d = await apiFetch('/api/flashcards', { method: 'POST', body: JSON.stringify({ front: fc.front, back: fc.back }) });
           if (d.flashcard) setFlashcards(prev => [d.flashcard, ...prev]);
         }
         setGenContent('');
@@ -1020,7 +1006,7 @@ function FlashcardReviewer({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetch('/api/flashcards?due=true').then(r => r.json()).then(d => {
+    apiFetch('/api/flashcards?due=true').then(d => {
       if (d.flashcards) setCards(d.flashcards);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -1029,7 +1015,7 @@ function FlashcardReviewer({ onBack }: { onBack: () => void }) {
     const card = cards[currentIndex];
     if (!card) return;
     try {
-      await fetch(`/api/flashcards/${card.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: quality }) });
+      await apiFetch(`/api/flashcards/${card.id}`, { method: 'PATCH', body: JSON.stringify({ review: quality }) });
     } catch {}
     setReviewed(prev => prev + 1);
     setRatings(prev => [...prev, quality]);
@@ -1172,7 +1158,7 @@ function PomodoroTimer() {
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetch('/api/sessions').then(r => r.json()).then(d => {
+    apiFetch('/api/sessions').then(d => {
       if (d.sessions) {
         const today = new Date().toDateString();
         setTotalToday(d.sessions.filter((s: any) => new Date(s.createdAt).toDateString() === today).reduce((sum: number, s: any) => sum + s.duration, 0));
@@ -1189,7 +1175,7 @@ function PomodoroTimer() {
             setIsRunning(false);
             if (mode === 'focus') {
               const dur = durations.focus - prev;
-              fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: dur, type: 'pomodoro' }) });
+              apiFetch('/api/sessions', { method: 'POST', body: JSON.stringify({ duration: dur, type: 'pomodoro' }) });
               setTotalToday(t => t + dur);
             }
             return 0;
@@ -1275,9 +1261,9 @@ function SenseiChat() {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     Promise.all([
-      fetch('/api/chat').then(r => r.json()),
-      fetch('/api/notebooks').then(r => r.json()),
-      fetch('/api/memories').then(r => r.json()).catch(() => ({ count: 0 })),
+      apiFetch('/api/chat'),
+      apiFetch('/api/notebooks'),
+      apiFetch('/api/memories').catch(() => ({ count: 0 })),
     ]).then(([chatData, nbData, memData]) => {
       if (nbData.notebooks) setNotebooks(nbData.notebooks);
       if (memData?.count) {
@@ -1333,8 +1319,7 @@ Quanto mais voce conversa comigo, mais eu aprendo sobre voce e mais personalizad
     setInput('');
     setIsLoading(true);
     try {
-      const res = await fetch('/api/sensei-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: userMsg }) });
-      const data = await res.json();
+      const data = await apiFetch('/api/sensei-chat', { method: 'POST', body: JSON.stringify({ message: userMsg }) });
 
       // Handle usage limit
       if (data.code === 'USAGE_LIMIT') {
@@ -1364,7 +1349,7 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
   const handleClear = async () => {
     if (!confirm('Limpar toda a conversa?')) return;
     try {
-      await fetch('/api/chat', { method: 'DELETE' });
+      await apiFetch('/api/chat', { method: 'DELETE' });
     } catch {}
     setMessages([{
       id: 'welcome-clear',

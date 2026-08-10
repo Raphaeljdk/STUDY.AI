@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Users, Shield, Crown, Search, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
+import { apiFetch, ApiError } from '@/lib/api';
 
 interface UserRow {
   id: string;
@@ -28,11 +29,10 @@ export function AdminPanel() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users');
-      const data = await res.json();
-      if (res.ok) setUsers(data.users);
-      else setMsg({ type: 'error', text: data.error });
-    } catch {
+      const data = await apiFetch('/api/admin/users');
+      setUsers(data.users || []);
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       setMsg({ type: 'error', text: 'Erro ao buscar usuários' });
     }
     setLoading(false);
@@ -45,20 +45,15 @@ export function AdminPanel() {
     setSavingId(userId);
     setMsg(null);
     try {
-      const res = await fetch('/api/admin/users', {
+      const data = await apiFetch('/api/admin/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, plan }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, plan: data.user.plan } : u)));
-        setMsg({ type: 'success', text: `Plano de ${data.user.name} alterado para ${planLabels[plan]}` });
-      } else {
-        setMsg({ type: 'error', text: data.error });
-      }
-    } catch {
-      setMsg({ type: 'error', text: 'Erro ao atualizar plano' });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, plan: data.user.plan } : u)));
+      setMsg({ type: 'success', text: `Plano de ${data.user.name} alterado para ${planLabels[plan]}` });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      setMsg({ type: 'error', text: err.message || 'Erro ao atualizar plano' });
     }
     setSavingId(null);
   };
@@ -67,20 +62,15 @@ export function AdminPanel() {
     setSavingId(userId);
     setMsg(null);
     try {
-      const res = await fetch('/api/admin/users', {
+      const data = await apiFetch('/api/admin/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, role }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: data.user.role } : u)));
-        setMsg({ type: 'success', text: `Role de ${data.user.name} alterado para ${role}` });
-      } else {
-        setMsg({ type: 'error', text: data.error });
-      }
-    } catch {
-      setMsg({ type: 'error', text: 'Erro ao atualizar role' });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: data.user.role } : u)));
+      setMsg({ type: 'success', text: `Role de ${data.user.name} alterado para ${role}` });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      setMsg({ type: 'error', text: err.message || 'Erro ao atualizar role' });
     }
     setSavingId(null);
   };
@@ -89,20 +79,15 @@ export function AdminPanel() {
     if (!confirm(`Tem certeza que deseja deletar o usuário ${name}?`)) return;
     setSavingId(userId);
     try {
-      const res = await fetch('/api/admin/users', {
+      await apiFetch('/api/admin/users', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
-      if (res.ok) {
-        setUsers((prev) => prev.filter((u) => u.id !== userId));
-        setMsg({ type: 'success', text: `Usuário ${name} removido` });
-      } else {
-        const data = await res.json();
-        setMsg({ type: 'error', text: data.error });
-      }
-    } catch {
-      setMsg({ type: 'error', text: 'Erro ao deletar' });
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setMsg({ type: 'success', text: `Usuário ${name} removido` });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      setMsg({ type: 'error', text: err.message || 'Erro ao deletar' });
     }
     setSavingId(null);
   };

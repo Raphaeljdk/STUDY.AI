@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ZenButton } from './ZenButton';
+import { apiFetch } from '@/lib/api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -82,11 +83,11 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
       let res: Response;
       try {
-        res = await fetch('/api/auth/register', {
+        res = await apiFetch('/api/auth/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...form, plan: 'FREE' }),
           signal: controller.signal,
+          raw: true,
         });
       } catch (err: any) {
         clearTimeout(timeoutId);

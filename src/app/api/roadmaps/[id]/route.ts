@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, nowISO } from '@/lib/db';
 
 const VALID_STATUSES = ['active', 'completed', 'paused'];
@@ -10,18 +9,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.roadmap.findFirst({ where: { id, userId } });
@@ -74,18 +64,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const existing = db.roadmap.findFirst({ where: { id, userId } });

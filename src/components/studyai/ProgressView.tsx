@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WabiSabiCard } from './WabiSabiCard';
+import { apiFetch, ApiError } from '@/lib/api';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts';
@@ -288,11 +289,11 @@ export function ProgressView({ user }: ProgressViewProps) {
     setError(null);
     try {
       const [gamRes, achRes, xpRes, statsRes, subRes] = await Promise.all([
-        fetch('/api/gamification').then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-        fetch('/api/achievements').then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-        fetch('/api/xp').then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-        fetch('/api/stats').then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-        fetch('/api/subjects').then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+        apiFetch('/api/gamification'),
+        apiFetch('/api/achievements'),
+        apiFetch('/api/xp'),
+        apiFetch('/api/stats'),
+        apiFetch('/api/subjects'),
       ]);
       setGamification(gamRes);
       setAchievements(achRes.achievements || []);

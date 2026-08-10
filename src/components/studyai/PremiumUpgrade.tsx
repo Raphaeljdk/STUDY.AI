@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, Zap, Check, X, Loader2, Sparkles, Infinity, MessageCircle, Brain, ShieldCheck } from 'lucide-react';
 import { ZenButton } from './ZenButton';
+import { apiFetch, ApiError } from '@/lib/api';
 
 interface UsageData {
   plan: string;
@@ -27,8 +28,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/checkout', { method: 'POST' });
-      const data = await res.json();
+      const data = await apiFetch('/api/checkout', { method: 'POST' });
 
       if (data.code === 'STRIPE_NOT_CONFIGURED') {
         setError('Pagamento indisponivel no momento. Tente novamente mais tarde.');
@@ -39,7 +39,8 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
       } else {
         setError(data.error || 'Nao foi possivel iniciar o pagamento.');
       }
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       setError('Erro de conexao. Tente novamente.');
     } finally {
       setLoading(false);

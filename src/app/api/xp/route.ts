@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 const VALID_SOURCES = [
@@ -10,36 +9,27 @@ const VALID_SOURCES = [
 
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const source = searchParams.get('source');
 
     // Fetch user for level info
-    const user = db.user.findUnique({
+    const userData = db.user.findUnique({
       where: { id: userId },
       select: ['xp', 'level'],
     });
 
-    if (!user) {
+    if (!userData) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
     }
 
-    const currentLevelXP = user.level * 100;
-    const nextLevelXP = (user.level + 1) * 100;
-    const xpInCurrentLevel = user.xp - currentLevelXP;
+    const currentLevelXP = userData.level * 100;
+    const nextLevelXP = (userData.level + 1) * 100;
+    const xpInCurrentLevel = userData.xp - currentLevelXP;
     const xpNeededForNextLevel = nextLevelXP - currentLevelXP;
     const progressPercent = Math.min(100, Math.max(0, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100)));
 
@@ -62,8 +52,8 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json({
-      xp: user.xp,
-      level: user.level,
+      xp: userData.xp,
+      level: userData.level,
       currentLevelXP,
       nextLevelXP,
       xpInCurrentLevel,
@@ -83,18 +73,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     let body: any;
     try {
@@ -123,16 +104,16 @@ export async function POST(request: Request) {
     });
 
     // Recalculate level
-    const user = db.user.findUnique({
+    const userData = db.user.findUnique({
       where: { id: userId },
       select: ['xp', 'level'],
     });
-    if (!user) {
+    if (!userData) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
     }
 
-    const newXP = user.xp + amount;
-    let newLevel = user.level;
+    const newXP = userData.xp + amount;
+    let newLevel = userData.level;
     const levelXP = newLevel * 100;
 
     if (amount > 0 && newXP >= levelXP) {

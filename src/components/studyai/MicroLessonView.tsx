@@ -8,6 +8,7 @@ import {
   Zap, Clock,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -651,19 +652,14 @@ export function MicroLessonView() {
     setTopic(selectedTopic);
     setGenerating(true);
     try {
-      const res = await fetch('/api/microlesson', {
+      const data = await apiFetch('/api/microlesson', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: selectedTopic }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to generate lesson');
-      }
-      const data = await res.json();
       setLesson(data);
       setScreen('lesson');
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({
         title: 'Erro ao gerar microaula',
         description: err.message || 'Tente novamente.',

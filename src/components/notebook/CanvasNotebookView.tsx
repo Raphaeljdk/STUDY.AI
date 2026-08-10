@@ -11,6 +11,7 @@ import {
   Columns2, Rows2, CalendarDays, PenLine, FileEdit, Columns3,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 
 interface NotebookPageData {
   id: string;
@@ -51,27 +52,24 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
   // --- Load pages ---
   const loadPages = useCallback(async () => {
     try {
-      const [nbRes, pgRes] = await Promise.all([
-        fetch(`/api/notebooks/${notebookId}`),
-        fetch(`/api/notebooks/${notebookId}/pages`),
+      const [nbData, pgData] = await Promise.all([
+        apiFetch(`/api/notebooks/${notebookId}`),
+        apiFetch(`/api/notebooks/${notebookId}/pages`),
       ]);
-      const nbData = await nbRes.json();
-      const pgData = await pgRes.json();
 
       if (nbData.notebook) setTitle(nbData.notebook.title);
 
       if (pgData.pages && pgData.pages.length > 0) {
         setPages(pgData.pages);
       } else {
-        const createRes = await fetch(`/api/notebooks/${notebookId}/pages`, {
+        const createData = await apiFetch(`/api/notebooks/${notebookId}/pages`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paperStyle: 'grid', paperColor: '#ffffff' }),
         });
-        const createData = await createRes.json();
         if (createData.page) setPages([createData.page]);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       console.error('[CanvasNotebookView] load error:', err);
       toast({ title: 'Erro ao carregar', description: 'Nao foi possivel carregar o caderno.', variant: 'destructive' });
     }
@@ -88,9 +86,8 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     if (!activePage) return;
     setSaving(true);
     try {
-      await fetch(`/api/notebooks/pages/${activePage.id}`, {
+      await apiFetch(`/api/notebooks/pages/${activePage.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ canvasData: canvasJson }),
       });
     } catch (err) {
@@ -106,9 +103,8 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
     saveTimerRef.current = setTimeout(async () => {
       setSaving(true);
       try {
-        await fetch(`/api/notebooks/pages/${activePage.id}`, {
+        await apiFetch(`/api/notebooks/pages/${activePage.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ textContent: html }),
         });
       } catch (err) {
@@ -127,12 +123,10 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
   // --- Page management ---
   const handleAddPage = async () => {
     try {
-      const res = await fetch(`/api/notebooks/${notebookId}/pages`, {
+      const data = await apiFetch(`/api/notebooks/${notebookId}/pages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paperStyle: 'grid', paperColor: '#ffffff' }),
       });
-      const data = await res.json();
       if (data.page) {
         setPages(prev => [...prev, data.page]);
         setActivePageIdx(pages.length);
@@ -148,7 +142,7 @@ export function CanvasNotebookView({ notebookId, onBack }: CanvasNotebookViewPro
       return;
     }
     try {
-      await fetch(`/api/notebooks/pages/${pageId}`, { method: 'DELETE' });
+      await apiFetch(`/api/notebooks/pages/${pageId}`, { method: 'DELETE' });
       const newPages = pages.filter(p => p.id !== pageId);
       setPages(newPages);
       if (activePageIdx >= newPages.length) setActivePageIdx(newPages.length - 1);

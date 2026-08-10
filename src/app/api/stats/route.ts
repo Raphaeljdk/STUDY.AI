@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const now = new Date();
     const nowIsoStr = now.toISOString();
@@ -25,7 +15,7 @@ export async function GET() {
 
     // Synchronous db calls (no Promise.all needed)
     // User gamification data
-    const user = db.user.findUnique({
+    const userData = db.user.findUnique({
       where: { id: userId },
       select: [
         'xp', 'level', 'currentStreak', 'longestStreak',
@@ -73,7 +63,7 @@ export async function GET() {
     // Weekly session count
     const weeklySessions = db.studySession.count({ where: { userId, createdAt: { gte: oneWeekAgoISO } } });
 
-    if (!user) {
+    if (!userData) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
     }
 
@@ -115,9 +105,9 @@ export async function GET() {
     }
 
     // Level progress
-    const currentLevelXP = user.level * 100;
-    const nextLevelXP = (user.level + 1) * 100;
-    const xpInCurrentLevel = user.xp - currentLevelXP;
+    const currentLevelXP = userData.level * 100;
+    const nextLevelXP = (userData.level + 1) * 100;
+    const xpInCurrentLevel = userData.xp - currentLevelXP;
     const xpNeededForNextLevel = nextLevelXP - currentLevelXP;
     const levelProgress = Math.min(100, Math.max(0, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100)));
 
@@ -154,7 +144,7 @@ export async function GET() {
 
       // New Fase 1 stats
       // Study time
-      totalStudyMinutes: user.totalStudyMinutes,
+      totalStudyMinutes: userData.totalStudyMinutes,
       todayStudyMinutes,
       weeklyStudyMinutes: weeklyMinutes,
 
@@ -165,25 +155,25 @@ export async function GET() {
       // Task stats
       tasksCompletedToday,
       pendingTasksCount,
-      totalTasksCompleted: user.totalTasksCompleted,
+      totalTasksCompleted: userData.totalTasksCompleted,
 
       // Goal progress
       inProgressGoals,
       completedGoalsToday,
 
       // Gamification
-      xp: user.xp,
-      level: user.level,
+      xp: userData.xp,
+      level: userData.level,
       levelProgress,
-      currentStreak: user.currentStreak,
-      longestStreak: user.longestStreak,
+      currentStreak: userData.currentStreak,
+      longestStreak: userData.longestStreak,
 
       // Flashcard stats (deduplicated)
       flashcardDueCount,
       masteredCards,
 
       // Session stats
-      totalSessions: user.totalSessions,
+      totalSessions: userData.totalSessions,
 
       // AI recommendations (stub)
       aiRecommendations: [

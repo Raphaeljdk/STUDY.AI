@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { requireUserAsync } from '@/lib/api-server';
 import { aiChat } from '@/lib/zai';
 import { canUse, incrementUsage } from '@/lib/usage';
 
@@ -19,12 +17,9 @@ Regras:
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    const userId = (session.user as any)?.id;
-    if (!userId) return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id', 'plan', 'role'] });
-    if (!userExists) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     // Usage limit check
     const usageCheck = await canUse(userId, 'flashcards');

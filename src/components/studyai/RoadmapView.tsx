@@ -9,6 +9,7 @@ import {
   Milestone, Route, Lightbulb, X,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -116,11 +117,10 @@ export function RoadmapView() {
   const fetchRoadmaps = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/roadmaps');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await apiFetch('/api/roadmaps');
       setRoadmaps(data.roadmaps || []);
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel carregar as trilhas.', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -134,9 +134,8 @@ export function RoadmapView() {
     if (!topic.trim()) return;
     setGenerating(true);
     try {
-      const res = await fetch('/api/roadmaps', {
+      await apiFetch('/api/roadmaps', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `Trilha: ${topic.trim()}`,
           topic: topic.trim(),
@@ -145,12 +144,12 @@ export function RoadmapView() {
           isAI: true,
         }),
       });
-      if (!res.ok) throw new Error();
       toast({ title: 'Trilha criada!', description: 'Sua trilha de aprendizagem foi gerada.' });
       setGenerateOpen(false);
       setGenerateInput('');
       fetchRoadmaps();
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel gerar a trilha.', variant: 'destructive' });
     } finally {
       setGenerating(false);
@@ -163,9 +162,8 @@ export function RoadmapView() {
     try {
       // Generate steps locally based on topic
       const defaultSteps: RoadmapStep[] = generateDefaultSteps(suggestion.topic);
-      const res = await fetch('/api/roadmaps', {
+      await apiFetch('/api/roadmaps', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: suggestion.title,
           topic: suggestion.topic,
@@ -174,10 +172,10 @@ export function RoadmapView() {
           isAI: true,
         }),
       });
-      if (!res.ok) throw new Error();
       toast({ title: 'Trilha criada!', description: `${suggestion.title} adicionada as suas trilhas.` });
       fetchRoadmaps();
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel criar a trilha.', variant: 'destructive' });
     } finally {
       setGenerating(false);
@@ -195,12 +193,10 @@ export function RoadmapView() {
       const newStep = stepIndex + 1;
       const newStatus = newStep >= roadmap.totalSteps ? 'completed' : 'active';
 
-      const res = await fetch(`/api/roadmaps/${roadmap.id}`, {
+      const data = await apiFetch(`/api/roadmaps/${roadmap.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentStep: newStep, status: newStatus }),
       });
-      if (!res.ok) throw new Error();
 
       if (newStatus === 'completed') {
         toast({ title: 'Trilha concluida!', description: `Parabens! Voce completou "${roadmap.title}".` });
@@ -208,10 +204,10 @@ export function RoadmapView() {
       fetchRoadmaps();
       // Update selected if viewing detail
       if (selectedRoadmap?.id === roadmap.id) {
-        const data = await res.json();
         setSelectedRoadmap(data.roadmap);
       }
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel atualizar a trilha.', variant: 'destructive' });
     }
   };
@@ -220,13 +216,13 @@ export function RoadmapView() {
   const deleteRoadmap = async () => {
     if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/roadmaps/${deleteTarget.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/roadmaps/${deleteTarget.id}`, { method: 'DELETE' });
       toast({ title: 'Trilha removida', description: '"${deleteTarget.title}" foi excluida.' });
       if (selectedRoadmap?.id === deleteTarget.id) setSelectedRoadmap(null);
       setDeleteTarget(null);
       fetchRoadmaps();
-    } catch {
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Nao foi possivel excluir a trilha.', variant: 'destructive' });
     }
   };

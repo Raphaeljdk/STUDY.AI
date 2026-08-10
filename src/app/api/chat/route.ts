@@ -1,29 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
-
-async function requireUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return { error: NextResponse.json({ error: 'Nao autorizado' }, { status: 401 }) };
-  }
-  const userId = (session.user as any)?.id;
-  if (!userId) {
-    return { error: NextResponse.json({ error: 'Sessao invalida' }, { status: 401 }) };
-  }
-  const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-  if (!userExists) {
-    return { error: NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 }) };
-  }
-  return { userId };
-}
 
 export async function GET() {
   try {
-    const auth = await requireUser();
-    if ('error' in auth) return auth.error;
-    const { userId } = auth;
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const messages = db.chatMessage.findMany({
       where: { userId },
@@ -40,9 +23,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireUser();
-    if ('error' in auth) return auth.error;
-    const { userId } = auth;
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     // JSON parse safety
     let body: any;
@@ -80,9 +63,9 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   try {
-    const auth = await requireUser();
-    if ('error' in auth) return auth.error;
-    const { userId } = auth;
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     db.chatMessage.deleteMany({ where: { userId } });
     return NextResponse.json({ success: true });

@@ -8,6 +8,7 @@ import {
   Flame, History, Check, X,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -794,11 +795,8 @@ export function BattleView() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch('/api/battle');
-        if (res.ok) {
-          const data = await res.json();
-          setHistory(data.battles || data || []);
-        }
+        const data = await apiFetch('/api/battle');
+        setHistory(data.battles || data || []);
       } catch {
         // silent
       }
@@ -810,19 +808,14 @@ export function BattleView() {
     setSubject(selectedSubject);
     setLoading(true);
     try {
-      const res = await fetch('/api/battle', {
+      const data = await apiFetch('/api/battle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: selectedSubject }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to start battle');
-      }
-      const data = await res.json();
       setBattle(data);
       setScreen('battle');
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({
         title: 'Erro ao iniciar duelo',
         description: err.message || 'Tente novamente.',
@@ -837,23 +830,20 @@ export function BattleView() {
   ) => {
     if (!battle) return;
     try {
-      const res = await fetch('/api/battle/finish', {
+      const data = await apiFetch('/api/battle/finish', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           battleId: battle.id,
           answers,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setResult(data);
-        // Refresh history
-        const histRes = await fetch('/api/battle');
-        if (histRes.ok) {
-          const histData = await histRes.json();
-          setHistory(histData.battles || histData || []);
-        }
+      setResult(data);
+      // Refresh history
+      try {
+        const histData = await apiFetch('/api/battle');
+        setHistory(histData.battles || histData || []);
+      } catch {
+        // silent
       }
     } catch {
       toast({ title: 'Erro ao salvar resultado', description: 'Seu resultado foi calculado localmente.' });

@@ -8,6 +8,7 @@ import {
   Trophy, ArrowLeft,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -244,19 +245,14 @@ function MissionDetail({
   const handleCompleteStep = async (stepId: string) => {
     setCompletingStep(stepId);
     try {
-      const res = await fetch(`/api/missions/${mission.id}`, {
+      await apiFetch(`/api/missions/${mission.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stepId }),
       });
-      if (res.ok) {
-        onUpdate();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast({ title: 'Erro', description: err.error || 'Nao foi possivel completar a etapa.' });
-      }
-    } catch {
-      toast({ title: 'Erro', description: 'Erro de conexao. Tente novamente.' });
+      onUpdate();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      toast({ title: 'Erro', description: err.message || 'Erro de conexao. Tente novamente.' });
     } finally {
       setCompletingStep(null);
     }
@@ -264,12 +260,11 @@ function MissionDetail({
 
   const handleCompleteMission = async () => {
     try {
-      const res = await fetch(`/api/missions/${mission.id}/complete`, { method: 'POST' });
-      if (res.ok) {
-        toast({ title: 'Missao concluida!', description: `+${mission.xpReward} XP ganhos!` });
-        onUpdate();
-      }
-    } catch {
+      await apiFetch(`/api/missions/${mission.id}/complete`, { method: 'POST' });
+      toast({ title: 'Missao concluida!', description: `+${mission.xpReward} XP ganhos!` });
+      onUpdate();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro', description: 'Tente novamente.' });
     }
   };
@@ -554,9 +549,8 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
 
   const fetchMissions = useCallback(async () => {
     try {
-      const res = await fetch('/api/missions');
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiFetch('/api/missions').catch(() => null);
+      if (data) {
         setMissions(Array.isArray(data) ? data : data.missions || []);
       }
     } catch {
@@ -577,20 +571,14 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
     }
     setCreating(true);
     try {
-      const res = await fetch('/api/missions', {
+      const data = await apiFetch('/api/missions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: formSubject.trim(),
           topic: formTopic.trim(),
           timeAvailable: formTime,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to create mission');
-      }
-      const data = await res.json();
       setMissions((prev) => [data, ...prev]);
       setShowCreateDialog(false);
       setFormSubject('');
@@ -598,6 +586,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
       setFormTime(30);
       toast({ title: 'Missao criada!', description: data.title || 'Sua missao esta pronta.' });
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao criar missao', description: err.message || 'Tente novamente.' });
     } finally {
       setCreating(false);

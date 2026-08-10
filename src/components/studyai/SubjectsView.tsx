@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { apiFetch, ApiError } from '@/lib/api';
 
 // ===== TYPES =====
 interface SubjectsViewProps {
@@ -283,16 +284,14 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
   const fetchSubjects = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/subjects');
-      if (!res.ok) throw new Error('Erro ao carregar materias');
-      const data = await res.json();
+      const data = await apiFetch('/api/subjects');
 
       // Enrich subjects with mastery and pending task data
       const enriched: SubjectWithMastery[] = await Promise.all(
         (data.subjects || []).map(async (s: SubjectList) => {
           try {
-            const detailRes = await fetch(`/api/subjects/${s.id}`);
-            if (!detailRes.ok) {
+            const detailData = await apiFetch(`/api/subjects/${s.id}`).catch(() => null);
+            if (!detailData) {
               return {
                 ...s,
                 mastery: 0,
@@ -300,7 +299,6 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                 pendingTasks: 0,
               };
             }
-            const detailData = await detailRes.json();
             const detail: SubjectDetail = detailData.subject;
             const topics = detail.topics || [];
             const avgMastery =
@@ -336,6 +334,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
 
       setSubjects(enriched);
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({
         title: 'Erro ao carregar',
         description: err.message || 'Nao foi possivel carregar suas materias.',
@@ -354,12 +353,11 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
   const fetchSubjectDetail = useCallback(async (subjectId: string) => {
     try {
       setDetailLoading(true);
-      const res = await fetch(`/api/subjects/${subjectId}`);
-      if (!res.ok) throw new Error('Materia nao encontrada');
-      const data = await res.json();
+      const data = await apiFetch(`/api/subjects/${subjectId}`);
       setSubjectDetail(data.subject);
       setDetailTopics(data.subject.topics || []);
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({
         title: 'Erro',
         description: err.message || 'Nao foi possivel carregar os detalhes.',
@@ -411,9 +409,8 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
     }
     try {
       setFormSubmitting(true);
-      const res = await fetch('/api/subjects', {
+      await apiFetch('/api/subjects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formName.trim(),
           description: formDescription.trim() || null,
@@ -421,14 +418,11 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
           icon: formIcon,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao criar materia');
-      }
       toast({ title: 'Materia criada!', description: `${formName.trim()} foi adicionada com sucesso.` });
       setShowAddDialog(false);
       fetchSubjects();
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao criar', description: err.message, variant: 'destructive' });
     } finally {
       setFormSubmitting(false);
@@ -443,9 +437,8 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
     }
     try {
       setFormSubmitting(true);
-      const res = await fetch(`/api/subjects/${subjectDetail.id}`, {
+      await apiFetch(`/api/subjects/${subjectDetail.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formName.trim(),
           description: formDescription.trim() || null,
@@ -453,15 +446,12 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
           icon: formIcon,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao atualizar materia');
-      }
       toast({ title: 'Materia atualizada!', description: `${formName.trim()} foi salva com sucesso.` });
       setShowEditDialog(false);
       fetchSubjectDetail(subjectDetail.id);
       fetchSubjects();
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' });
     } finally {
       setFormSubmitting(false);
@@ -473,11 +463,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
     if (!deleteTarget) return;
     try {
       setDeleting(true);
-      const res = await fetch(`/api/subjects/${deleteTarget}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao excluir materia');
-      }
+      await apiFetch(`/api/subjects/${deleteTarget}`, { method: 'DELETE' });
       toast({ title: 'Materia excluida', description: 'A materia foi removida com sucesso.' });
       setShowDeleteDialog(false);
       setDeleteTarget(null);
@@ -486,6 +472,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
       }
       fetchSubjects();
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' });
     } finally {
       setDeleting(false);
@@ -500,18 +487,13 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
     }
     try {
       setTopicSubmitting(true);
-      const res = await fetch(`/api/subjects/${selectedSubjectId}/topics`, {
+      await apiFetch(`/api/subjects/${selectedSubjectId}/topics`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: topicName.trim(),
           description: topicDescription.trim() || null,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao criar topico');
-      }
       toast({ title: 'Topico adicionado!', description: `${topicName.trim()} foi criado com sucesso.` });
       setTopicName('');
       setTopicDescription('');
@@ -519,6 +501,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
       fetchSubjectDetail(selectedSubjectId);
       fetchSubjects();
     } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
       toast({ title: 'Erro ao criar topico', description: err.message, variant: 'destructive' });
     } finally {
       setTopicSubmitting(false);
@@ -864,12 +847,12 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
         </div>
 
         {/* Stats cards row */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
             style={{ borderRadius: 'var(--ws-radius-card)' }}
           >
             <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
@@ -883,7 +866,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
             style={{ borderRadius: 'var(--ws-radius-card)' }}
           >
             <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
@@ -899,7 +882,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
             style={{ borderRadius: 'var(--ws-radius-card)' }}
           >
             <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
@@ -913,7 +896,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-4"
+            className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
             style={{ borderRadius: 'var(--ws-radius-card)' }}
           >
             <div className="flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">

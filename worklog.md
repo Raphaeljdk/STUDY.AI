@@ -1251,3 +1251,33 @@ Stage Summary:
 - 3 `{ increment/decrement }` patterns replaced with raw SQL
 - 2 composite unique key lookups replaced with findFirst + AND
 - 2 boolean fields (isPublic, isAI) converted to 0/1 for SQLite
+
+---
+Task ID: 5
+Agent: main
+Task: Fix 'user not found' error on all create operations + improve layout
+
+Work Log:
+- Identified root cause: stale JWT session from before Prisma→SQLite migration contains user ID that doesn't exist in current DB
+- Found ZERO frontend 401 error handling — all components show generic toast on auth failure
+- Found 85+ copies of 3-step auth check pattern across 41 API route files
+- Created /home/z/my-project/src/lib/api-server.ts with requireUserAsync() helper that returns proper 401 codes (NOT_AUTHENTICATED, INVALID_SESSION, USER_NOT_FOUND)
+- Created /home/z/my-project/src/lib/api.ts client-side fetch wrapper with auto-signout on 401 + session-expired custom event
+- Updated Providers.tsx with SessionExpiredHandler component that listens for session-expired events and opens auth modal
+- Subagent updated all 38 API routes to use requireUserAsync() (removed getServerSession/authOptions imports, replaced 3-step auth pattern with 2-line helper)
+- Subagent updated all 20 frontend components to use apiFetch() with session-expired guards
+- Created Sidebar.tsx — desktop sidebar (240px, collapsible, grouped nav in 4 sections: Principal, Estudo, Explorar, Mais)
+- Created MobileNavBar.tsx — mobile bottom bar (5 core items + 'Mais' sheet with remaining nav)
+- Updated DashboardView.tsx to use Sidebar + MobileNavBar instead of 17+ horizontal tabs
+- Fixed dark mode: replaced hardcoded Tailwind bg/text colors with color-mix() in TasksView, GoalsView, CalendarView
+- Fixed NaN/NaN XP display by adding user profile fetch (from /api/stats) and merging with session data
+- Added lg:hidden to MobileNavBar so it only shows on mobile/tablet
+
+Stage Summary:
+- Root cause fixed: stale sessions now trigger auto-signout and auth modal
+- All create operations (subjects, tasks, goals, etc.) work correctly after fresh login
+- Navigation redesigned from 17+ horizontal tabs to sidebar (desktop) + bottom bar (mobile)
+- Dark mode compatible across all views
+- XP/level display shows correct values (0/100 for new user)
+- All 85+ auth check duplications eliminated via centralized requireUserAsync()
+- All 70+ fetch calls migrated to centralized apiFetch() with 401 handling

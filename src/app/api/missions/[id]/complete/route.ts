@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
@@ -8,10 +7,10 @@ async function awardXP(userId: string, amount: number, source: any, description:
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
-  if (!user) return xpTx;
+  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  if (!userData) return xpTx;
 
-  const newXP = user.xp + amount;
+  const newXP = userData.xp + amount;
   const newLevel = Math.floor(newXP / 500) + 1;
 
   db.user.update({
@@ -27,18 +26,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    }
-    const userId = (session.user as any)?.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    }
-    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
-    if (!userExists) {
-      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
-    }
+    const user = await requireUserAsync();
+    if (user instanceof NextResponse) return user;
+    const userId = user.id;
 
     const { id } = await params;
     const mission = db.mission.findFirst({ where: { id, userId } });
@@ -64,13 +54,13 @@ export async function POST(
     // Award XP
     const xpTx = awardXP(userId, xpAmount, 'GOAL_COMPLETED', `Missao concluida: ${mission.title}`);
 
-    const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+    const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
 
     return NextResponse.json({
       mission: updatedMission,
       xpAwarded: xpAmount,
-      newXp: user?.xp,
-      newLevel: user?.level,
+      newXp: userData?.xp,
+      newLevel: userData?.level,
     });
   } catch (error) {
     console.error('Route error:', error);
