@@ -580,6 +580,11 @@ if (process.env.NODE_ENV !== 'production') {
 // Extended client: auto-ensures tables before every Prisma query.
 // The $extends query hook intercepts all model queries.
 // Raw SQL in createTables() uses _baseClient directly (no hook).
+//
+// CRITICAL FIX: Prisma v6 + SQLite generates numeric millisecond timestamps
+// (e.g. "1786364295199") for @default(now()) / @updatedAt instead of
+// ISO 8601 strings, causing P2023. We inject ISO strings explicitly
+// in create/update operations so Prisma never auto-generates them.
 
 function convertDatesToISO(obj: any): any {
   if (obj === null || obj === undefined) return obj
@@ -598,9 +603,48 @@ function convertDatesToISO(obj: any): any {
 const db = _baseClient.$extends({
   query: {
     $allModels: {
-      async $allOperations({ args, query }) {
+      async $allOperations({ args, query, operation }) {
         await ensureTables(_baseClient)
+
+        const nowISO = new Date().toISOString()
+
+        // --- INJECT ISO TIMESTAMPS FOR WRITE OPERATIONS ---
+
+        // create: { data: { ... } }
+        if (operation === 'create' && args.data) {
+          if (!args.data.createdAt) args.data.createdAt = nowISO
+          if (!args.data.updatedAt && 'updatedAt' in args.data === false) args.data.updatedAt = nowISO
+        }
+
+        // createMany: { data: [ { ... }, { ... } ] }
+        if (operation === 'createMany' && Array.isArray(args.data)) {
+          for (const item of args.data) {
+            if (!item.createdAt) item.createdAt = nowISO
+            if (!item.updatedAt && 'updatedAt' in item === false) item.updatedAt = nowISO
+          }
+        }
+
+        // update / updateMany: { data: { ... } }
+        if (operation === 'update' || operation === 'updateMany') {
+          if (args.data) {
+            args.data.updatedAt = nowISO
+          }
+        }
+
+        // upsert: { create: { ... }, update: { ... } }
+        if (operation === 'upsert') {
+          if (args.create) {
+            if (!args.create.createdAt) args.create.createdAt = nowISO
+            if (!args.create.updatedAt && 'updatedAt' in args.create === false) args.create.updatedAt = nowISO
+          }
+          if (args.update) {
+            args.update.updatedAt = nowISO
+          }
+        }
+
+        // --- CONVERT ANY REMAINING Date OBJECTS TO ISO STRINGS ---
         args = convertDatesToISO(args)
+
         return query(args)
       },
     },

@@ -54,12 +54,15 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    const nowISO = new Date().toISOString();
     const user = await db.user.create({
       data: {
         name: trimmedName,
         email: normalizedEmail,
         password: hashedPassword,
         plan: 'FREE',
+        createdAt: nowISO,
+        updatedAt: nowISO,
       },
     });
 
