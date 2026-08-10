@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         initialScore: score,
         finalScore: score,
         answers: JSON.stringify(answers),
-        completedAt: new Date(),
+        completedAt: new Date().toISOString(),
       },
     });
 

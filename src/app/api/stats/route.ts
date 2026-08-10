@@ -19,8 +19,9 @@ export async function GET() {
     }
 
     const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nowISO = now.toISOString();
+    const oneWeekAgoISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const todayStartISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
     // Parallel data fetches
     const [
@@ -55,9 +56,9 @@ export async function GET() {
       // Pending tasks
       db.task.count({ where: { userId, status: 'PENDING' } }),
       // Tasks completed today
-      db.task.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStart } } }),
+      db.task.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } }),
       // Flashcards due
-      db.flashcard.count({ where: { userId, nextReview: { lte: now } } }),
+      db.flashcard.count({ where: { userId, nextReview: { lte: nowISO } } }),
       // Total flashcards
       db.flashcard.count({ where: { userId } }),
       // Notebook count
@@ -68,7 +69,7 @@ export async function GET() {
       db.flashcard.count({ where: { userId, repetitions: { gte: 5 } } }),
       // Sessions this week
       db.studySession.findMany({
-        where: { userId, createdAt: { gte: oneWeekAgo } },
+        where: { userId, createdAt: { gte: oneWeekAgoISO } },
         select: { duration: true, createdAt: true },
       }),
       // All sessions (for streak)
@@ -78,7 +79,7 @@ export async function GET() {
       }),
       // Today sessions
       db.studySession.findMany({
-        where: { userId, createdAt: { gte: todayStart } },
+        where: { userId, createdAt: { gte: todayStartISO } },
         select: { duration: true },
       }),
       // Chat count
@@ -86,9 +87,9 @@ export async function GET() {
       // In-progress goals
       db.goal.count({ where: { userId, status: 'IN_PROGRESS' } }),
       // Goals completed today
-      db.goal.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStart } } }),
+      db.goal.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } }),
       // Weekly session count
-      db.studySession.count({ where: { userId, createdAt: { gte: oneWeekAgo } } }),
+      db.studySession.count({ where: { userId, createdAt: { gte: oneWeekAgoISO } } }),
     ]);
 
     if (!user) {

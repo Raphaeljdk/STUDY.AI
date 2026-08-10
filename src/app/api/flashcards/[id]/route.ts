@@ -61,6 +61,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       const nextReview = new Date();
       nextReview.setDate(nextReview.getDate() + newInterval);
+      const nextReviewISO = nextReview.toISOString();
 
       // TOCTOU-safe updateMany with userId filter
       const result = await db.flashcard.updateMany({
@@ -69,7 +70,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           easeFactor: newEF,
           interval: newInterval,
           repetitions: newRepetitions,
-          nextReview,
+          nextReview: nextReviewISO,
         },
       });
 

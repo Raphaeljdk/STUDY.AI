@@ -417,6 +417,97 @@ CREATE TABLE IF NOT EXISTS "Roadmap" (
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "Roadmap_userId_idx" ON "Roadmap"("userId");
+
+CREATE TRIGGER IF NOT EXISTS "User_updatedAt"
+  AFTER UPDATE ON "User"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "User" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Subject_updatedAt"
+  AFTER UPDATE ON "Subject"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Subject" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Topic_updatedAt"
+  AFTER UPDATE ON "Topic"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Topic" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Task_updatedAt"
+  AFTER UPDATE ON "Task"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Task" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Goal_updatedAt"
+  AFTER UPDATE ON "Goal"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Goal" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "CalendarEvent_updatedAt"
+  AFTER UPDATE ON "CalendarEvent"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "CalendarEvent" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Notebook_updatedAt"
+  AFTER UPDATE ON "Notebook"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Notebook" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "NotebookPage_updatedAt"
+  AFTER UPDATE ON "NotebookPage"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "NotebookPage" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Flashcard_updatedAt"
+  AFTER UPDATE ON "Flashcard"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Flashcard" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "UserMemory_updatedAt"
+  AFTER UPDATE ON "UserMemory"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "UserMemory" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "DiscoverItem_updatedAt"
+  AFTER UPDATE ON "DiscoverItem"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "DiscoverItem" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Mission_updatedAt"
+  AFTER UPDATE ON "Mission"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Mission" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
+
+CREATE TRIGGER IF NOT EXISTS "Roadmap_updatedAt"
+  AFTER UPDATE ON "Roadmap"
+  FOR EACH ROW
+  BEGIN
+    UPDATE "Roadmap" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
+  END;
 `
 
 // ═══════════════════════════════════════════════════════════════
@@ -489,11 +580,27 @@ if (process.env.NODE_ENV !== 'production') {
 // Extended client: auto-ensures tables before every Prisma query.
 // The $extends query hook intercepts all model queries.
 // Raw SQL in createTables() uses _baseClient directly (no hook).
+
+function convertDatesToISO(obj: any): any {
+  if (obj === null || obj === undefined) return obj
+  if (obj instanceof Date) return obj.toISOString()
+  if (Array.isArray(obj)) return obj.map(convertDatesToISO)
+  if (typeof obj === 'object') {
+    const result: any = {}
+    for (const key of Object.keys(obj)) {
+      result[key] = convertDatesToISO(obj[key])
+    }
+    return result
+  }
+  return obj
+}
+
 const db = _baseClient.$extends({
   query: {
     $allModels: {
       async $allOperations({ args, query }) {
         await ensureTables(_baseClient)
+        args = convertDatesToISO(args)
         return query(args)
       },
     },

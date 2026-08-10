@@ -69,7 +69,7 @@ export async function PATCH(
     if (typeof currentValue === 'number') data.currentValue = currentValue;
     if (typeof targetValue === 'number') data.targetValue = targetValue;
     if (typeof unit === 'string') data.unit = unit;
-    if (targetDate !== undefined) data.targetDate = targetDate ? new Date(targetDate) : null;
+    if (targetDate !== undefined) data.targetDate = targetDate ? new Date(targetDate).toISOString() : null;
     if (status && VALID_STATUSES.includes(status)) data.status = status;
 
     // Auto-complete goal if currentValue >= targetValue
@@ -79,14 +79,14 @@ export async function PATCH(
 
     if (newTargetValue && newCurrentValue >= newTargetValue && existing.status !== 'COMPLETED') {
       data.status = 'COMPLETED';
-      data.completedAt = new Date();
+      data.completedAt = new Date().toISOString();
       await awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
       xpAwarded = true;
     }
 
     // Explicit mark complete
     if (status === 'COMPLETED' && existing.status !== 'COMPLETED') {
-      data.completedAt = new Date();
+      data.completedAt = new Date().toISOString();
       if (!xpAwarded) {
         await awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
         xpAwarded = true;

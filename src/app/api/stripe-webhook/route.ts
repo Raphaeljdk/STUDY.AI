@@ -39,7 +39,7 @@ export async function POST(request: Request) {
             plan: 'PREMIUM',
             stripeSubscriptionId: event.data.object.subscription,
             stripePriceId: event.data.object.line_items?.data?.[0]?.price?.id,
-            stripeCurrentPeriodEnd: new Date(event.data.object.subscription_details?.current_period_end * 1000 || Date.now() + 30 * 86400000),
+            stripeCurrentPeriodEnd: new Date(event.data.object.subscription_details?.current_period_end * 1000 || Date.now() + 30 * 86400000).toISOString(),
           },
         });
         break;
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         if (event.data.object.status === 'active') {
           await db.user.update({
             where: { id: userId },
-            data: { plan: 'PREMIUM', stripeCurrentPeriodEnd: new Date(event.data.object.current_period_end * 1000) },
+            data: { plan: 'PREMIUM', stripeCurrentPeriodEnd: new Date(event.data.object.current_period_end * 1000).toISOString() },
           });
         }
         break;

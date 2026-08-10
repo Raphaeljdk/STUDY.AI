@@ -778,3 +778,44 @@ Stage Summary:
 - Password error was caused by DB failure (tables missing) - now fixed
 - Registration, login, and full dashboard verified working
 
+---
+Task ID: 2-fix-p2023
+Agent: general-purpose
+Task: Fix P2023 DateTime error - Prisma v6 generating numeric timestamps instead of ISO strings
+
+Work Log:
+- Read worklog.md for project context
+- Analyzed prisma/schema.prisma: found @default(now()) and @updatedAt on 30+ DateTime fields causing Prisma v6 to generate numeric timestamps (e.g. "1786364295199") instead of ISO 8601 strings
+- Rewrote prisma/schema.prisma: removed ALL @default(now()) and ALL @updatedAt from DateTime fields; kept all other defaults (cuid(), string literals, int defaults)
+- Added 13 SQLite AFTER UPDATE triggers to db.ts SCHEMA_SQL for: User, Subject, Topic, Task, Goal, CalendarEvent, Notebook, NotebookPage, Flashcard, UserMemory, DiscoverItem, Mission, Roadmap - each auto-sets updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+- Added convertDatesToISO() recursive helper function to db.ts that converts any Date objects in query args to ISO strings before passing to Prisma
+- Updated $extends hook in db.ts to call convertDatesToISO(args) before every query
+- Fixed HomeDashboard.tsx null guards: changed useState initializers to use `||` instead of `??`, added safeTasks/safeEvents/safeGoals/safeStudyPlanSlots Array.isArray wrappers, replaced all .length and .map usages with safe versions
+- Deleted old database file (db/custom.db) and node_modules/.prisma/client
+- Regenerated Prisma client (v6.19.2) successfully
+
+Stage Summary:
+- P2023 error root cause: Prisma v6 @default(now()) generates numeric milliseconds instead of ISO 8601 strings for SQLite
+- Fix: Removed all Prisma-level DateTime defaults; raw SQL tables already have proper DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+- updatedAt auto-update now handled by SQLite AFTER UPDATE triggers (13 tables)
+- Date objects from API routes converted to ISO strings via convertDatesToISO in $extends hook
+- HomeDashboard protected against null/undefined array access with safe wrappers
+- Fresh database will be created on next app start via existing auto-table-creation mechanism
+
+---
+Task ID: 3-verify-fixes
+Agent: verify-agent
+Task: Verify all P2023 fixes and fix remaining API route Date issues
+
+Work Log:
+- Verified schema.prisma has no @default(now()) or @updatedAt
+- Verified db.ts has convertDatesToISO and all 13 UPDATE triggers
+- Fixed all API routes passing new Date() to Prisma
+- Ran lint check
+- Started dev server
+
+Stage Summary:
+- All DateTime defaults now handled by SQLite strftime
+- All API routes converted to use ISO strings or handled by convertDatesToISO
+- Lint passes clean
+- Dev server running

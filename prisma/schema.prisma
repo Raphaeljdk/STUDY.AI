@@ -100,8 +100,8 @@ model User {
   reputation        Int      @default(0)
   reputationLevel   String   @default("Aprendiz")
   learningStyle     String?  // visual, auditory, kinesthetic, reading
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime
+  updatedAt             DateTime
 
   // Relations
   notebooks            Notebook[]
@@ -138,8 +138,8 @@ model Subject {
   icon        String   @default("book")
   sortOrder   Int      @default(0)
   isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 
   topics      Topic[]
   tasks       Task[]
@@ -158,8 +158,8 @@ model Topic {
   mastery     Float    @default(0) // 0-100 percentage
   totalQuestions Int    @default(0)
   correctAnswers Int   @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 
   @@index([subjectId])
 }
@@ -183,8 +183,8 @@ model Task {
   actualMinutes    Int?
   sortOrder   Int      @default(0)
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 
   @@index([userId])
   @@index([status])
@@ -207,11 +207,11 @@ model Goal {
   unit          String?    // "minutes", "tasks", "questions"
   subjectId     String?
   subject       Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  startDate     DateTime   @default(now())
+  startDate     DateTime
   targetDate    DateTime?
   completedAt   DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime
+  updatedAt     DateTime
 
   @@index([userId])
   @@index([status])
@@ -234,8 +234,8 @@ model CalendarEvent {
   subject     Subject?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   isAllDay    Boolean   @default(false)
   color       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 
   @@index([userId])
   @@index([date])
@@ -252,7 +252,7 @@ model XPTransaction {
   amount      Int       // positive = gain, negative = loss
   source      XPSource
   description String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime
 
   @@index([userId])
   @@index([createdAt])
@@ -269,7 +269,7 @@ model Achievement {
   category    String   @default("general") // general, streak, study, social
   sortOrder   Int      @default(0)
   users       UserAchievement[]
-  createdAt   DateTime @default(now())
+  createdAt   DateTime
 }
 
 model UserAchievement {
@@ -278,7 +278,7 @@ model UserAchievement {
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievementId String
   achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
-  unlockedAt    DateTime   @default(now())
+  unlockedAt    DateTime
 
   @@unique([userId, achievementId])
   @@index([userId])
@@ -290,7 +290,7 @@ model StreakRecord {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      DateTime
   streak    Int      // current streak count on that date
-  createdAt DateTime @default(now())
+  createdAt DateTime
 
   @@unique([userId, date])
   @@index([userId])
@@ -311,8 +311,8 @@ model Notebook {
   flashcards  Flashcard[]
   pages       NotebookPage[]
   tags        NotebookTag[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 }
 
 model NotebookPage {
@@ -328,8 +328,8 @@ model NotebookPage {
   width      Int      @default(1200)
   height     Int      @default(1600)
   layers     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime
+  updatedAt  DateTime
 
   @@index([notebookId])
 }
@@ -341,7 +341,7 @@ model NotebookTag {
   notebookId String
   notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
   userId    String
-  createdAt DateTime @default(now())
+  createdAt DateTime
 
   @@index([notebookId])
   @@index([userId])
@@ -357,9 +357,9 @@ model Flashcard {
   easeFactor   Float    @default(2.5)
   interval     Int      @default(0)
   repetitions  Int      @default(0)
-  nextReview   DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now())
+  nextReview   DateTime
+  createdAt    DateTime
+  updatedAt    DateTime
 }
 
 model StudySession {
@@ -374,7 +374,7 @@ model StudySession {
   rating       Int?     // 1-4: easy, normal, hard, very hard
   notes        String?
   xpEarned     Int      @default(0)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime
 
   @@index([userId])
 }
@@ -385,14 +385,14 @@ model ChatMessage {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      String
   content   String
-  createdAt DateTime @default(now())
+  createdAt DateTime
 }
 
 model DailyUsage {
   id            String   @id @default(cuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date          DateTime @default(now())
+  date          DateTime
   chatMessages  Int      @default(0)
   flashcards    Int      @default(0)
 
@@ -407,8 +407,8 @@ model UserMemory {
   category  String   @default("general")
   content   String
   source    String   @default("conversation")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime
+  updatedAt DateTime
 
   @@index([userId])
 }
@@ -433,8 +433,8 @@ model DiscoverItem {
   saves       Int      @default(0)
   userId      String?  // creator (null for system-generated)
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime
+  updatedAt   DateTime
 
   discoverSaves DiscoverSave[]
 }
@@ -445,7 +445,7 @@ model DiscoverSave {
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   discoverItemId String
   discoverItem  DiscoverItem @relation(fields: [discoverItemId], references: [id], onDelete: Cascade)
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime
 
   @@unique([userId, discoverItemId])
   @@index([userId])
@@ -466,7 +466,7 @@ model Battle {
   duration      Int      @default(60) // seconds
   xpEarned      Int      @default(0)
   completedAt   DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime
 
   @@index([userId])
 }
@@ -491,8 +491,8 @@ model Mission {
   estimatedMinutes Int?
   xpReward      Int          @default(0)
   completedAt   DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime
+  updatedAt     DateTime
 
   @@index([userId])
   @@index([status])
@@ -513,7 +513,7 @@ model PreTest {
   questions     String   // JSON array of questions
   answers       String?  // JSON array of answers
   completedAt   DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime
 
   @@index([userId])
 }
@@ -534,8 +534,8 @@ model Roadmap {
   totalSteps    Int      @default(0)
   status        String   @default("active") // active, completed, paused
   isAI          Boolean  @default(false) // generated by AI
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime
+  updatedAt     DateTime
 
   @@index([userId])
 }

@@ -74,7 +74,7 @@ export async function PATCH(
     }
     if (priority && VALID_PRIORITIES.includes(priority)) data.priority = priority;
     if (status && VALID_STATUSES.includes(status)) data.status = status;
-    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate).toISOString() : null;
     if (typeof estimatedMinutes === 'number') data.estimatedMinutes = estimatedMinutes;
     if (typeof actualMinutes === 'number') data.actualMinutes = actualMinutes;
     if (typeof sortOrder === 'number') data.sortOrder = sortOrder;
@@ -82,7 +82,7 @@ export async function PATCH(
     // Handle task completion: award XP
     let xpAwarded = false;
     if (status === 'COMPLETED' && existing.status !== 'COMPLETED') {
-      data.completedAt = new Date();
+      data.completedAt = new Date().toISOString();
       await awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
       xpAwarded = true;
       // Update user total tasks completed

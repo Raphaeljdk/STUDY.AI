@@ -56,7 +56,7 @@ export async function POST(
       data: {
         status: 'completed',
         completedSteps: mission.totalSteps,
-        completedAt: new Date(),
+        completedAt: new Date().toISOString(),
       },
     });
 

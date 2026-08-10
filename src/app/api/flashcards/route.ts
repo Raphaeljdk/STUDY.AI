@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       }
       where.notebookId = notebookId;
     }
-    if (dueOnly) where.nextReview = { lte: new Date() };
+    if (dueOnly) where.nextReview = { lte: new Date().toISOString() };
 
     const flashcards = await db.flashcard.findMany({
       where,

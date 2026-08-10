@@ -145,9 +145,9 @@ export function HomeDashboard({
   // Derive initial loading state — skip fetching if stats were passed via props
   const hasInitialProps = !!propsStats;
   const [stats, setStats] = useState<HomeDashboardProps['stats']>(propsStats);
-  const [todayTasks, setTodayTasks] = useState<HomeDashboardProps['todayTasks']>(propsTasks ?? []);
-  const [upcomingEvents, setUpcomingEvents] = useState<HomeDashboardProps['upcomingEvents']>(propsEvents ?? []);
-  const [dailyGoals, setDailyGoals] = useState<GoalItem[]>([]);
+  const [todayTasks, setTodayTasks] = useState<HomeDashboardProps['todayTasks']>((propsTasks || []) as HomeDashboardProps['todayTasks']);
+  const [upcomingEvents, setUpcomingEvents] = useState<HomeDashboardProps['upcomingEvents']>((propsEvents || []) as HomeDashboardProps['upcomingEvents']);
+  const [dailyGoals, setDailyGoals] = useState<GoalItem[]>([] as GoalItem[]);
   const [loading, setLoading] = useState(!hasInitialProps);
 
   useEffect(() => {
@@ -201,6 +201,12 @@ export function HomeDashboard({
         { time: '+1h', activity: 'Praticar com Pomodoro', duration: '25 min', icon: Clock },
       ]
     : [];
+
+  // Safety wrappers — guarantee arrays even if state gets corrupted
+  const safeTasks = Array.isArray(todayTasks) ? todayTasks : []
+  const safeEvents = Array.isArray(upcomingEvents) ? upcomingEvents : []
+  const safeGoals = Array.isArray(dailyGoals) ? dailyGoals : []
+  const safeStudyPlanSlots = Array.isArray(studyPlanSlots) ? studyPlanSlots : []
 
   if (loading) {
     return (
@@ -317,9 +323,9 @@ export function HomeDashboard({
             </div>
           </div>
 
-          {studyPlanSlots.length > 0 ? (
+          {safeStudyPlanSlots.length > 0 ? (
             <div className="space-y-2.5">
-              {studyPlanSlots.map((slot, i) => (
+              {safeStudyPlanSlots.map((slot, i) => (
                 <motion.button
                   key={i}
                   className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_4%,transparent)]"
@@ -611,10 +617,10 @@ export function HomeDashboard({
             </button>
           </div>
 
-          {upcomingEvents.length > 0 ? (
+          {safeEvents.length > 0 ? (
             <WabiSabiCard hover={false} className="p-0 overflow-hidden">
               <div className="max-h-80 overflow-y-auto divide-y divide-[var(--ws-glass-border)]">
-                {upcomingEvents.map((event, i) => {
+                {safeEvents.map((event, i) => {
                   const eventColor = getEventColor(event.color, event.type);
                   return (
                     <motion.div
@@ -671,10 +677,10 @@ export function HomeDashboard({
             </button>
           </div>
 
-          {todayTasks.length > 0 ? (
+          {safeTasks.length > 0 ? (
             <WabiSabiCard hover={false} className="p-0 overflow-hidden">
               <div className="max-h-80 overflow-y-auto divide-y divide-[var(--ws-glass-border)]">
-                {todayTasks.map((task, i) => {
+                {safeTasks.map((task, i) => {
                   const priority = getPriorityIndicator(task.priority);
                   return (
                     <motion.div
@@ -728,7 +734,7 @@ export function HomeDashboard({
       </div>
 
       {/* ===== 8. METAS DO DIA ===== */}
-      {dailyGoals.length > 0 && (
+      {safeGoals.length > 0 && (
         <motion.section
           className="mb-8"
           {...fadeInUp}
@@ -744,7 +750,7 @@ export function HomeDashboard({
 
           <WabiSabiCard hover={false}>
             <div className="space-y-4">
-              {dailyGoals.map((goal, i) => {
+              {safeGoals.map((goal, i) => {
                 const progress = goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0;
                 const isComplete = progress >= 100;
                 return (

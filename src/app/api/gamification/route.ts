@@ -50,10 +50,9 @@ export async function GET() {
     const totalAchievements = await db.achievement.count();
 
     // Today's XP earned
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString();
     const todayXPTx = await db.xPTransaction.aggregate({
-      where: { userId, createdAt: { gte: todayStart }, amount: { gt: 0 } },
+      where: { userId, createdAt: { gte: todayStartISO }, amount: { gt: 0 } },
       _sum: { amount: true },
     });
     const todayXP = todayXPTx._sum.amount || 0;

@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         correctAnswers: correct,
         confidenceAvg: confidence,
         xpEarned: xpAmount,
-        completedAt: new Date(),
+        completedAt: new Date().toISOString(),
       },
     });
 
