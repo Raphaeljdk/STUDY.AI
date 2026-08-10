@@ -80,8 +80,9 @@ export async function GET(_request: Request) {
       .slice(0, 5);
 
     // Battle avg
-    const battleAvg = recentBattles.length > 0
-      ? Math.round(recentBattles.reduce((sum, b) => sum + b.correctAnswers, 0) / recentBattles.reduce((sum, b) => sum + b.totalQuestions, 0) * 100)
+    const totalBattleQ = recentBattles.reduce((sum, b) => sum + b.totalQuestions, 0);
+    const battleAvg = recentBattles.length > 0 && totalBattleQ > 0
+      ? Math.round(recentBattles.reduce((sum, b) => sum + b.correctAnswers, 0) / totalBattleQ * 100)
       : null;
 
     // Pre-test avg

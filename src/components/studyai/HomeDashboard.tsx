@@ -145,8 +145,8 @@ export function HomeDashboard({
   // Derive initial loading state — skip fetching if stats were passed via props
   const hasInitialProps = !!propsStats;
   const [stats, setStats] = useState<HomeDashboardProps['stats']>(propsStats);
-  const [todayTasks, setTodayTasks] = useState<HomeDashboardProps['todayTasks']>(propsTasks);
-  const [upcomingEvents, setUpcomingEvents] = useState<HomeDashboardProps['upcomingEvents']>(propsEvents);
+  const [todayTasks, setTodayTasks] = useState<HomeDashboardProps['todayTasks']>(propsTasks ?? []);
+  const [upcomingEvents, setUpcomingEvents] = useState<HomeDashboardProps['upcomingEvents']>(propsEvents ?? []);
   const [dailyGoals, setDailyGoals] = useState<GoalItem[]>([]);
   const [loading, setLoading] = useState(!hasInitialProps);
 
@@ -164,16 +164,21 @@ export function HomeDashboard({
       if (statsData) {
         setStats({
           minutesToday: statsData.todayMinutes ?? 0,
-          minutesThisWeek: statsData.weeklyMinutes ?? 0,
-          pendingTasks: statsData.pendingTasks ?? 0,
+          minutesThisWeek: statsData.weeklyStudyMinutes ?? 0,
+          pendingTasks: statsData.pendingTasksCount ?? 0,
           dueFlashcards: statsData.dueFlashcards ?? 0,
           subjectCount: statsData.notebooks ?? 0,
-          completedToday: statsData.completedToday ?? 0,
+          completedToday: statsData.tasksCompletedToday ?? 0,
         });
       }
-      if (tasksData?.tasks) setTodayTasks(tasksData.tasks);
+      if (tasksData?.tasks) {
+        setTodayTasks(tasksData.tasks.map((t: any) => ({
+          ...t,
+          subjectName: t.subject?.name ?? t.subjectName ?? null,
+        })));
+      }
       if (eventsData?.events) setUpcomingEvents(eventsData.events);
-      if (goalsData?.goals) setDailyGoals(goalsData);
+      if (goalsData?.goals) setDailyGoals(goalsData.goals);
     }).finally(() => setLoading(false));
   }, [propsStats, propsTasks, propsEvents]);
 

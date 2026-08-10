@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
     }
 
-    const { type, title, content, summary, subject, difficulty, emoji, tags, generateWithAI } = body;
+    const { type, title, content, summary, subject, difficulty, duration, emoji, tags, generateWithAI } = body;
 
     if (generateWithAI) {
       // AI-generated discover item

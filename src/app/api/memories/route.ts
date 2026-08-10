@@ -13,6 +13,10 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
+    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!userExists) {
+      return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
+    }
 
     const memories = await db.userMemory.findMany({
       where: { userId },

@@ -175,7 +175,7 @@ export async function POST(request: Request) {
     // 2. Calcular sabedoria
     const wisdom = getWisdomLevel(memories.length);
     const nextLvl = getNextLevel(memories.length);
-    const userName = user.name.split(' ')[0];
+    const userName = (user.name || 'Estudante').split(' ')[0];
     const isDeep = wisdom.min >= 25;
     const openingPhrase = isDeep ? pickRandom(SENSEI_PHRASES_DEEP) : pickRandom(SENSEI_PHRASES);
 

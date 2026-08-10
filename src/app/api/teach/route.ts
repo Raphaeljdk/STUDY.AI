@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       include: {
         topics: {
           select: { name: true, mastery: true },
-          where: { name: { contains: topic } || undefined },
+          where: topic ? { name: { contains: topic } } : undefined,
           take: 5,
         },
       },
