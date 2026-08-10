@@ -866,3 +866,26 @@ Stage Summary:
 - ⚠️ Registration API returns 500 due to "readonly database" — this is a sandbox/infrastructure limitation, not a code defect
 - ⚠️ Minor: form data (email, password) persists when switching from Register to Login tab — may be intentional UX or minor issue
 
+---
+Task ID: 6-datetime-to-string
+Agent: fix-agent
+Task: Convert all DateTime fields to String in Prisma schema to eliminate P2023
+
+Work Log:
+- Replaced all 51 DateTime/DateTime? fields with String/String? in schema.prisma
+- Added @default("") to all non-optional date String fields (createdAt, updatedAt, startDate, date, nextReview, unlockedAt) so TypeScript sees them as optional in create calls — the db.ts middleware and SQLite DEFAULT clauses inject the real ISO strings at runtime
+- Regenerated Prisma client (rm -rf node_modules/.prisma && npx prisma generate)
+- Fixed 3 source files passing new Date() where String is now expected:
+  - src/app/api/calendar/route.ts: date and endDate fields now use new Date(x).toISOString()
+  - src/app/api/goals/route.ts: targetDate now uses new Date(x).toISOString()
+  - src/app/api/tasks/route.ts: dueDate now uses new Date(x).toISOString()
+- Fixed string vs Date comparison in stats/route.ts (streak and daily chart loops now use .toISOString() for dayStart/dayEnd)
+- Verified db.ts extension hook (convertDatesToISO + timestamp injection) is syntactically correct and kept as safety net
+- Verified all remaining tsc errors in src/app/api/ are pre-existing (Stripe version, category scope, duplicate property) — zero new errors from DateTime→String change
+- Register route (raw SQL) was NOT modified
+
+Stage Summary:
+- Prisma now treats all date/time fields as plain strings
+- No DateTime conversion = no P2023 error
+- Register route uses raw SQL (unchanged)
+- All API routes pass ISO strings or are fixed

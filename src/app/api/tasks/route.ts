@@ -97,7 +97,7 @@ export async function POST(request: Request) {
         description: typeof description === 'string' ? description.trim() : null,
         subjectId: subjectId || null,
         priority: VALID_PRIORITIES.includes(priority) ? priority : 'MEDIUM',
-        dueDate: dueDate ? new Date(dueDate) : null,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         estimatedMinutes: typeof estimatedMinutes === 'number' ? estimatedMinutes : null,
         sortOrder: typeof sortOrder === 'number' ? sortOrder : 0,
         userId,

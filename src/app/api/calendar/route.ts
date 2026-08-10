@@ -30,13 +30,13 @@ export async function GET(request: Request) {
     if (month) {
       // Filter by month: first day 00:00 to last day 23:59
       const [year, m] = month.split('-').map(Number);
-      const startDate = new Date(year, m - 1, 1);
-      const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+      const startDate = new Date(year, m - 1, 1).toISOString();
+      const endDate = new Date(year, m, 0, 23, 59, 59, 999).toISOString();
       where.date = { gte: startDate, lte: endDate };
     } else if (weekStart && weekEnd) {
       where.date = {
-        gte: new Date(weekStart),
-        lte: new Date(weekEnd),
+        gte: new Date(weekStart).toISOString(),
+        lte: new Date(weekEnd).toISOString(),
       };
     }
 
@@ -100,8 +100,8 @@ export async function POST(request: Request) {
         title: title.trim(),
         description: typeof description === 'string' ? description.trim() : null,
         type: VALID_TYPES.includes(type) ? type : 'STUDY_SESSION',
-        date: new Date(date),
-        endDate: endDate ? new Date(endDate) : null,
+        date: new Date(date).toISOString(),
+        endDate: endDate ? new Date(endDate).toISOString() : null,
         subjectId: subjectId || null,
         isAllDay: typeof isAllDay === 'boolean' ? isAllDay : false,
         color: typeof color === 'string' && color ? color : null,

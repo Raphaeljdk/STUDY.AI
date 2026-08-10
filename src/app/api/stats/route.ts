@@ -112,8 +112,8 @@ export async function GET() {
     // Streak calculation
     let streak = 0;
     for (let i = 0; i <= 365; i++) {
-      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).toISOString();
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1).toISOString();
       const hasSession = allSessions.some(s => s.createdAt >= dayStart && s.createdAt < dayEnd);
       if (hasSession) streak++;
       else if (i > 0) break;
@@ -122,9 +122,9 @@ export async function GET() {
     // Daily breakdown for mini chart (last 7 days)
     const dailyData: { day: string; minutes: number }[] = [];
     for (let i = 6; i >= 0; i--) {
-      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      const dayLabel = dayStart.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).toISOString();
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1).toISOString();
+      const dayLabel = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
       const dayMinutes = Math.round(
         sessions
           .filter(s => s.createdAt >= dayStart && s.createdAt < dayEnd)

@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         targetValue: typeof targetValue === 'number' ? targetValue : null,
         unit: typeof unit === 'string' ? unit : null,
         subjectId: subjectId || null,
-        targetDate: targetDate ? new Date(targetDate) : null,
+        targetDate: targetDate ? new Date(targetDate).toISOString() : null,
         userId,
       },
       include: {

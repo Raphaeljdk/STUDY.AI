@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
+import { randomUUID } from 'crypto';
 
 export async function POST(request: Request) {
   try {
@@ -54,17 +55,35 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // ═══════════════════════════════════════════════════════════════
+    // CRITICAL: Use RAW SQL for INSERT to bypass Prisma v6 DateTime bug.
+    // Prisma v6 + SQLite converts DateTime to numeric milliseconds
+    // (e.g. "1786369187922") instead of ISO 8601 strings, causing P2023.
+    // Raw SQL gives us full control over the value format.
+    // ═══════════════════════════════════════════════════════════════
+    const userId = randomUUID();
     const nowISO = new Date().toISOString();
-    const user = await db.user.create({
-      data: {
-        name: trimmedName,
-        email: normalizedEmail,
-        password: hashedPassword,
-        plan: 'FREE',
-        createdAt: nowISO,
-        updatedAt: nowISO,
-      },
-    });
+
+    await db.$executeRawUnsafe(
+      `INSERT INTO "User" ("id", "name", "email", "password", "role", "plan", "xp", "level", "currentStreak", "longestStreak", "totalStudyMinutes", "totalSessions", "totalTasksCompleted", "totalFlashcardsReviewed", "totalQuestionsAnswered", "reputation", "reputationLevel", "createdAt", "updatedAt")
+       VALUES (?, ?, ?, ?, 'USER', 'FREE', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 'Aprendiz', ?, ?)`,
+      userId,
+      trimmedName,
+      normalizedEmail,
+      hashedPassword,
+      nowISO,
+      nowISO
+    );
+
+    // Read back the created user using Prisma (read-only, no DateTime issue)
+    const user = await db.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Falha ao criar usuário' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
