@@ -13,19 +13,19 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const memories = await db.userMemory.findMany({
+    const memories = db.userMemory.findMany({
       where: { userId },
-      select: { id: true, category: true, content: true, createdAt: true },
+      select: ['id', 'category', 'content', 'createdAt'],
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
 
-    const count = await db.userMemory.count({ where: { userId } });
+    const count = db.userMemory.count({ where: { userId } });
 
     return NextResponse.json({ memories, count });
   } catch {

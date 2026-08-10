@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, genId } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -15,9 +15,10 @@ function getTodayStart(): Date {
 }
 
 export async function getUsage(userId: string) {
-  const today = getTodayStart();
-  const usage = await db.dailyUsage.findUnique({
-    where: { userId_date: { userId, date: today } },
+  const today = getTodayStart().toISOString();
+  // findUnique with compound key → use findFirst (unique index on userId+date)
+  const usage = db.dailyUsage.findFirst({
+    where: { userId, date: today },
   });
   return {
     chatMessages: usage?.chatMessages ?? 0,
@@ -26,7 +27,7 @@ export async function getUsage(userId: string) {
 }
 
 export async function canUse(userId: string, type: UsageType): Promise<{ allowed: boolean; used: number; limit: number }> {
-  const user = await db.user.findUnique({ where: { id: userId }, select: { plan: true, role: true } });
+  const user = db.user.findUnique({ where: { id: userId }, select: ['plan', 'role'] });
   if (!user) return { allowed: false, used: 0, limit: 0 };
 
   // Admin and premium bypass limits
@@ -42,20 +43,28 @@ export async function canUse(userId: string, type: UsageType): Promise<{ allowed
 }
 
 export async function incrementUsage(userId: string, type: UsageType): Promise<void> {
-  const today = getTodayStart();
+  const today = getTodayStart().toISOString();
   const field = type === 'chatMessages' ? 'chatMessages' : 'flashcards';
 
-  await db.dailyUsage.upsert({
-    where: { userId_date: { userId, date: today } },
-    create: { userId, date: today, [field]: 1 },
-    update: { [field]: { increment: 1 } },
-  });
+  // Replace Prisma upsert with findFirst + create/update
+  const existing = db.dailyUsage.findFirst({ where: { userId, date: today } });
+  if (existing) {
+    // Atomic increment via raw SQL
+    db.dailyUsage.exec(
+      `UPDATE "DailyUsage" SET "${field}" = "${field}" + 1 WHERE "userId" = ? AND "date" = ?`,
+      userId, today
+    );
+  } else {
+    db.dailyUsage.create({
+      data: { id: genId(), userId, date: today, [field]: 1 },
+    });
+  }
 }
 
 export async function getSessionUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return null;
-  const user = await db.user.findUnique({ where: { email: session.user.email } });
+  const user = db.user.findUnique({ where: { email: session.user.email } });
   return user;
 }
 

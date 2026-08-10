@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 import { headers } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -33,31 +33,32 @@ export async function POST(request: Request) {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        await db.user.update({
+        db.user.update({
           where: { id: userId },
           data: {
             plan: 'PREMIUM',
             stripeSubscriptionId: event.data.object.subscription,
             stripePriceId: event.data.object.line_items?.data?.[0]?.price?.id,
             stripeCurrentPeriodEnd: new Date(event.data.object.subscription_details?.current_period_end * 1000 || Date.now() + 30 * 86400000).toISOString(),
+            updatedAt: nowISO(),
           },
         });
         break;
       }
       case 'customer.subscription.updated': {
         if (event.data.object.status === 'active') {
-          await db.user.update({
+          db.user.update({
             where: { id: userId },
-            data: { plan: 'PREMIUM', stripeCurrentPeriodEnd: new Date(event.data.object.current_period_end * 1000).toISOString() },
+            data: { plan: 'PREMIUM', stripeCurrentPeriodEnd: new Date(event.data.object.current_period_end * 1000).toISOString(), updatedAt: nowISO() },
           });
         }
         break;
       }
       case 'customer.subscription.deleted':
       case 'customer.subscription.paused': {
-        await db.user.update({
+        db.user.update({
           where: { id: userId },
-          data: { plan: 'FREE', stripeCurrentPeriodEnd: null },
+          data: { plan: 'FREE', stripeCurrentPeriodEnd: null, updatedAt: nowISO() },
         });
         break;
       }

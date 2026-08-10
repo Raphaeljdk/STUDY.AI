@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -36,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Qualidade invalida' }, { status: 400 });
       }
 
-      const card = await db.flashcard.findFirst({ where: { id, userId } });
+      const card = db.flashcard.findFirst({ where: { id, userId } });
       if (!card) {
         return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
       }
@@ -64,13 +64,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const nextReviewISO = nextReview.toISOString();
 
       // TOCTOU-safe updateMany with userId filter
-      const result = await db.flashcard.updateMany({
+      const result = db.flashcard.updateMany({
         where: { id, userId },
         data: {
           easeFactor: newEF,
           interval: newInterval,
           repetitions: newRepetitions,
           nextReview: nextReviewISO,
+          updatedAt: nowISO(),
         },
       });
 
@@ -78,13 +79,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
       }
 
-      const updated = await db.flashcard.findFirst({ where: { id, userId } });
+      const updated = db.flashcard.findFirst({ where: { id, userId } });
       return NextResponse.json({ flashcard: updated });
     }
 
     // Edit mode
     const { front, back, notebookId } = body;
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
 
     if (typeof front === 'string') {
       if (!front.trim()) {
@@ -105,9 +106,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
       }
       // Cross-user notebook injection fix
-      const ownedNotebook = await db.notebook.findFirst({
+      const ownedNotebook = db.notebook.findFirst({
         where: { id: notebookId, userId },
-        select: { id: true },
+        select: ['id'],
       });
       if (!ownedNotebook) {
         return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
@@ -120,7 +121,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     // TOCTOU-safe updateMany with userId filter
-    const result = await db.flashcard.updateMany({
+    const result = db.flashcard.updateMany({
       where: { id, userId },
       data,
     });
@@ -129,7 +130,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
     }
 
-    const flashcard = await db.flashcard.findFirst({ where: { id, userId } });
+    const flashcard = db.flashcard.findFirst({ where: { id, userId } });
     return NextResponse.json({ flashcard });
   } catch (error) {
     console.error('Route error:', error);
@@ -148,14 +149,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
     const { id } = await params;
 
     // TOCTOU-safe deleteMany with userId filter
-    const result = await db.flashcard.deleteMany({ where: { id, userId } });
+    const result = db.flashcard.deleteMany({ where: { id, userId } });
 
     if (result.count === 0) {
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });

@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['EXAM', 'HOMEWORK', 'SEMINAR', 'DELIVERY', 'CLASS', 'REVIEW', 'STUDY_SESSION', 'OTHER'];
+
+function attachSubjects(events: any[]) {
+  const subjectIds = [...new Set(events.map((e: any) => e.subjectId).filter(Boolean))];
+  const subjects = subjectIds.length > 0
+    ? db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
+    : [];
+  const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
+  return events.map((e: any) => ({ ...e, subject: e.subjectId ? subjectMap.get(e.subjectId) || null : null }));
+}
 
 export async function GET(request: Request) {
   try {
@@ -15,7 +24,7 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -40,15 +49,14 @@ export async function GET(request: Request) {
       };
     }
 
-    const events = await db.calendarEvent.findMany({
+    const events = db.calendarEvent.findMany({
       where,
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
-      },
       orderBy: { date: 'asc' },
     });
 
-    return NextResponse.json({ events });
+    const eventsWithSubjects = attachSubjects(events);
+
+    return NextResponse.json({ events: eventsWithSubjects });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -89,30 +97,33 @@ export async function POST(request: Request) {
 
     // Validate subjectId if provided
     if (subjectId) {
-      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
       if (!subject) {
         return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 400 });
       }
     }
 
-    const event = await db.calendarEvent.create({
+    const event = db.calendarEvent.create({
       data: {
+        id: genId(),
         title: title.trim(),
         description: typeof description === 'string' ? description.trim() : null,
         type: VALID_TYPES.includes(type) ? type : 'STUDY_SESSION',
         date: new Date(date).toISOString(),
         endDate: endDate ? new Date(endDate).toISOString() : null,
         subjectId: subjectId || null,
-        isAllDay: typeof isAllDay === 'boolean' ? isAllDay : false,
+        isAllDay: typeof isAllDay === 'boolean' ? (isAllDay ? 1 : 0) : 0,
         color: typeof color === 'string' && color ? color : null,
         userId,
-      },
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 
-    return NextResponse.json({ event }, { status: 201 });
+    // Attach subject (was include)
+    const eventsWithSubjects = attachSubjects([event]);
+
+    return NextResponse.json({ event: eventsWithSubjects[0] }, { status: 201 });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

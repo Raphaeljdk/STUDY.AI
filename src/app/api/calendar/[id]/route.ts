@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['EXAM', 'HOMEWORK', 'SEMINAR', 'DELIVERY', 'CLASS', 'REVIEW', 'STUDY_SESSION', 'OTHER'];
+
+function attachSubject(event: any) {
+  if (!event?.subjectId) return { ...event, subject: null };
+  const subject = db.subject.findUnique({ where: { id: event.subjectId }, select: ['id', 'name', 'color', 'icon'] });
+  return { ...event, subject: subject || null };
+}
 
 export async function PATCH(
   request: Request,
@@ -18,13 +24,13 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.calendarEvent.findFirst({ where: { id, userId } });
+    const existing = db.calendarEvent.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Evento nao encontrado' }, { status: 404 });
     }
@@ -38,30 +44,29 @@ export async function PATCH(
 
     const { title, description, type, date, endDate, subjectId, isAllDay, color } = body;
 
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
     if (typeof title === 'string' && title.trim()) data.title = title.trim();
     if (typeof description === 'string') data.description = description.trim();
     if (type && VALID_TYPES.includes(type)) data.type = type;
-    if (date) data.date = new Date(date);
-    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
+    if (date) data.date = new Date(date).toISOString();
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate).toISOString() : null;
     if (subjectId === null) data.subjectId = null;
     if (typeof subjectId === 'string' && subjectId) {
-      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
       if (subject) data.subjectId = subjectId;
     }
-    if (typeof isAllDay === 'boolean') data.isAllDay = isAllDay;
+    if (typeof isAllDay === 'boolean') data.isAllDay = isAllDay ? 1 : 0;
     if (typeof color === 'string' && color) data.color = color;
     if (color === null) data.color = null;
 
-    const event = await db.calendarEvent.update({
+    const event = db.calendarEvent.update({
       where: { id },
       data,
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
-      },
     });
 
-    return NextResponse.json({ event });
+    const eventWithSubject = attachSubject(event);
+
+    return NextResponse.json({ event: eventWithSubject });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -81,18 +86,18 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.calendarEvent.findFirst({ where: { id, userId } });
+    const existing = db.calendarEvent.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Evento nao encontrado' }, { status: 404 });
     }
 
-    await db.calendarEvent.delete({ where: { id } });
+    db.calendarEvent.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

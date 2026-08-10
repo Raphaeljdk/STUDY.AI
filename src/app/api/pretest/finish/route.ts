@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO, sqlite } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Respostas obrigatorias (array)' }, { status: 400 });
     }
 
-    const preTest = await db.preTest.findFirst({ where: { id: preTestId, userId } });
+    const preTest = db.preTest.findFirst({ where: { id: preTestId, userId } });
     if (!preTest) {
       return NextResponse.json({ error: 'Pre-teste nao encontrado' }, { status: 404 });
     }
@@ -66,21 +66,18 @@ export async function POST(request: Request) {
 
     const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
 
-    const updatedPreTest = await db.preTest.update({
+    const updatedPreTest = db.preTest.update({
       where: { id: preTestId },
       data: {
         initialScore: score,
         finalScore: score,
         answers: JSON.stringify(answers),
-        completedAt: new Date().toISOString(),
+        completedAt: nowISO(),
       },
     });
 
-    // Update user total questions answered
-    await db.user.update({
-      where: { id: userId },
-      data: { totalQuestionsAnswered: { increment: questions.length } },
-    });
+    // Update user total questions answered (increment)
+    sqlite.prepare('UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?').run(questions.length, userId);
 
     return NextResponse.json({
       preTest: updatedPreTest,

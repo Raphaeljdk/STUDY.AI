@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 import { canUse, incrementUsage } from '@/lib/usage';
 
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 // SISTEMA DE SABEDORIA DO SENSEI AI
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 
 const WISDOM_LEVELS = [
   { min: 0,   title: 'Aprendiz',       emoji: '🌱', desc: 'Iniciando a jornada...' },
@@ -60,9 +60,9 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 // EXTRAÇÃO DE MEMÓRIAS
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 
 const MEMORY_PROMPT = `Analise esta conversa e extraia FATOS IMPORTANTES sobre o usuario.
 
@@ -112,7 +112,7 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
     for (const m of mems.slice(0, 5)) {
       if (!m.content || m.content.length < 5 || m.content.length > 200) continue;
       const cat = valid.includes(m.category?.toLowerCase()) ? m.category.toLowerCase() : 'general';
-      const existing = await db.userMemory.findMany({ where: { userId, category }, select: { content: true } });
+      const existing = db.userMemory.findMany({ where: { userId, category }, select: ['content'] });
       const dup = existing.some(e => {
         const w1 = e.content.toLowerCase().split(/\s+/);
         const w2 = m.content.toLowerCase().split(/\s+/);
@@ -120,7 +120,7 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
         return common.length / Math.max(w1.length, w2.length) > 0.6;
       });
       if (!dup) {
-        await db.userMemory.create({ data: { userId, category: cat, content: m.content.trim(), source: 'conversation' } });
+        db.userMemory.create({ data: { id: genId(), userId, category: cat, content: m.content.trim(), source: 'conversation', createdAt: nowISO(), updatedAt: nowISO() } });
       }
     }
   } catch (err) {
@@ -128,9 +128,9 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
   }
 }
 
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 // ROTA PRINCIPAL
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════
 
 export async function POST(request: Request) {
   try {
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     const userId = (session.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
 
-    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, plan: true, role: true } });
+    const user = db.user.findUnique({ where: { id: userId }, select: ['id', 'name', 'plan', 'role'] });
     if (!user) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
 
     // Usage limit check
@@ -164,12 +164,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mensagem invalida' }, { status: 400 });
     }
 
-    // 1. Carregar memorias e historico
-    const [memories, recentMsgs, notebooks] = await Promise.all([
-      db.userMemory.findMany({ where: { userId }, select: { category: true, content: true }, orderBy: { createdAt: 'desc' }, take: 30 }),
-      db.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 16, select: { role: true, content: true } }),
-      db.notebook.findMany({ where: { userId }, select: { title: true, content: true } }),
-    ]);
+    // 1. Carregar memorias e historico (synchronous, no Promise.all needed)
+    const memories = db.userMemory.findMany({ where: { userId }, select: ['category', 'content'], orderBy: { createdAt: 'desc' }, take: 30 });
+    const recentMsgs = db.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 16, select: ['role', 'content'] });
+    const notebooks = db.notebook.findMany({ where: { userId }, select: ['title', 'content'] });
     const history = recentMsgs.reverse();
 
     // 2. Calcular sabedoria
@@ -253,13 +251,9 @@ ${wisdom.min >= 150 ? '- Voce e infinito — fale como o proprio universo conver
     // 7.1 Increment usage
     incrementUsage(userId, 'chatMessages').catch(() => {});
 
-    // 8. Salvar mensagens
-    await db.chatMessage.createMany({
-      data: [
-        { userId, role: 'user', content: message },
-        { userId, role: 'assistant', content: reply },
-      ],
-    });
+    // 8. Salvar mensagens (createMany not available, use individual creates)
+    db.chatMessage.create({ data: { id: genId(), userId, role: 'user', content: message, createdAt: nowISO() } });
+    db.chatMessage.create({ data: { id: genId(), userId, role: 'assistant', content: reply, createdAt: nowISO() } });
 
     // 9. Extrair memorias (nao-bloqueante)
     extractMemories(userId, message, reply).catch(() => {});

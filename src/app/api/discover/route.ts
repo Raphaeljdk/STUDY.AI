@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO, sqlite } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 
 const VALID_TYPES = ['mini_aula', 'dica', 'conceito', 'questao', 'resumo', 'curiosidade', 'tecnica', 'codigo', 'formula'];
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -27,33 +27,39 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { isPublic: true };
+    const where: any = { isPublic: 1 };
     if (type && VALID_TYPES.includes(type)) {
       where.type = type;
     }
 
-    const [items, total] = await Promise.all([
-      db.discoverItem.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: Math.min(limit, 50),
-        include: {
-          _count: { select: { discoverSaves: true } },
-          user: { select: { id: true, name: true } },
-        },
-      }),
-      db.discoverItem.count({ where }),
-    ]);
+    const items = db.discoverItem.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: Math.min(limit, 50),
+    });
+
+    const total = db.discoverItem.count({ where });
+
+    // Get save counts for each item
+    const itemsWithCounts = items.map(item => {
+      const saveCount = db.discoverSave.count({ where: { discoverItemId: item.id } });
+      const user = item.userId ? db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
+      return { ...item, _count: { discoverSaves: saveCount }, user };
+    });
 
     // Check which items the current user saved
-    const savedItems = await db.discoverSave.findMany({
-      where: { userId, discoverItemId: { in: items.map(i => i.id) } },
-      select: { discoverItemId: true },
-    });
-    const savedSet = new Set(savedItems.map(s => s.discoverItemId));
+    const itemIds = items.map(i => i.id);
+    let savedSet = new Set<string>();
+    if (itemIds.length > 0) {
+      const savedItems = db.discoverSave.findMany({
+        where: { userId, discoverItemId: { in: itemIds } },
+        select: ['discoverItemId'],
+      });
+      savedSet = new Set(savedItems.map(s => s.discoverItemId));
+    }
 
-    const itemsWithSaved = items.map(item => ({
+    const itemsWithSaved = itemsWithCounts.map(item => ({
       ...item,
       isSaved: savedSet.has(item.id),
     }));
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -121,8 +127,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Erro ao gerar conteudo com IA' }, { status: 500 });
       }
 
-      const item = await db.discoverItem.create({
+      const item = db.discoverItem.create({
         data: {
+          id: genId(),
           type: itemType,
           title: aiData.title || 'Conteudo gerado',
           content: aiData.content || '',
@@ -132,8 +139,10 @@ export async function POST(request: Request) {
           duration: typeof aiData.duration === 'number' ? aiData.duration : null,
           emoji: aiData.emoji || '💡',
           tags: aiData.tags || null,
-          isPublic: true,
+          isPublic: 1,
           userId,
+          createdAt: nowISO(),
+          updatedAt: nowISO(),
         },
       });
 
@@ -148,8 +157,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Conteudo obrigatorio' }, { status: 400 });
     }
 
-    const item = await db.discoverItem.create({
+    const item = db.discoverItem.create({
       data: {
+        id: genId(),
         type: type && VALID_TYPES.includes(type) ? type : 'dica',
         title: title.trim(),
         content: content.trim(),
@@ -159,8 +169,10 @@ export async function POST(request: Request) {
         duration: typeof duration === 'number' ? duration : null,
         emoji: typeof emoji === 'string' ? emoji : '💡',
         tags: typeof tags === 'string' ? tags : null,
-        isPublic: true,
+        isPublic: 1,
         userId,
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

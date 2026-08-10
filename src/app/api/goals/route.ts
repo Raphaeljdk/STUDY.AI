@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['DAILY', 'WEEKLY', 'MONTHLY', 'SUBJECT', 'EXAM'];
 const VALID_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'ABANDONED'];
+
+function attachSubjects(goals: any[]) {
+  const subjectIds = [...new Set(goals.map((g: any) => g.subjectId).filter(Boolean))];
+  const subjects = subjectIds.length > 0
+    ? db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
+    : [];
+  const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
+  return goals.map((g: any) => ({ ...g, subject: g.subjectId ? subjectMap.get(g.subjectId) || null : null }));
+}
 
 export async function GET(request: Request) {
   try {
@@ -16,7 +25,7 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -33,15 +42,14 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    const goals = await db.goal.findMany({
+    const goals = db.goal.findMany({
       where,
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
-      },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ goals });
+    const goalsWithSubjects = attachSubjects(goals);
+
+    return NextResponse.json({ goals: goalsWithSubjects });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -58,7 +66,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -78,14 +86,15 @@ export async function POST(request: Request) {
 
     // Validate subjectId if provided
     if (subjectId) {
-      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
       if (!subject) {
         return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 400 });
       }
     }
 
-    const goal = await db.goal.create({
+    const goal = db.goal.create({
       data: {
+        id: genId(),
         title: title.trim(),
         description: typeof description === 'string' ? description.trim() : null,
         type: VALID_TYPES.includes(type) ? type : 'DAILY',
@@ -94,13 +103,15 @@ export async function POST(request: Request) {
         subjectId: subjectId || null,
         targetDate: targetDate ? new Date(targetDate).toISOString() : null,
         userId,
-      },
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 
-    return NextResponse.json({ goal }, { status: 201 });
+    // Attach subject (was include)
+    const goalsWithSubjects = attachSubjects([goal]);
+
+    return NextResponse.json({ goal: goalsWithSubjects[0] }, { status: 201 });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

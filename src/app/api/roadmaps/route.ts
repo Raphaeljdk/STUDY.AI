@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 export async function GET(_request: Request) {
   try {
@@ -13,12 +13,12 @@ export async function GET(_request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const roadmaps = await db.roadmap.findMany({
+    const roadmaps = db.roadmap.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -65,8 +65,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Etapas obrigatorias' }, { status: 400 });
     }
 
-    const roadmap = await db.roadmap.create({
+    const roadmap = db.roadmap.create({
       data: {
+        id: genId(),
         userId,
         title: title.trim(),
         description: typeof description === 'string' ? description.trim() : null,
@@ -74,7 +75,9 @@ export async function POST(request: Request) {
         steps: JSON.stringify(steps),
         totalSteps: steps.length,
         currentStep: 0,
-        isAI: typeof isAI === 'boolean' ? isAI : false,
+        isAI: (typeof isAI === 'boolean' ? isAI : false) ? 1 : 0,
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

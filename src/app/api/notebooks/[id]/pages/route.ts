@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,16 +16,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const { id } = await params;
 
-    const notebook = await db.notebook.findFirst({
+    const notebook = db.notebook.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: ['id'],
     });
 
     if (!notebook) {
       return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
     }
 
-    const pages = await db.notebookPage.findMany({
+    const pages = db.notebookPage.findMany({
       where: { notebookId: id },
       orderBy: { pageNumber: 'asc' },
     });
@@ -50,9 +50,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const { id } = await params;
 
-    const notebook = await db.notebook.findFirst({
+    const notebook = db.notebook.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: ['id'],
     });
 
     if (!notebook) {
@@ -66,20 +66,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
     }
 
-    const lastPage = await db.notebookPage.findFirst({
+    const lastPage = db.notebookPage.findFirst({
       where: { notebookId: id },
       orderBy: { pageNumber: 'desc' },
-      select: { pageNumber: true },
+      select: ['pageNumber'],
     });
 
     const nextPageNumber = (lastPage?.pageNumber ?? 0) + 1;
 
-    const page = await db.notebookPage.create({
+    const page = db.notebookPage.create({
       data: {
+        id: genId(),
         notebookId: id,
         pageNumber: nextPageNumber,
         paperStyle: body.paperStyle ?? 'blank',
         paperColor: body.paperColor ?? '#ffffff',
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

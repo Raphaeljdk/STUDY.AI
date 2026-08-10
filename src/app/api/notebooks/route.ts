@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -14,18 +14,25 @@ export async function GET() {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const notebooks = await db.notebook.findMany({
+    const notebooks = db.notebook.findMany({
       where: { userId },
-      include: { _count: { select: { flashcards: true } } },
       orderBy: { updatedAt: 'desc' },
     });
 
-    return NextResponse.json({ notebooks });
+    // Manually add _count.flashcards for each notebook
+    const notebooksWithCount = notebooks.map((nb: any) => ({
+      ...nb,
+      _count: {
+        flashcards: db.flashcard.count({ where: { notebookId: nb.id } }),
+      },
+    }));
+
+    return NextResponse.json({ notebooks: notebooksWithCount });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -43,7 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -63,11 +70,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Titulo obrigatorio' }, { status: 400 });
     }
 
-    const notebook = await db.notebook.create({
+    const notebook = db.notebook.create({
       data: {
+        id: genId(),
         title: title.trim(),
         color: typeof color === 'string' && color ? color : '#c0392b',
         userId,
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

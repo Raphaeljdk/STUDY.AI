@@ -14,44 +14,48 @@ export async function GET(_request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    // Gather all topic mastery data
-    const subjects = await db.subject.findMany({
+    // Gather all subject data (no include — separate queries)
+    const subjects = db.subject.findMany({
       where: { userId },
-      include: {
-        topics: {
-          select: { id: true, name: true, mastery: true, totalQuestions: true, correctAnswers: true },
-        },
-        _count: { select: { tasks: true } },
-      },
+    });
+
+    // Get topics for each subject separately
+    const subjectsWithTopics = subjects.map(subject => {
+      const topics = db.topic.findMany({
+        where: { subjectId: subject.id },
+        select: ['id', 'name', 'mastery', 'totalQuestions', 'correctAnswers'],
+      });
+      const taskCount = db.task.count({ where: { subjectId: subject.id } });
+      return { ...subject, topics, _count: { tasks: taskCount } };
     });
 
     // Get recent battle performance
-    const recentBattles = await db.battle.findMany({
+    const recentBattles = db.battle.findMany({
       where: { userId, completedAt: { not: null } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
     // Get recent pre-test scores
-    const recentPreTests = await db.preTest.findMany({
+    const recentPreTests = db.preTest.findMany({
       where: { userId, completedAt: { not: null } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
     // Get active missions
-    const activeMissions = await db.mission.findMany({
+    const activeMissions = db.mission.findMany({
       where: { userId, status: 'active' },
     });
 
     // Build topic mastery data for AI
     const topicMasteryData: { topic: string; subject: string; mastery: number; questions: number; accuracy: number }[] = [];
-    for (const subject of subjects) {
+    for (const subject of subjectsWithTopics) {
       for (const topic of subject.topics) {
         topicMasteryData.push({
           topic: topic.name,
@@ -64,7 +68,7 @@ export async function GET(_request: Request) {
     }
 
     // Calculate averages
-    const allTopics = subjects.flatMap(s => s.topics);
+    const allTopics = subjectsWithTopics.flatMap(s => s.topics);
     const avgMastery = allTopics.length > 0
       ? Math.round(allTopics.reduce((sum, t) => sum + t.mastery, 0) / allTopics.length)
       : 0;
@@ -121,7 +125,7 @@ export async function GET(_request: Request) {
 
     return NextResponse.json({
       overview: {
-        totalSubjects: subjects.length,
+        totalSubjects: subjectsWithTopics.length,
         totalTopics: allTopics.length,
         avgMastery,
         activeMissions: activeMissions.length,

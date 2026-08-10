@@ -889,3 +889,365 @@ Stage Summary:
 - No DateTime conversion = no P2023 error
 - Register route uses raw SQL (unchanged)
 - All API routes pass ISO strings or are fixed
+
+---
+Task ID: migrate-group-1
+Agent: general-purpose
+Task: Migrate auth, admin, setup routes from Prisma to better-sqlite3
+
+Work Log:
+- Read db.ts: understood Model class with findUnique/findFirst/findMany/create/update/updateMany/delete/deleteMany/count/exec/query/queryOne; exports db (model map), genId(), nowISO(), sqlite (raw instance); select is string[]; SCHEMA_SQL defines all tables with TEXT id/createdAt/updatedAt columns
+- **src/lib/auth.ts** — NO CHANGES NEEDED. Only uses `db.user.findUnique()` which is fully compatible with the new Model API. Import `import { db } from './db'` is already correct (only `db` needed).
+- **src/app/api/auth/[...nextauth]/route.ts** — NO CHANGES NEEDED. Only imports authOptions from auth.ts and re-exports the NextAuth handler. Does not import db or @prisma/client.
+- **src/app/api/admin/seed/route.ts** — MIGRATED:
+  - Updated import: `{ db }` → `{ db, genId, nowISO }`
+  - Changed `select: { id: true, role: true }` → `select: ['id', 'role']`
+  - Added `updatedAt: nowISO()` to the `update()` call data
+  - Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to the `create()` call data
+- **src/app/api/admin/users/route.ts** — MIGRATED:
+  - Updated import: `{ db }` → `{ db, nowISO }`
+  - Removed `isPrismaRecordNotFound()` helper (no Prisma error codes with better-sqlite3)
+  - Changed all `select: { field: true }` objects to `select: ['field', ...]` arrays (GET, PATCH target lookup, DELETE target lookup)
+  - Added `data.updatedAt = nowISO()` before the PATCH update call
+  - Removed `select` from `db.user.update()` (new API update doesn't support select; returns full row)
+  - Replaced Prisma error catch (P2025) with null-check on `update()` return value
+  - Replaced Prisma error catch (P2025) on delete with null-check on `db.user.delete()` return value
+  - Manually picked fields from updated user for PATCH response to maintain API contract
+- **src/app/api/setup-db/route.ts** — MIGRATED:
+  - Updated import: `{ db }` → `{ db, sqlite }`
+  - Replaced all `db.$executeRawUnsafe(sql)` calls with `sqlite.exec(sql)` or `sqlite.prepare(sql).run()`
+  - Replaced PostgreSQL-style ALTER TABLE ADD COLUMN (with catch for 'already exists') with SQLite `PRAGMA table_info` check before attempting ALTER TABLE
+  - Removed redundant CREATE TABLE IF NOT EXISTS for NotebookPage/NotebookTag/DailyUsage (now created automatically by db.ts SCHEMA_SQL on startup) — replaced with existence verification via `SELECT 1 FROM table LIMIT 1`
+  - Removed `await` from synchronous sqlite calls (better-sqlite3 is synchronous; awaits are harmless but removed for clarity)
+- **src/app/api/route.ts** — NO CHANGES NEEDED. Only uses `db.user.count()` which is fully compatible. Import already correct.
+
+Stage Summary:
+- 3 files migrated (seed, admin/users, setup-db)
+- 3 files skipped (auth.ts, nextauth route, root api route) — already compatible
+- All `@prisma/client` imports removed (none existed in these files)
+- All `$executeRawUnsafe` replaced with raw `sqlite` methods
+- All `select: { field: true }` converted to `select: ['field']`
+- All `create()` calls now include `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+- All `update()` calls now include `updatedAt: nowISO()`
+- Prisma error code checking replaced with null-return checking
+
+---
+Task ID: migrate-group-2
+Agent: general-purpose
+Task: Migrate notebooks, tasks, goals, subjects, calendar CRUD routes from Prisma to better-sqlite3
+
+Work Log:
+- Migrated 13 API route files from Prisma ORM to better-sqlite3 Model API
+- All imports changed from `{ db }` to `{ db, genId, nowISO }` or `{ db, genId, nowISO, sqlite }` as needed
+- No @prisma/client imports found in any of these files (confirmed clean)
+
+File-by-file changes:
+- **notebooks/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - GET: Removed `include: { _count: { select: { flashcards: true } } }`, replaced with manual `db.flashcard.count()` per notebook
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to create data
+  - `select: { id: true }` → `select: [\"id\"]`
+
+- **notebooks/[id]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, nowISO }`
+  - GET: Removed `include: { flashcards: { orderBy: { createdAt: \\desc\ } } }`, added separate `db.flashcard.findMany()` query, merged into response
+  - PATCH: Added `updatedAt: nowISO()` to update data
+
+- **notebooks/[id]/pages/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to notebookPage create data
+  - `select: { id: true }` → `select: [\"id\"]`, `select: { pageNumber: true }` → `select: [\"pageNumber\"]`
+
+- **notebooks/pages/[pageId]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, nowISO }`
+  - GET/PUT/DELETE: Removed `include: { notebook: { select: { userId: true } } }`, replaced with separate `db.notebook.findUnique()` query for ownership check
+  - PUT: Added `updatedAt: nowISO()` to update data
+
+- **tasks/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - GET: Removed `include: { subject: { select: {...} } }`, added `attachSubjects()` helper that batch-fetches subjects and maps them onto tasks
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to create data; used `attachSubjects()` for response
+
+- **tasks/[id]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO, sqlite }`
+  - `awardXP()`: Added `id: genId()`, `createdAt: nowISO()` to XPTransaction create
+  - Replaced Prisma `{ increment: 1 }` with raw SQL: `sqlite.prepare(\"UPDATE User SET totalTasksCompleted = totalTasksCompleted + 1 WHERE id = ?\").run(userId)`
+  - PATCH: Removed `include: { subject: ... }`, added `attachSubject()` helper for single task
+  - PATCH: Added `updatedAt: nowISO()` to update data
+  - `select: { xp: true, level: true }` → `select: [\"xp\", \"level\"]`
+
+- **goals/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - GET: Removed `include: { subject: ... }`, added `attachSubjects()` batch helper
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to create data; used `attachSubjects()` for response
+
+- **goals/[id]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - `awardXP()`: Same changes as tasks/[id] — added id/createdAt to XPTransaction create
+  - PATCH: Removed `include: { subject: ... }`, added `attachSubject()` single-item helper
+  - PATCH: Added `updatedAt: nowISO()` to update data
+
+- **subjects/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - GET: Removed `include: { _count: { select: { topics: true, tasks: true } } }`, replaced with per-subject `db.topic.count()` and `db.task.count()`
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to create data
+
+- **subjects/[id]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, nowISO }`
+  - GET: Removed `include: { _count: ..., topics: ... }`, replaced with separate queries for topics + 4 count queries (topics, tasks, goals, sessions)
+  - PATCH: Added `updatedAt: nowISO()` to update data
+  - PATCH: Boolean `isActive` converted to `1/0` for SQLite storage
+
+- **subjects/[id]/topics/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to topic create data
+
+- **calendar/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, genId, nowISO }`
+  - GET: Removed `include: { subject: ... }`, added `attachSubjects()` batch helper
+  - POST: Added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` to create data
+  - POST: Boolean `isAllDay` converted to `1/0` for SQLite storage
+  - Used `attachSubjects()` for response
+
+- **calendar/[id]/route.ts** — MIGRATED:
+  - Import: `{ db }` → `{ db, nowISO }`
+  - PATCH: Removed `include: { subject: ... }`, added `attachSubject()` single-item helper
+  - PATCH: Added `updatedAt: nowISO()` to update data
+  - PATCH: Boolean `isAllDay` converted to `1/0` for SQLite storage
+  - PATCH: `new Date(date)` → `new Date(date).toISOString()` for SQLite TEXT storage
+  - PATCH: `new Date(endDate)` → `new Date(endDate).toISOString()` for SQLite TEXT storage
+
+Patterns applied across all files:
+- `select: { field: true }` → `select: [\"field\"]`
+- `include: { relation: { select: {...} } }` → separate query + manual merge via helper functions
+- `include: { _count: { select: { ... } } }` → separate `db.model.count()` calls
+- `create()` always includes `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()` (when table has those columns)
+- `update()` always includes `updatedAt: nowISO()` (when table has updatedAt column)
+- Prisma `{ increment: N }` → raw SQL via `sqlite.prepare()`
+- JavaScript booleans (`isAllDay`, `isActive`) → SQLite integers (`0`/`1`)
+- Removed `await` from all db calls (better-sqlite3 is synchronous)
+
+Stage Summary:
+- 13 API route files migrated successfully
+- 0 @prisma/client imports remain in migrated files
+- 0 Prisma `include` patterns remain in migrated files
+- 1 Prisma `{ increment }` pattern replaced with raw SQL
+- 3 helper functions created: attachSubjects() (batch), attachSubject() (single-item) — used in tasks, goals, calendar routes
+
+---
+## Group 3: sessions, chat, sensei-chat, flashcards, xp, stats, gamification, achievements, memories, usage
+
+### Files migrated (12):
+
+1. **src/app/api/sessions/route.ts**
+   - Import: `{ db }` → `{ db, genId, nowISO }`
+   - Removed `await` from all db calls (findUnique, findMany, create)
+   - `create()`: added `id: genId()`, `createdAt: nowISO()`
+   - `select: { id: true }` → `select: ['id']`
+
+2. **src/app/api/chat/route.ts**
+   - Import: `{ db }` → `{ db, genId, nowISO }`
+   - Removed `await` from all db calls (findUnique, findMany, create, deleteMany)
+   - `create()`: added `id: genId()`, `createdAt: nowISO()`
+   - `select: { id: true }` → `select: ['id']`
+
+3. **src/app/api/sensei-chat/route.ts**
+   - Import: `{ db }` → `{ db, genId, nowISO }`
+   - Removed `await` from all db calls (findUnique, findMany, create)
+   - Replaced `Promise.all([...])` with direct synchronous calls (no longer needed)
+   - Replaced `createMany()` with two individual `create()` calls
+   - `create()` calls: added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+   - `select: { field: true, ... }` → `select: ['field', ...]`
+
+4. **src/app/api/flashcards/route.ts**
+   - Import: `{ db }` → `{ db, genId, nowISO }`
+   - Removed `await` from all db calls
+   - `create()`: added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+   - `select: { id: true }` → `select: ['id']`
+
+5. **src/app/api/flashcards/[id]/route.ts**
+   - Import: `{ db }` → `{ db, nowISO }`
+   - Removed `await` from all db calls (findUnique, findFirst, updateMany, deleteMany)
+   - `update()`: added `updatedAt: nowISO()` to all update data
+
+6. **src/app/api/generate-flashcards/route.ts**
+   - Removed `await` from `db.user.findUnique()` call
+   - `select: { id: true, plan: true, role: true }` → `select: ['id', 'plan', 'role']`
+
+7. **src/app/api/xp/route.ts**
+   - Import: `{ db }` → `{ db, genId, nowISO, sqlite }`
+   - Removed `await` from all db calls
+   - Replaced `groupBy({ by: ['source'], _sum: { amount: true } })` with raw SQL via `db.xPTransaction.query()`
+   - `create()`: added `id: genId()`, `createdAt: nowISO()`
+   - `update()`: added `updatedAt: nowISO()`
+
+8. **src/app/api/stats/route.ts**
+   - Removed `await` from all db calls
+   - Replaced `Promise.all([...])` with direct synchronous calls
+   - Renamed local variable `nowISO` → `nowIsoStr` to avoid conflict
+   - Replaced `_count: { select: { tasks, topics, sessions } }` with per-subject count queries via `db.task.count()` and `db.topic.count()`
+   - `select: { field: true, ... }` → `select: ['field', ...]`
+
+9. **src/app/api/gamification/route.ts**
+   - Import: `{ db }` → `{ db, sqlite }`
+   - Removed `await` from all db calls
+   - Replaced `aggregate({ _sum: { amount: true } })` with raw SQL via `db.xPTransaction.queryOne()`
+   - `select: { field: true, ... }` → `select: ['field', ...]`
+
+10. **src/app/api/achievements/route.ts**
+    - Removed `await` from all db calls
+    - Replaced Prisma `include: { users: { where, select } }` with separate query: `db.userAchievement.findMany()` + Map for O(1) lookup
+
+11. **src/app/api/memories/route.ts**
+    - Removed `await` from all db calls (findUnique, findMany, count)
+    - `select: { field: true, ... }` → `select: ['field', ...]`
+
+12. **src/lib/usage.ts**
+    - Import: `{ db }` → `{ db, genId }`
+    - Removed `await` from all db calls
+    - Replaced `findUnique({ where: { userId_date: { userId, date } } })` (compound key) with `findFirst({ where: { userId, date } })`
+    - Replaced `upsert()` with findFirst + create/update pattern
+    - Replaced `{ increment: 1 }` with atomic raw SQL: `UPDATE ... SET "field" = "field" + 1`
+    - Changed `getTodayStart()` Date → `.toISOString()` string for SQLite TEXT comparison
+
+### Summary:
+- 12 files migrated
+- 0 `await db.` calls remain
+- 0 `@prisma/client` imports remain
+- 0 Prisma `include` patterns remain
+- 0 Prisma `groupBy` patterns remain (2 replaced with raw SQL)
+- 0 Prisma `aggregate` patterns remain (1 replaced with raw SQL)
+- 0 Prisma `upsert` patterns remain (1 replaced with find+create/update)
+- 0 Prisma `createMany` patterns remain (1 replaced with 2x create)
+- 0 Prisma `{ increment }` patterns remain (1 replaced with raw SQL)
+- 0 compound unique key `userId_date` patterns remain
+---
+Task ID: migrate-group-4
+Agent: general-purpose
+Task: Migrate battle, pretest, missions, roadmaps, discover, teach, brain, microlesson, autopilot, checkout routes from Prisma to better-sqlite3
+
+Work Log:
+- Read db.ts to understand Model API (findUnique, findFirst, findMany, create, update, delete, count, exec, query, queryOne) + exports (genId, nowISO, sqlite)
+- Migrated 18 route files total
+
+## File-by-file changes:
+
+### 1. battle/route.ts
+- Import: `db` → `db, genId, nowISO`
+- Removed `await` from all db calls (synchronous)
+- `select: { id: true }` → `select: ['id']`
+- `create()`: added `id: genId()`, `createdAt: nowISO()`
+
+### 2. battle/finish/route.ts
+- Import: `db` → `db, genId, nowISO, sqlite`
+- Removed `await` from all db calls
+- `select: { id: true }` → `select: ['id']`
+- `create()` for XPTransaction: added `id: genId()`, `createdAt: nowISO()`
+- `user.update()` in awardXP: added `updatedAt: nowISO()`, removed `await`
+- `{ increment: battle.totalQuestions }` → raw SQL: `sqlite.prepare('UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?').run(...)`
+
+### 3. pretest/route.ts
+- Import: `db` → `db, genId, nowISO`
+- Removed `await` from all db calls
+- `select: { id: true }` → `select: ['id']`
+- `create()`: added `id: genId()`, `createdAt: nowISO()`
+
+### 4. pretest/finish/route.ts
+- Import: `db` → `db, nowISO, sqlite`
+- Removed `await` from all db calls
+- `select: { id: true }` → `select: ['id']`
+- `{ increment: questions.length }` → raw SQL increment
+
+### 5. missions/route.ts
+- Import: `db` → `db, genId, nowISO`
+- Removed `await` from all db calls
+- `create()` (both AI and manual): added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+
+### 6. missions/[id]/route.ts
+- Import: `db` → `db, nowISO`
+- Removed `await` from all db calls
+- PATCH `update()`: added `updatedAt: nowISO()` to data
+
+### 7. missions/[id]/complete/route.ts
+- Import: `db` → `db, genId, nowISO`
+- Removed `await` from all db calls
+- `create()` for XPTransaction: added `id: genId()`, `createdAt: nowISO()`
+- `user.update()` in awardXP: added `updatedAt: nowISO()`
+- `mission.update()`: added `updatedAt: nowISO()`
+
+### 8. roadmaps/route.ts
+- Import: `db` → `db, genId, nowISO`
+- Removed `await` from all db calls
+- `create()`: added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+- `isAI: boolean` → `isAI: boolean ? 1 : 0` (SQLite integer)
+
+### 9. roadmaps/[id]/route.ts
+- Import: `db` → `db, nowISO`
+- Removed `await` from all db calls
+- PATCH `update()`: added `updatedAt: nowISO()`
+
+### 10. discover/route.ts
+- Import: `db` → `db, genId, nowISO, sqlite`
+- Removed `await` from all db calls, removed `Promise.all` (sync now)
+- `include: { _count: { select: { discoverSaves: true } }, user: ... }` → separate queries after main query
+- `isPublic: true` → `isPublic: 1` (SQLite integer)
+- `create()`: added `id: genId()`, `createdAt: nowISO()`, `updatedAt: nowISO()`
+
+### 11. discover/[id]/route.ts
+- Import: `db` → `db, nowISO`
+- Removed `await` from all db calls
+- `include: { _count, user }` → separate `count()` and `findUnique()` queries
+- `where: { userId_discoverItemId: { userId, discoverItemId: id } }` (composite unique) → `findFirst({ where: { userId, discoverItemId: id } })`
+- PATCH: `isPublic: boolean` → `isPublic: boolean ? 1 : 0`
+- PATCH `update()`: added `updatedAt: nowISO()`
+
+### 12. discover/[id]/save/route.ts
+- Import: `db` → `db, genId, nowISO, sqlite`
+- Removed `await` from all db calls
+- Composite unique `where` → `findFirst` with AND
+- `{ increment: 1 }` → raw SQL: `sqlite.prepare('UPDATE "DiscoverItem" SET "saves" = "saves" + 1 ...')`
+- `{ decrement: 1 }` → raw SQL: `sqlite.prepare('UPDATE "DiscoverItem" SET "saves" = "saves" - 1 ...')`
+- `create()`: added `id: genId()`, `createdAt: nowISO()`
+
+### 13. teach/route.ts
+- Import: `db` → `db, genId, nowISO, sqlite`
+- Removed `await` from all db calls
+- `select: { id: true, content: true, createdAt: true }` → `select: ['id', 'content', 'createdAt']`
+- `include: { topics: { select, where } }` → separate topic queries per subject
+- `{ increment: totalXP }, { increment: 1 }` → raw SQL: `sqlite.prepare('UPDATE "User" SET "xp" = "xp" + ?, "totalQuestionsAnswered" = "totalQuestionsAnswered" + ?, "updatedAt" = ? WHERE "id" = ?')`
+- `create()` for XPTransaction/ChatMessage: added `id: genId()`, `createdAt: nowISO()`
+- `topic.update()`: added `updatedAt: nowISO()`
+
+### 14. brain/route.ts
+- Import: `db` → `db` (no genId/nowISO needed - read-only route)
+- Removed `await` from all db calls
+- `include: { topics, _count }` → separate `findMany` for topics + `count` for tasks per subject
+
+### 15. microlesson/route.ts
+- Import: `db` → `db` (no genId/nowISO needed - no db writes)
+- Removed `await` from db calls
+
+### 16. autopilot/route.ts
+- Import: `db` → `db` (no genId/nowISO needed - no db writes)
+- Removed `await` from db calls
+- `include: { topics }` → separate topic queries per subject
+
+### 17. checkout/route.ts
+- Import: `db` → `db, nowISO`
+- Removed `await` from db.user.update()
+- Added `updatedAt: nowISO()` to update data
+
+### 18. stripe-webhook/route.ts
+- Import: `db` → `db, nowISO`
+- Removed `await` from all db.user.update() calls
+- Added `updatedAt: nowISO()` to all update data objects
+
+Stage Summary:
+- 18 files migrated from Prisma to better-sqlite3
+- 0 `await db.` calls remain in migrated files
+- 0 `@prisma/client` imports remain in migrated files
+- 0 `include:` patterns remain (replaced with separate queries)
+- 0 `Prisma.EnumX.VALUE` patterns found
+- 3 `{ increment/decrement }` patterns replaced with raw SQL
+- 2 composite unique key lookups replaced with findFirst + AND
+- 2 boolean fields (isPublic, isAI) converted to 0/1 for SQLite

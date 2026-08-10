@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 export async function GET(
   _request: Request,
@@ -16,25 +16,34 @@ export async function GET(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const subject = await db.subject.findFirst({
+    const subject = db.subject.findFirst({
       where: { id, userId },
-      include: {
-        _count: { select: { topics: true, tasks: true, goals: true, sessions: true } },
-        topics: { orderBy: { sortOrder: 'asc' } },
-      },
     });
 
     if (!subject) {
       return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 404 });
     }
 
-    return NextResponse.json({ subject });
+    // Separate queries for _count and topics (was include)
+    const topics = db.topic.findMany({
+      where: { subjectId: id },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const _count = {
+      topics: db.topic.count({ where: { subjectId: id } }),
+      tasks: db.task.count({ where: { subjectId: id } }),
+      goals: db.goal.count({ where: { subjectId: id } }),
+      sessions: db.studySession.count({ where: { subjectId: id } }),
+    };
+
+    return NextResponse.json({ subject: { ...subject, topics, _count } });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -54,13 +63,13 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.subject.findFirst({ where: { id, userId } });
+    const existing = db.subject.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 404 });
     }
@@ -74,15 +83,15 @@ export async function PATCH(
 
     const { name, description, color, icon, sortOrder, isActive } = body;
 
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
     if (typeof name === 'string' && name.trim()) data.name = name.trim();
     if (typeof description === 'string') data.description = description.trim();
     if (typeof color === 'string' && color) data.color = color;
     if (typeof icon === 'string' && icon) data.icon = icon;
     if (typeof sortOrder === 'number') data.sortOrder = sortOrder;
-    if (typeof isActive === 'boolean') data.isActive = isActive;
+    if (typeof isActive === 'boolean') data.isActive = isActive ? 1 : 0;
 
-    const subject = await db.subject.update({
+    const subject = db.subject.update({
       where: { id },
       data,
     });
@@ -107,18 +116,18 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.subject.findFirst({ where: { id, userId } });
+    const existing = db.subject.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 404 });
     }
 
-    await db.subject.delete({ where: { id } });
+    db.subject.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

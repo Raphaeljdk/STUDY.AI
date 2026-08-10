@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify admin user exists
-    const adminExists = await db.user.findUnique({ where: { id: adminId }, select: { id: true, role: true } });
+    const adminExists = await db.user.findUnique({ where: { id: adminId }, select: ['id', 'role'] });
     if (!adminExists || adminExists.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       // Se já existe, atualiza para admin
       const updated = await db.user.update({
         where: { email: normalizedEmail },
-        data: { role: 'ADMIN' },
+        data: { role: 'ADMIN', updatedAt: nowISO() },
       });
       return NextResponse.json({
         success: true,
@@ -63,11 +63,14 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await db.user.create({
       data: {
+        id: genId(),
         name: finalName,
         email: normalizedEmail,
         password: hashedPassword,
         role: 'ADMIN',
         plan: 'SENSEI',
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

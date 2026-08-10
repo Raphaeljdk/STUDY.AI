@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -32,18 +32,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome da prova obrigatorio' }, { status: 400 });
     }
 
-    // Gather user's existing data for context
-    const userSubjects = await db.subject.findMany({
+    // Gather user's existing data for context (no include — separate queries)
+    const userSubjects = db.subject.findMany({
       where: { userId },
-      include: {
-        topics: { select: { name: true, mastery: true } },
-      },
     });
 
-    const subjectsContext = userSubjects.map(s => ({
-      name: s.name,
-      topics: s.topics.map(t => ({ name: t.name, mastery: t.mastery })),
-    }));
+    // Get topics for each subject separately
+    const subjectsContext = userSubjects.map(s => {
+      const topics = db.topic.findMany({ select: ['name', 'mastery'], where: { subjectId: s.id } });
+      return {
+        name: s.name,
+        topics: topics.map(t => ({ name: t.name, mastery: t.mastery })),
+      };
+    });
 
     const studyHours = typeof studyHoursPerDay === 'number' ? studyHoursPerDay : 3;
     const level = typeof currentLevel === 'string' ? currentLevel : 'intermediario';

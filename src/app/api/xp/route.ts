@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 const VALID_SOURCES = [
   'STUDY_SESSION', 'TASK_COMPLETED', 'GOAL_COMPLETED', 'FLASHCARD_REVIEW',
@@ -18,19 +18,19 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
- const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
     const source = searchParams.get('source');
 
     // Fetch user for level info
-    const user = await db.user.findUnique({
+    const user = db.user.findUnique({
       where: { id: userId },
-      select: { xp: true, level: true },
+      select: ['xp', 'level'],
     });
 
     if (!user) {
@@ -49,18 +49,17 @@ export async function GET(request: Request) {
       where.source = source;
     }
 
-    const transactions = await db.xPTransaction.findMany({
+    const transactions = db.xPTransaction.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
     });
 
-    // Total XP breakdown by source
-    const xpBreakdown = await db.xPTransaction.groupBy({
-      by: ['source'],
-      where: { userId, amount: { gt: 0 } },
-      _sum: { amount: true },
-    });
+    // Total XP breakdown by source (replaces groupBy)
+    const xpBreakdown = db.xPTransaction.query(
+      `SELECT "source", SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "amount" > 0 GROUP BY "source"`,
+      userId
+    );
 
     return NextResponse.json({
       xp: user.xp,
@@ -73,7 +72,7 @@ export async function GET(request: Request) {
       transactions,
       xpBreakdown: xpBreakdown.map(b => ({
         source: b.source,
-        total: b._sum.amount || 0,
+        total: b.total || 0,
       })),
     });
   } catch (error) {
@@ -92,7 +91,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -112,19 +111,21 @@ export async function POST(request: Request) {
 
     const finalSource = VALID_SOURCES.includes(source) ? source : 'MANUAL';
 
-    const xpTx = await db.xPTransaction.create({
+    const xpTx = db.xPTransaction.create({
       data: {
+        id: genId(),
         userId,
         amount,
         source: finalSource,
         description: typeof description === 'string' ? description.trim() : null,
+        createdAt: nowISO(),
       },
     });
 
     // Recalculate level
-    const user = await db.user.findUnique({
+    const user = db.user.findUnique({
       where: { id: userId },
-      select: { xp: true, level: true },
+      select: ['xp', 'level'],
     });
     if (!user) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
@@ -138,9 +139,9 @@ export async function POST(request: Request) {
       newLevel = newLevel + 1;
     }
 
-    await db.user.update({
+    db.user.update({
       where: { id: userId },
-      data: { xp: newXP, level: newLevel },
+      data: { xp: newXP, level: newLevel, updatedAt: nowISO() },
     });
 
     return NextResponse.json({ transaction: xpTx, newXp: newXP, newLevel }, { status: 201 });

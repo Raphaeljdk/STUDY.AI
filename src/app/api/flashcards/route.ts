@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -25,9 +25,9 @@ export async function GET(request: Request) {
     const where: any = { userId };
     if (notebookId) {
       // Cross-user notebook injection fix: verify ownership
-      const ownedNotebook = await db.notebook.findFirst({
+      const ownedNotebook = db.notebook.findFirst({
         where: { id: notebookId, userId },
-        select: { id: true },
+        select: ['id'],
       });
       if (!ownedNotebook) {
         return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     }
     if (dueOnly) where.nextReview = { lte: new Date().toISOString() };
 
-    const flashcards = await db.flashcard.findMany({
+    const flashcards = db.flashcard.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -85,9 +85,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
       }
       // Cross-user notebook injection fix
-      const ownedNotebook = await db.notebook.findFirst({
+      const ownedNotebook = db.notebook.findFirst({
         where: { id: notebookId, userId },
-        select: { id: true },
+        select: ['id'],
       });
       if (!ownedNotebook) {
         return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
@@ -95,8 +95,8 @@ export async function POST(request: Request) {
       finalNotebookId = notebookId;
     }
 
-    const flashcard = await db.flashcard.create({
-      data: { front: front.trim(), back: back.trim(), notebookId: finalNotebookId, userId },
+    const flashcard = db.flashcard.create({
+      data: { id: genId(), front: front.trim(), back: back.trim(), notebookId: finalNotebookId, userId, createdAt: nowISO(), updatedAt: nowISO() },
     });
 
     return NextResponse.json({ flashcard }, { status: 201 });

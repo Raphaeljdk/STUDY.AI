@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser, isPremiumUser } from '@/lib/usage';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         metadata: { userId: user.id },
       });
       customerId = customer.id;
-      await db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
+      db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId, updatedAt: nowISO() } });
     }
 
     const origin = request.headers.get('origin') || 'https://study-ai-nine-xi.vercel.app';

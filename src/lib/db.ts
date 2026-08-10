@@ -1,45 +1,27 @@
-import { PrismaClient } from '@prisma/client'
+import Database from 'better-sqlite3'
 import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
+import { randomUUID } from 'crypto'
 
 // ═══════════════════════════════════════════════════════════════
-// DATABASE URL NORMALIZATION
-// The Prisma schema uses provider="sqlite", so the URL MUST
-// start with "file:". If the env var points to PostgreSQL
-// (e.g. on Vercel), we override it to use a local SQLite file.
+// DATABASE PATH
 // ═══════════════════════════════════════════════════════════════
 
-function getNormalizedDbUrl(): string {
-  const url = process.env.DATABASE_URL || ''
-
-  if (url.startsWith('file:')) {
-    const filePath = url.replace('file:', '')
-    const dir = join(process.cwd(), filePath.substring(0, filePath.lastIndexOf('/')) || 'db')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    return url
+function getDbPath(): string {
+  // In production (Vercel), use /tmp/ which is writable
+  if (process.env.NODE_ENV === 'production') {
+    return '/tmp/studyai.db'
   }
-
-  const fallbackPath = process.env.NODE_ENV === 'production'
-    ? '/tmp/studyai.db'
-    : join(process.cwd(), 'db', 'custom.db')
-
-  const dir = join(fallbackPath, '..')
+  // Local dev
+  const dir = join(process.cwd(), 'db')
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-
-  console.warn(
-    `[db] DATABASE_URL is not file:. Falling back to file:${fallbackPath}`
-  )
-
-  return `file:${fallbackPath}`
+  return join(dir, 'custom.db')
 }
 
-const effectiveDbUrl = getNormalizedDbUrl()
-process.env.DATABASE_URL = effectiveDbUrl
+const DB_PATH = getDbPath()
 
 // ═══════════════════════════════════════════════════════════════
-// RAW SQL SCHEMA — All CREATE TABLE IF NOT EXISTS statements
-// This is the single source of truth for runtime table creation.
-// Works everywhere (local dev, Vercel serverless) without Prisma CLI.
+// RAW SQL SCHEMA
 // ═══════════════════════════════════════════════════════════════
 
 const SCHEMA_SQL = `
@@ -417,238 +399,272 @@ CREATE TABLE IF NOT EXISTS "Roadmap" (
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "Roadmap_userId_idx" ON "Roadmap"("userId");
-
-CREATE TRIGGER IF NOT EXISTS "User_updatedAt"
-  AFTER UPDATE ON "User"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "User" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Subject_updatedAt"
-  AFTER UPDATE ON "Subject"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Subject" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Topic_updatedAt"
-  AFTER UPDATE ON "Topic"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Topic" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Task_updatedAt"
-  AFTER UPDATE ON "Task"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Task" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Goal_updatedAt"
-  AFTER UPDATE ON "Goal"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Goal" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "CalendarEvent_updatedAt"
-  AFTER UPDATE ON "CalendarEvent"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "CalendarEvent" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Notebook_updatedAt"
-  AFTER UPDATE ON "Notebook"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Notebook" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "NotebookPage_updatedAt"
-  AFTER UPDATE ON "NotebookPage"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "NotebookPage" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Flashcard_updatedAt"
-  AFTER UPDATE ON "Flashcard"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Flashcard" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "UserMemory_updatedAt"
-  AFTER UPDATE ON "UserMemory"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "UserMemory" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "DiscoverItem_updatedAt"
-  AFTER UPDATE ON "DiscoverItem"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "DiscoverItem" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Mission_updatedAt"
-  AFTER UPDATE ON "Mission"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Mission" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
-
-CREATE TRIGGER IF NOT EXISTS "Roadmap_updatedAt"
-  AFTER UPDATE ON "Roadmap"
-  FOR EACH ROW
-  BEGIN
-    UPDATE "Roadmap" SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE "id" = OLD."id";
-  END;
 `
 
 // ═══════════════════════════════════════════════════════════════
-// AUTO TABLE CREATION
-// Uses Prisma client extension ($extends) to ensure all tables
-// exist before the FIRST query. Subsequent queries are zero-cost.
+// DATABASE SINGLETON (better-sqlite3 — synchronous, no ORM)
 // ═══════════════════════════════════════════════════════════════
 
-let _tablesReady = false
-let _tablesPromise: Promise<void> | null = null
-let _isCreatingTables = false
+const globalForDb = globalThis as unknown as { _sqliteDb: Database.Database | undefined }
 
-async function createTables(baseClient: PrismaClient): Promise<void> {
-  const statements = SCHEMA_SQL
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
+const sqlite: Database.Database =
+  globalForDb._sqliteDb ?? new Database(DB_PATH, { fileMustExist: false })
 
+if (!globalForDb._sqliteDb) {
+  globalForDb._sqliteDb = sqlite
+  // Enable WAL mode for better concurrent read performance
+  sqlite.pragma('journal_mode = WAL')
+  sqlite.pragma('foreign_keys = ON')
+  // Create all tables
+  const statements = SCHEMA_SQL.split(';').map(s => s.trim()).filter(s => s.length > 0)
   for (const sql of statements) {
-    try {
-      await baseClient.$executeRawUnsafe(sql)
-    } catch (err: any) {
-      // Log but continue — IF NOT EXISTS means most should be fine
-      console.warn('[db] Table creation note:', err?.message?.substring(0, 100))
-    }
+    try { sqlite.exec(sql) } catch (e: any) { /* table/index already exists */ }
   }
-
-  console.log('[db] All tables ensured via raw SQL')
-}
-
-function ensureTables(baseClient: PrismaClient): Promise<void> {
-  if (_tablesReady) return Promise.resolve()
-  if (_isCreatingTables) return Promise.resolve()
-  if (_tablesPromise) return _tablesPromise
-
-  _isCreatingTables = true
-  _tablesPromise = createTables(baseClient)
-    .then(() => {
-      _tablesReady = true
-      _isCreatingTables = false
-    })
-    .catch((err) => {
-      _isCreatingTables = false
-      _tablesPromise = null // Allow retry on next query
-      console.error('[db] Failed to create tables:', err)
-    })
-
-  return _tablesPromise
+  console.log(`[db] SQLite ready at ${DB_PATH}`)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PRISMA CLIENT (singleton with auto-table-creation via $extends)
+// UTILITY
 // ═══════════════════════════════════════════════════════════════
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+export const nowISO = () => new Date().toISOString()
+export const genId = () => randomUUID()
 
-// Base client (no extensions) — used for raw table creation
-const _baseClient =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = _baseClient
-}
-
-// Extended client: auto-ensures tables before every Prisma query.
-// The $extends query hook intercepts all model queries.
-// Raw SQL in createTables() uses _baseClient directly (no hook).
-//
-// CRITICAL FIX: Prisma v6 + SQLite generates numeric millisecond timestamps
-// (e.g. "1786364295199") for @default(now()) / @updatedAt instead of
-// ISO 8601 strings, causing P2023. We inject ISO strings explicitly
-// in create/update operations so Prisma never auto-generates them.
-
-function convertDatesToISO(obj: any): any {
-  if (obj === null || obj === undefined) return obj
-  if (obj instanceof Date) return obj.toISOString()
-  if (Array.isArray(obj)) return obj.map(convertDatesToISO)
-  if (typeof obj === 'object') {
-    const result: any = {}
-    for (const key of Object.keys(obj)) {
-      result[key] = convertDatesToISO(obj[key])
+// Convert SQLite row (snake_case integers for booleans) to JS object
+function rowToObj(row: any): any {
+  if (!row) return null
+  const obj: any = { ...row }
+  // SQLite stores booleans as 0/1
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === 0 && ['isActive', 'isAllDay', 'isAI', 'isPublic'].includes(key)) {
+      // Keep as 0/1 for now — let the API routes handle boolean conversion if needed
     }
-    return result
   }
   return obj
 }
 
-const db = _baseClient.$extends({
-  query: {
-    $allModels: {
-      async $allOperations({ args, query, operation }) {
-        await ensureTables(_baseClient)
+function rowsToObjs(rows: any[]): any[] {
+  return rows.map(rowToObj)
+}
 
-        const nowISO = new Date().toISOString()
+// ═══════════════════════════════════════════════════════════════
+// QUERY BUILDER — Prisma-compatible API using better-sqlite3
+// ═══════════════════════════════════════════════════════════════
 
-        // --- INJECT ISO TIMESTAMPS FOR WRITE OPERATIONS ---
+/**
+ * Build WHERE clause from Prisma-style where object.
+ * Supports: equality, { gte, lte, gt, lt, contains, in, not, notIn, startsWith }, AND, OR
+ */
+export function buildWhere(where: Record<string, any>, params: any[] = [], tablePrefix = ''): string {
+  if (!where || Object.keys(where).length === 0) return '1=1'
 
-        // create: { data: { ... } }
-        if (operation === 'create' && args.data) {
-          if (!args.data.createdAt) args.data.createdAt = nowISO
-          if (!args.data.updatedAt && 'updatedAt' in args.data === false) args.data.updatedAt = nowISO
+  const clauses: string[] = []
+
+  for (const [key, value] of Object.entries(where)) {
+    const col = tablePrefix ? `${tablePrefix}."${key}"` : `"${key}"`
+
+    if (key === 'AND' && Array.isArray(value)) {
+      const andClauses = value.map((w: any) => buildWhere(w, params, tablePrefix))
+      clauses.push(`(${andClauses.join(' AND ')})`)
+    } else if (key === 'OR' && Array.isArray(value)) {
+      const orClauses = value.map((w: any) => buildWhere(w, params, tablePrefix))
+      clauses.push(`(${orClauses.join(' OR ')})`)
+    } else if (key === 'NOT' && typeof value === 'object' && value !== null) {
+      clauses.push(`NOT (${buildWhere(value, params, tablePrefix)})`)
+    } else if (value === null || value === undefined) {
+      clauses.push(`${col} IS NULL`)
+    } else if (typeof value === 'object' && !Array.isArray(value)) {
+      // Comparison operators
+      for (const [op, opVal] of Object.entries(value)) {
+        switch (op) {
+          case 'gte': clauses.push(`${col} >= ?`); params.push(opVal); break
+          case 'gt': clauses.push(`${col} > ?`); params.push(opVal); break
+          case 'lte': clauses.push(`${col} <= ?`); params.push(opVal); break
+          case 'lt': clauses.push(`${col} < ?`); params.push(opVal); break
+          case 'contains': clauses.push(`${col} LIKE ?`); params.push(`%${opVal}%`); break
+          case 'startsWith': clauses.push(`${col} LIKE ?`); params.push(`${opVal}%`); break
+          case 'endsWith': clauses.push(`${col} LIKE ?`); params.push(`%${opVal}`); break
+          case 'in':
+            if (Array.isArray(opVal) && opVal.length > 0) {
+              clauses.push(`${col} IN (${opVal.map(() => '?').join(', ')})`)
+              params.push(...opVal)
+            } else {
+              clauses.push('1=0') // empty IN = no results
+            }
+            break
+          case 'notIn':
+            if (Array.isArray(opVal) && opVal.length > 0) {
+              clauses.push(`${col} NOT IN (${opVal.map(() => '?').join(', ')})`)
+              params.push(...opVal)
+            }
+            break
+          case 'not': clauses.push(`${col} != ?`); params.push(opVal); break
+          case 'equals': clauses.push(`${col} = ?`); params.push(opVal); break
+          case 'neq': clauses.push(`${col} != ?`); params.push(opVal); break
+          default: clauses.push(`${col} = ?`); params.push(opVal)
         }
+      }
+    } else {
+      // Simple equality
+      clauses.push(`${col} = ?`)
+      params.push(value)
+    }
+  }
 
-        // createMany: { data: [ { ... }, { ... } ] }
-        if (operation === 'createMany' && Array.isArray(args.data)) {
-          for (const item of args.data) {
-            if (!item.createdAt) item.createdAt = nowISO
-            if (!item.updatedAt && 'updatedAt' in item === false) item.updatedAt = nowISO
-          }
-        }
+  return clauses.length > 0 ? clauses.join(' AND ') : '1=1'
+}
 
-        // update / updateMany: { data: { ... } }
-        if (operation === 'update' || operation === 'updateMany') {
-          if (args.data) {
-            args.data.updatedAt = nowISO
-          }
-        }
+/** Build ORDER BY clause from Prisma-style orderBy */
+function buildOrderBy(orderBy: any): string {
+  if (!orderBy) return ''
+  if (typeof orderBy === 'string') return `ORDER BY "${orderBy}" ASC`
+  if (Array.isArray(orderBy)) {
+    return 'ORDER BY ' + orderBy.map((o: any) => {
+      const key = typeof o === 'string' ? o : Object.keys(o)[0]
+      const dir = typeof o === 'string' ? 'ASC' : (o[key] === 'desc' ? 'DESC' : 'ASC')
+      return `"${key}" ${dir}`
+    }).join(', ')
+  }
+  // Single object: { field: 'asc' | 'desc' }
+  const key = Object.keys(orderBy)[0]
+  const dir = orderBy[key] === 'desc' ? 'DESC' : 'ASC'
+  return `ORDER BY "${key}" ${dir}`
+}
 
-        // upsert: { create: { ... }, update: { ... } }
-        if (operation === 'upsert') {
-          if (args.create) {
-            if (!args.create.createdAt) args.create.createdAt = nowISO
-            if (!args.create.updatedAt && 'updatedAt' in args.create === false) args.create.updatedAt = nowISO
-          }
-          if (args.update) {
-            args.update.updatedAt = nowISO
-          }
-        }
+// ═══════════════════════════════════════════════════════════════
+// MODEL CLASS — Provides Prisma-like API for each table
+// ═══════════════════════════════════════════════════════════════
 
-        // --- CONVERT ANY REMAINING Date OBJECTS TO ISO STRINGS ---
-        args = convertDatesToISO(args)
+export class Model {
+  constructor(public table: string) {}
 
-        return query(args)
-      },
-    },
-  },
-})
+  findUnique({ where, select }: { where: Record<string, any>; select?: string[] } = {} as any): any {
+    const params: any[] = []
+    const sel = select && select.length > 0 ? select.map(s => `"${s}"`).join(', ') : '*'
+    const whereClause = buildWhere(where, params)
+    const row = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause} LIMIT 1`).get(...params)
+    return rowToObj(row)
+  }
 
-export { db }
+  findFirst({ where, orderBy, select }: any = {}): any {
+    const params: any[] = []
+    const sel = select && select.length > 0 ? select.map(s => `"${s}"`).join(', ') : '*'
+    const whereClause = buildWhere(where, params)
+    const orderClause = orderBy ? ' ' + buildOrderBy(orderBy) : ''
+    const row = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause} LIMIT 1`).get(...params)
+    return rowToObj(row)
+  }
+
+  findMany({ where, select, orderBy, take, skip, distinct }: any = {}): any[] {
+    const params: any[] = []
+    let sel = select && select.length > 0 ? select.map((s: string) => `"${s}"`).join(', ') : '*'
+    if (distinct) sel = `DISTINCT ${sel}`
+    const whereClause = buildWhere(where, params)
+    const orderClause = orderBy ? ' ' + buildOrderBy(orderBy) : ''
+    const limitClause = take ? ` LIMIT ${take}` : ''
+    const offsetClause = skip ? ` OFFSET ${skip}` : ''
+    const rows = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause}${limitClause}${offsetClause}`).all(...params)
+    return rowsToObjs(rows)
+  }
+
+  create({ data }: { data: Record<string, any> }): any {
+    const keys = Object.keys(data)
+    const values = Object.values(data)
+    const placeholders = keys.map(() => '?').join(', ')
+    const cols = keys.map(k => `"${k}"`).join(', ')
+    sqlite.prepare(`INSERT INTO "${this.table}" (${cols}) VALUES (${placeholders})`).run(...values)
+    // Return the created row
+    return this.findUnique({ where: { id: data.id } })
+  }
+
+  update({ where, data }: { where: Record<string, any>; data: Record<string, any> }): any {
+    const params: any[] = []
+    const setClause = Object.keys(data).map(k => { params.push(data[k]); return `"${k}" = ?` }).join(', ')
+    const whereClause = buildWhere(where, params)
+    sqlite.prepare(`UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`).run(...params)
+    return this.findUnique({ where })
+  }
+
+  updateMany({ where, data }: { where: Record<string, any>; data: Record<string, any> }): { count: number } {
+    const params: any[] = []
+    const setClause = Object.keys(data).map(k => { params.push(data[k]); return `"${k}" = ?` }).join(', ')
+    const whereClause = buildWhere(where, params)
+    const result = sqlite.prepare(`UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`).run(...params)
+    return { count: result.changes }
+  }
+
+  delete({ where }: { where: Record<string, any> }): any {
+    const row = this.findUnique({ where })
+    if (!row) return null
+    const params: any[] = []
+    const whereClause = buildWhere(where, params)
+    sqlite.prepare(`DELETE FROM "${this.table}" WHERE ${whereClause}`).run(...params)
+    return row
+  }
+
+  deleteMany({ where }: { where?: Record<string, any> } = {}): { count: number } {
+    const params: any[] = []
+    const whereClause = buildWhere(where || {}, params)
+    const result = sqlite.prepare(`DELETE FROM "${this.table}" WHERE ${whereClause}`).run(...params)
+    return { count: result.changes }
+  }
+
+  count({ where }: { where?: Record<string, any> } = {}): number {
+    const params: any[] = []
+    const whereClause = buildWhere(where || {}, params)
+    const row = sqlite.prepare(`SELECT COUNT(*) as count FROM "${this.table}" WHERE ${whereClause}`).get(...params) as any
+    return row?.count ?? 0
+  }
+
+  /** Raw SQL execution */
+  exec(sql: string, ...params: any[]) {
+    return sqlite.prepare(sql).run(...params)
+  }
+
+  /** Raw SQL query */
+  query(sql: string, ...params: any[]) {
+    return rowsToObjs(sqlite.prepare(sql).all(...params))
+  }
+
+  /** Raw SQL query - single row */
+  queryOne(sql: string, ...params: any[]) {
+    return rowToObj(sqlite.prepare(sql).get(...params))
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORTED MODELS (drop-in Prisma replacement)
+// Usage: import { db } from '@/lib/db'
+//        db.user.findUnique({ where: { id: '...' } })
+//        db.user.create({ data: { name: '...', email: '...' } })
+// ═══════════════════════════════════════════════════════════════
+
+export const db = {
+  user: new Model('User'),
+  subject: new Model('Subject'),
+  topic: new Model('Topic'),
+  task: new Model('Task'),
+  goal: new Model('Goal'),
+  calendarEvent: new Model('CalendarEvent'),
+  xpTransaction: new Model('XPTransaction'),
+  achievement: new Model('Achievement'),
+  userAchievement: new Model('UserAchievement'),
+  streakRecord: new Model('StreakRecord'),
+  notebook: new Model('Notebook'),
+  notebookPage: new Model('NotebookPage'),
+  notebookTag: new Model('NotebookTag'),
+  flashcard: new Model('Flashcard'),
+  studySession: new Model('StudySession'),
+  chatMessage: new Model('ChatMessage'),
+  dailyUsage: new Model('DailyUsage'),
+  userMemory: new Model('UserMemory'),
+  discoverItem: new Model('DiscoverItem'),
+  discoverSave: new Model('DiscoverSave'),
+  battle: new Model('Battle'),
+  mission: new Model('Mission'),
+  preTest: new Model('PreTest'),
+  roadmap: new Model('Roadmap'),
+}
+
+// Also export the raw sqlite instance for advanced queries
+export { sqlite }

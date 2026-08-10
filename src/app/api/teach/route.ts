@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO, sqlite } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 
 async function requireUser() {
@@ -13,7 +13,7 @@ async function requireUser() {
   if (!userId) {
     return { error: NextResponse.json({ error: 'Sessao invalida' }, { status: 401 }) };
   }
-  const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+  const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
   if (!userExists) {
     return { error: NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 }) };
   }
@@ -27,18 +27,14 @@ export async function GET(_request: Request) {
     if ('error' in auth) return auth.error;
     const { userId } = auth;
 
-    const teachings = await db.chatMessage.findMany({
+    const teachings = db.chatMessage.findMany({
       where: {
         userId,
         role: 'teaching',
       },
       orderBy: { createdAt: 'desc' },
       take: 30,
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-      },
+      select: ['id', 'content', 'createdAt'],
     });
 
     return NextResponse.json({ teachings });
@@ -72,20 +68,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Explicacao muito curta. Explique com mais detalhes.' }, { status: 400 });
     }
 
-    // Get user's subjects for context
-    const subjects = await db.subject.findMany({
+    // Get user's subjects (no include — separate queries)
+    const subjects = db.subject.findMany({
       where: { userId },
-      include: {
-        topics: {
-          select: { name: true, mastery: true },
-          where: topic ? { name: { contains: topic } } : undefined,
-          take: 5,
-        },
-      },
       take: 10,
     });
 
-    const relatedTopics = subjects.flatMap(s => s.topics).filter(t => t.name.toLowerCase().includes(topic.toLowerCase()));
+    // Get topics for each subject separately
+    const subjectsWithTopics = subjects.map(s => {
+      const topicWhere: any = { subjectId: s.id };
+      if (topic) topicWhere.name = { contains: topic };
+      const topics = db.topic.findMany({
+        where: topicWhere,
+        select: ['name', 'mastery'],
+        take: 5,
+      });
+      return { ...s, topics };
+    });
+
+    const relatedTopics = subjectsWithTopics.flatMap(s => s.topics).filter(t => t.name.toLowerCase().includes(topic.toLowerCase()));
 
     const difficultyLabel = difficulty === 'basico' ? 'basico'
       : difficulty === 'intermediario' ? 'intermediario'
@@ -156,38 +157,33 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
     const xpEarned = Math.round((analysis.mastery || 0) / 10);
     const totalXP = Math.max(5, Math.min(25, xpEarned));
 
-    // Update user XP if earned
+    // Update user XP if earned (increment via raw SQL)
     if (totalXP > 0) {
-      await db.user.update({
-        where: { id: userId },
-        data: {
-          xp: { increment: totalXP },
-          totalQuestionsAnswered: { increment: 1 },
-        },
-      });
+      sqlite.prepare('UPDATE "User" SET "xp" = "xp" + ?, "totalQuestionsAnswered" = "totalQuestionsAnswered" + ?, "updatedAt" = ? WHERE "id" = ?').run(totalXP, 1, nowISO(), userId);
 
       // Create XP transaction
-      await db.xPTransaction.create({
+      db.xPTransaction.create({
         data: {
+          id: genId(),
           userId,
           amount: totalXP,
           source: 'QUIZ_COMPLETED',
           description: `Ensinar "${topic}" - nota ${analysis.overallGrade || '?'}`,
+          createdAt: nowISO(),
         },
       });
 
       // Update related topic mastery if exists
       if (relatedTopics.length > 0) {
-        const topicId = relatedTopics[0].name;
         // Find topic in database by name match
         for (const rel of relatedTopics) {
-          const dbTopic = await db.topic.findFirst({
+          const dbTopic = db.topic.findFirst({
             where: { name: rel.name },
           });
           if (dbTopic && (analysis.mastery || 0) > dbTopic.mastery) {
-            await db.topic.update({
+            db.topic.update({
               where: { id: dbTopic.id },
-              data: { mastery: analysis.mastery || 0 },
+              data: { mastery: analysis.mastery || 0, updatedAt: nowISO() },
             });
           }
         }
@@ -195,8 +191,9 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
     }
 
     // Save teaching session as memory
-    await db.chatMessage.create({
+    db.chatMessage.create({
       data: {
+        id: genId(),
         userId,
         role: 'teaching',
         content: JSON.stringify({
@@ -208,15 +205,16 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
           grade: analysis.overallGrade,
           xpEarned: totalXP,
         }),
+        createdAt: nowISO(),
       },
     });
 
     // Recalculate level
-    const updatedUser = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+    const updatedUser = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
     if (updatedUser) {
       const newLevel = Math.floor(updatedUser.xp / 500) + 1;
       if (newLevel > updatedUser.level) {
-        await db.user.update({ where: { id: userId }, data: { level: newLevel } });
+        db.user.update({ where: { id: userId }, data: { level: newLevel, updatedAt: nowISO() } });
       }
     }
 

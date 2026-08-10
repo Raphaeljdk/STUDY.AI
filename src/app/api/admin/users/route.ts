@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 function isAdmin(session: any): session is { user: { id: string; role: 'ADMIN' } } {
   return session?.user?.role === 'ADMIN';
-}
-
-function isPrismaRecordNotFound(error: any): boolean {
-  return (
-    error?.code === 'P2025' ||
-    error?.name === 'PrismaClientKnownRequestError' && error?.code === 'P2025'
-  );
 }
 
 export async function GET() {
@@ -22,7 +15,7 @@ export async function GET() {
     }
 
     const users = await db.user.findMany({
-      select: { id: true, name: true, email: true, role: true, plan: true, createdAt: true },
+      select: ['id', 'name', 'email', 'role', 'plan', 'createdAt'],
       orderBy: { createdAt: 'desc' },
     });
 
@@ -77,7 +70,7 @@ export async function PATCH(request: Request) {
     if (data.role !== undefined && data.role !== 'ADMIN') {
       const targetUser = await db.user.findUnique({
         where: { id: userId },
-        select: { role: true },
+        select: ['role'],
       });
       if (!targetUser) {
         return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
@@ -93,20 +86,26 @@ export async function PATCH(request: Request) {
       }
     }
 
-    try {
-      const updated = await db.user.update({
-        where: { id: userId },
-        data,
-        select: { id: true, name: true, email: true, role: true, plan: true },
-      });
+    data.updatedAt = nowISO();
 
-      return NextResponse.json({ user: updated });
-    } catch (updateError: any) {
-      if (isPrismaRecordNotFound(updateError)) {
-        return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-      }
-      throw updateError;
+    const updated = await db.user.update({
+      where: { id: userId },
+      data,
+    });
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
+
+    return NextResponse.json({
+      user: {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        plan: updated.plan,
+      },
+    });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -142,7 +141,7 @@ export async function DELETE(request: Request) {
     // Last admin protection on DELETE: cannot delete the last admin
     const targetUser = await db.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: ['role'],
     });
     if (!targetUser) {
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
@@ -157,15 +156,12 @@ export async function DELETE(request: Request) {
       }
     }
 
-    try {
-      await db.user.delete({ where: { id: userId } });
-      return NextResponse.json({ success: true });
-    } catch (deleteError: any) {
-      if (isPrismaRecordNotFound(deleteError)) {
-        return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-      }
-      throw deleteError;
+    const deleted = await db.user.delete({ where: { id: userId } });
+    if (!deleted) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

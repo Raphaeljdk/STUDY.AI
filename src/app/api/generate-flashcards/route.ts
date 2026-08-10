@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (!session?.user) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
     const userId = (session.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true, plan: true, role: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id', 'plan', 'role'] });
     if (!userExists) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
 
     // Usage limit check

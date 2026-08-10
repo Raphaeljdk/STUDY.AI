@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 const VALID_STATUSES = ['active', 'completed', 'paused'];
 
@@ -18,13 +18,13 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.roadmap.findFirst({ where: { id, userId } });
+    const existing = db.roadmap.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Trilha nao encontrada' }, { status: 404 });
     }
@@ -38,7 +38,7 @@ export async function PATCH(
 
     const { title, description, topic, status, steps, currentStep } = body;
 
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
     if (typeof title === 'string' && title.trim()) data.title = title.trim();
     if (typeof description === 'string') data.description = description.trim();
     if (typeof topic === 'string' && topic.trim()) data.topic = topic.trim();
@@ -57,7 +57,7 @@ export async function PATCH(
       data.status = 'completed';
     }
 
-    const roadmap = await db.roadmap.update({
+    const roadmap = db.roadmap.update({
       where: { id },
       data,
     });
@@ -82,18 +82,18 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.roadmap.findFirst({ where: { id, userId } });
+    const existing = db.roadmap.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Trilha nao encontrada' }, { status: 404 });
     }
 
-    await db.roadmap.delete({ where: { id } });
+    db.roadmap.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

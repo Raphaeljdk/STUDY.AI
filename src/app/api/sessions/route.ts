@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['pomodoro', 'break', 'focus'] as const;
 
@@ -16,12 +16,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const sessions = await db.studySession.findMany({
+    const sessions = db.studySession.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
     // Verify user exists in DB
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
       ? type
       : 'pomodoro';
 
-    const studySession = await db.studySession.create({
-      data: { userId, duration: Math.round(duration), type: finalType },
+    const studySession = db.studySession.create({
+      data: { id: genId(), userId, duration: Math.round(duration), type: finalType, createdAt: nowISO() },
     });
 
     return NextResponse.json({ session: studySession }, { status: 201 });

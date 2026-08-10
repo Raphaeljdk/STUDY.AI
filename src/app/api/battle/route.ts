@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 
 export async function GET(_request: Request) {
@@ -14,12 +14,12 @@ export async function GET(_request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const battles = await db.battle.findMany({
+    const battles = db.battle.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -84,12 +84,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao gerar questoes com IA' }, { status: 500 });
     }
 
-    const battle = await db.battle.create({
+    const battle = db.battle.create({
       data: {
+        id: genId(),
         userId,
         subject: subject.trim(),
         totalQuestions: numQuestions,
         duration: battleDuration,
+        createdAt: nowISO(),
       },
     });
 

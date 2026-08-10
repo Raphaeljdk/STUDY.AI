@@ -13,20 +13,22 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const achievements = await db.achievement.findMany({
+    // Replace Prisma include with separate queries
+    const achievements = db.achievement.findMany({
       orderBy: { sortOrder: 'asc' },
-      include: {
-        users: {
-          where: { userId },
-          select: { unlockedAt: true },
-        },
-      },
     });
+
+    // Get user's unlocked achievements for this user
+    const userAchievements = db.userAchievement.findMany({
+      where: { userId },
+      select: ['achievementId', 'unlockedAt'],
+    });
+    const unlockedMap = new Map(userAchievements.map(ua => [ua.achievementId, ua]));
 
     const achievementsWithStatus = achievements.map(a => ({
       id: a.id,
@@ -37,8 +39,8 @@ export async function GET() {
       xpReward: a.xpReward,
       category: a.category,
       sortOrder: a.sortOrder,
-      unlocked: a.users.length > 0,
-      unlockedAt: a.users.length > 0 ? a.users[0].unlockedAt : null,
+      unlocked: unlockedMap.has(a.id),
+      unlockedAt: unlockedMap.has(a.id) ? unlockedMap.get(a.id)!.unlockedAt : null,
     }));
 
     const unlockedCount = achievementsWithStatus.filter(a => a.unlocked).length;

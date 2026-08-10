@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 
 export async function GET(_request: Request) {
@@ -14,12 +14,12 @@ export async function GET(_request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const missions = await db.mission.findMany({
+    const missions = db.mission.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -80,8 +80,9 @@ export async function POST(request: Request) {
       }
 
       const stepsArr = Array.isArray(aiData.steps) ? aiData.steps : [];
-      const mission = await db.mission.create({
+      const mission = db.mission.create({
         data: {
+          id: genId(),
           userId,
           title: aiData.title || 'Missao gerada',
           description: aiData.description || null,
@@ -90,6 +91,8 @@ export async function POST(request: Request) {
           totalSteps: stepsArr.length,
           estimatedMinutes: typeof aiData.estimatedMinutes === 'number' ? aiData.estimatedMinutes : null,
           xpReward: typeof aiData.xpReward === 'number' ? aiData.xpReward : 100,
+          createdAt: nowISO(),
+          updatedAt: nowISO(),
         },
       });
 
@@ -104,8 +107,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Etapas obrigatorias' }, { status: 400 });
     }
 
-    const mission = await db.mission.create({
+    const mission = db.mission.create({
       data: {
+        id: genId(),
         userId,
         title: title.trim(),
         description: typeof description === 'string' ? description.trim() : null,
@@ -114,6 +118,8 @@ export async function POST(request: Request) {
         totalSteps: steps.length,
         estimatedMinutes: typeof estimatedMinutes === 'number' ? estimatedMinutes : null,
         xpReward: typeof xpReward === 'number' ? xpReward : 100,
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
       },
     });
 

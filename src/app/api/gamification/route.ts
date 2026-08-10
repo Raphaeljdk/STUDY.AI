@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, sqlite } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -13,25 +13,18 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({
+    const user = db.user.findUnique({
       where: { id: userId },
-      select: {
-        xp: true,
-        level: true,
-        currentStreak: true,
-        longestStreak: true,
-        lastStudyDate: true,
-        totalStudyMinutes: true,
-        totalSessions: true,
-        totalTasksCompleted: true,
-        totalFlashcardsReviewed: true,
-        totalQuestionsAnswered: true,
-      },
+      select: [
+        'xp', 'level', 'currentStreak', 'longestStreak', 'lastStudyDate',
+        'totalStudyMinutes', 'totalSessions', 'totalTasksCompleted',
+        'totalFlashcardsReviewed', 'totalQuestionsAnswered',
+      ],
     });
 
     if (!user) {
@@ -46,19 +39,19 @@ export async function GET() {
     const progressPercent = Math.min(100, Math.max(0, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100)));
 
     // Achievement count
-    const unlockedCount = await db.userAchievement.count({ where: { userId } });
-    const totalAchievements = await db.achievement.count();
+    const unlockedCount = db.userAchievement.count({ where: { userId } });
+    const totalAchievements = db.achievement.count();
 
-    // Today's XP earned
+    // Today's XP earned (replaces aggregate with raw SQL)
     const todayStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString();
-    const todayXPTx = await db.xPTransaction.aggregate({
-      where: { userId, createdAt: { gte: todayStartISO }, amount: { gt: 0 } },
-      _sum: { amount: true },
-    });
-    const todayXP = todayXPTx._sum.amount || 0;
+    const todayXPRow = db.xPTransaction.queryOne(
+      `SELECT SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "createdAt" >= ? AND "amount" > 0`,
+      userId, todayStartISO
+    );
+    const todayXP = todayXPRow?.total || 0;
 
     // Recent streak record
-    const recentStreak = await db.streakRecord.findFirst({
+    const recentStreak = db.streakRecord.findFirst({
       where: { userId },
       orderBy: { date: 'desc' },
     });

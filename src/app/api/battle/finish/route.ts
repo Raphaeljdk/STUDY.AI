@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = await db.xPTransaction.create({
-    data: { userId, amount, source, description },
+  const xpTx = db.xPTransaction.create({
+    data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const user = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+  const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!user) return xpTx;
 
   const newXP = user.xp + amount;
   const newLevel = Math.floor(newXP / 500) + 1;
 
-  await db.user.update({
+  db.user.update({
     where: { id: userId },
-    data: { xp: newXP, level: newLevel },
+    data: { xp: newXP, level: newLevel, updatedAt: nowISO() },
   });
 
   return xpTx;
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ID da batalha obrigatorio' }, { status: 400 });
     }
 
-    const battle = await db.battle.findFirst({ where: { id: battleId, userId } });
+    const battle = db.battle.findFirst({ where: { id: battleId, userId } });
     if (!battle) {
       return NextResponse.json({ error: 'Batalha nao encontrada' }, { status: 404 });
     }
@@ -68,26 +68,23 @@ export async function POST(request: Request) {
     else if (percentage >= 60) xpAmount += 10;
     if (percentage === 100) xpAmount += 20; // Perfect bonus
 
-    const updatedBattle = await db.battle.update({
+    const updatedBattle = db.battle.update({
       where: { id: battleId },
       data: {
         correctAnswers: correct,
         confidenceAvg: confidence,
         xpEarned: xpAmount,
-        completedAt: new Date().toISOString(),
+        completedAt: nowISO(),
       },
     });
 
     // Award XP
-    const xpTx = await awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
+    const xpTx = awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
 
-    // Update user total questions answered
-    await db.user.update({
-      where: { id: userId },
-      data: { totalQuestionsAnswered: { increment: battle.totalQuestions } },
-    });
+    // Update user total questions answered (increment)
+    sqlite.prepare('UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?').run(battle.totalQuestions, userId);
 
-    const user = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+    const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
 
     return NextResponse.json({
       battle: updatedBattle,

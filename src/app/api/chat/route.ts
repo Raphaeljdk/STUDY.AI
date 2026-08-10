@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO } from '@/lib/db';
 
 async function requireUser() {
   const session = await getServerSession(authOptions);
@@ -12,7 +12,7 @@ async function requireUser() {
   if (!userId) {
     return { error: NextResponse.json({ error: 'Sessao invalida' }, { status: 401 }) };
   }
-  const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+  const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
   if (!userExists) {
     return { error: NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 }) };
   }
@@ -25,7 +25,7 @@ export async function GET() {
     if ('error' in auth) return auth.error;
     const { userId } = auth;
 
-    const messages = await db.chatMessage.findMany({
+    const messages = db.chatMessage.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
       take: 200,
@@ -67,8 +67,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mensagem muito longa' }, { status: 400 });
     }
 
-    const chatMessage = await db.chatMessage.create({
-      data: { userId, role, content: message },
+    const chatMessage = db.chatMessage.create({
+      data: { id: genId(), userId, role, content: message, createdAt: nowISO() },
     });
 
     return NextResponse.json({ message: chatMessage }, { status: 201 });
@@ -84,7 +84,7 @@ export async function DELETE() {
     if ('error' in auth) return auth.error;
     const { userId } = auth;
 
-    await db.chatMessage.deleteMany({ where: { userId } });
+    db.chatMessage.deleteMany({ where: { userId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Route error:', error);

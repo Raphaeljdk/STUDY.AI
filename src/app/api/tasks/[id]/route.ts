@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 const VALID_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const XP_PER_TASK = 30;
 
-async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = await db.xPTransaction.create({
-    data: { userId, amount, source, description },
+function awardXP(userId: string, amount: number, source: any, description: string) {
+  const xpTx = db.xPTransaction.create({
+    data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const user = await db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true } });
+  const user = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!user) return;
 
   const newXP = user.xp + amount;
@@ -23,12 +23,18 @@ async function awardXP(userId: string, amount: number, source: any, description:
     newLevel = newLevel + 1;
   }
 
-  await db.user.update({
+  db.user.update({
     where: { id: userId },
     data: { xp: newXP, level: newLevel },
   });
 
   return xpTx;
+}
+
+function attachSubject(task: any) {
+  if (!task?.subjectId) return { ...task, subject: null };
+  const subject = db.subject.findUnique({ where: { id: task.subjectId }, select: ['id', 'name', 'color', 'icon'] });
+  return { ...task, subject: subject || null };
 }
 
 export async function PATCH(
@@ -44,13 +50,13 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.task.findFirst({ where: { id, userId } });
+    const existing = db.task.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Tarefa nao encontrada' }, { status: 404 });
     }
@@ -64,12 +70,12 @@ export async function PATCH(
 
     const { title, description, subjectId, priority, status, dueDate, estimatedMinutes, actualMinutes, sortOrder } = body;
 
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
     if (typeof title === 'string' && title.trim()) data.title = title.trim();
     if (typeof description === 'string') data.description = description.trim();
     if (subjectId === null) data.subjectId = null;
     if (typeof subjectId === 'string' && subjectId) {
-      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
       if (subject) data.subjectId = subjectId;
     }
     if (priority && VALID_PRIORITIES.includes(priority)) data.priority = priority;
@@ -83,13 +89,10 @@ export async function PATCH(
     let xpAwarded = false;
     if (status === 'COMPLETED' && existing.status !== 'COMPLETED') {
       data.completedAt = new Date().toISOString();
-      await awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
+      awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
       xpAwarded = true;
-      // Update user total tasks completed
-      await db.user.update({
-        where: { id: userId },
-        data: { totalTasksCompleted: { increment: 1 } },
-      });
+      // Update user total tasks completed (was increment)
+      sqlite.prepare('UPDATE "User" SET "totalTasksCompleted" = "totalTasksCompleted" + 1 WHERE "id" = ?').run(userId);
     }
 
     // If un-completing a task
@@ -97,15 +100,14 @@ export async function PATCH(
       data.completedAt = null;
     }
 
-    const task = await db.task.update({
+    const task = db.task.update({
       where: { id },
       data,
-      include: {
-        subject: { select: { id: true, name: true, color: true, icon: true } },
-      },
     });
 
-    return NextResponse.json({ task, xpAwarded });
+    const taskWithSubject = attachSubject(task);
+
+    return NextResponse.json({ task: taskWithSubject, xpAwarded });
   } catch (error) {
     console.error('Route error:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -125,18 +127,18 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Sessao invalida' }, { status: 401 });
     }
-    const userExists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const userExists = db.user.findUnique({ where: { id: userId }, select: ['id'] });
     if (!userExists) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 401 });
     }
 
     const { id } = await params;
-    const existing = await db.task.findFirst({ where: { id, userId } });
+    const existing = db.task.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Tarefa nao encontrada' }, { status: 404 });
     }
 
-    await db.task.delete({ where: { id } });
+    db.task.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

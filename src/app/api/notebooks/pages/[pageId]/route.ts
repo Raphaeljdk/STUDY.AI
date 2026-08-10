@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, nowISO } from '@/lib/db';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ pageId: string }> }) {
   try {
@@ -16,16 +16,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pag
 
     const { pageId } = await params;
 
-    const page = await db.notebookPage.findFirst({
+    const page = db.notebookPage.findFirst({
       where: { id: pageId },
-      include: {
-        notebook: {
-          select: { userId: true },
-        },
-      },
     });
 
-    if (!page || page.notebook.userId !== userId) {
+    if (!page) {
+      return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
+    }
+
+    // Separate query for notebook ownership check (was include)
+    const notebook = db.notebook.findUnique({
+      where: { id: page.notebookId },
+      select: ['userId'],
+    });
+
+    if (!notebook || notebook.userId !== userId) {
       return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
     }
 
@@ -49,16 +54,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
 
     const { pageId } = await params;
 
-    const existingPage = await db.notebookPage.findFirst({
+    const existingPage = db.notebookPage.findFirst({
       where: { id: pageId },
-      include: {
-        notebook: {
-          select: { userId: true },
-        },
-      },
     });
 
-    if (!existingPage || existingPage.notebook.userId !== userId) {
+    if (!existingPage) {
+      return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
+    }
+
+    // Separate query for notebook ownership check (was include)
+    const notebook = db.notebook.findUnique({
+      where: { id: existingPage.notebookId },
+      select: ['userId'],
+    });
+
+    if (!notebook || notebook.userId !== userId) {
       return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
     }
 
@@ -71,18 +81,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
 
     const { canvasData, textContent, paperStyle, paperColor, lineColor } = body;
 
-    const data: any = {};
+    const data: any = { updatedAt: nowISO() };
     if (typeof canvasData === 'string') data.canvasData = canvasData;
     if (typeof textContent === 'string') data.textContent = textContent;
     if (typeof paperStyle === 'string') data.paperStyle = paperStyle;
     if (typeof paperColor === 'string') data.paperColor = paperColor;
     if (typeof lineColor === 'string') data.lineColor = lineColor;
 
-    if (Object.keys(data).length === 0) {
+    if (Object.keys(data).length === 1) {
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar' }, { status: 400 });
     }
 
-    const page = await db.notebookPage.update({
+    const page = db.notebookPage.update({
       where: { id: pageId },
       data,
     });
@@ -107,20 +117,25 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     const { pageId } = await params;
 
-    const existingPage = await db.notebookPage.findFirst({
+    const existingPage = db.notebookPage.findFirst({
       where: { id: pageId },
-      include: {
-        notebook: {
-          select: { userId: true },
-        },
-      },
     });
 
-    if (!existingPage || existingPage.notebook.userId !== userId) {
+    if (!existingPage) {
       return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
     }
 
-    await db.notebookPage.delete({
+    // Separate query for notebook ownership check (was include)
+    const notebook = db.notebook.findUnique({
+      where: { id: existingPage.notebookId },
+      select: ['userId'],
+    });
+
+    if (!notebook || notebook.userId !== userId) {
+      return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
+    }
+
+    db.notebookPage.delete({
       where: { id: pageId },
     });
 
