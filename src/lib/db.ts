@@ -414,6 +414,20 @@ export async function ensureSchema(): Promise<void> {
         // table/index already exists — ignore
       }
     }
+    // Migration: add missing Goal columns
+    const goalMigrations = [
+      `ALTER TABLE "Goal" ADD COLUMN "type" TEXT NOT NULL DEFAULT 'DAILY'`,
+      `ALTER TABLE "Goal" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'IN_PROGRESS'`,
+      `ALTER TABLE "Goal" ADD COLUMN "targetValue" REAL`,
+      `ALTER TABLE "Goal" ADD COLUMN "unit" TEXT`,
+    ];
+    for (const sql of goalMigrations) {
+      try {
+        await execQuery(sql);
+      } catch {
+        // column already exists — ignore
+      }
+    }
     console.log('[db] Schema ensured — all 24 tables ready');
   })();
 

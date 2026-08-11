@@ -107,7 +107,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
     >
       {/* Logo + Brand */}
       <div className="flex shrink-0 items-center gap-3 border-b border-[var(--ws-glass-border)] px-4 py-3">
-        <img src="/logo.svg" alt="StudyAI" width={32} height={32} className="shrink-0 rounded-full" />
+        <img src="/studyai-logo.png" alt="StudyAI" width={32} height={32} className="shrink-0 rounded-full object-cover" />
         <AnimatePresence mode="wait">
           {!collapsed && (
             <motion.span

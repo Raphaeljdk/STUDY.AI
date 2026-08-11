@@ -72,8 +72,10 @@ const SUGGESTED_ROADMAPS = [
 
 function getDifficultyColor(difficulty: string): string {
   const d = difficulty?.toLowerCase() || '';
-  if (d.includes('facil') || d.includes('iniciante')) return 'var(--ws-verdigris)';
-  if (d.includes('medio') || d.includes('intermediario')) return 'var(--ws-gold)';
+  if (d.includes('fundamental')) return 'var(--ws-verdigris)';
+  if (d.includes('intermediari')) return 'var(--ws-gold)';
+  if (d.includes('avancad')) return 'var(--ws-accent)';
+  if (d.includes('especialista')) return '#e11d48';
   return 'var(--ws-accent)';
 }
 
@@ -134,18 +136,30 @@ export function RoadmapView() {
     if (!topic.trim()) return;
     setGenerating(true);
     try {
-      const defaultSteps: RoadmapStep[] = generateDefaultSteps(topic);
+      // Call AI to generate senior-level steps
+      let steps: RoadmapStep[];
+      try {
+        const data = await apiFetch('/api/roadmaps/generate', {
+          method: 'POST',
+          body: JSON.stringify({ topic: topic.trim() }),
+        });
+        steps = data.steps;
+      } catch {
+        // Fallback to local generation if AI fails
+        steps = generateDefaultSteps(topic);
+      }
+
       await apiFetch('/api/roadmaps', {
         method: 'POST',
         body: JSON.stringify({
           title: `Trilha: ${topic.trim()}`,
           topic: topic.trim(),
           description: `Plano de estudo gerado por IA para ${topic.trim()}`,
-          steps: defaultSteps,
+          steps,
           isAI: true,
         }),
       });
-      toast({ title: 'Trilha criada!', description: 'Sua trilha de aprendizagem foi gerada.' });
+      toast({ title: 'Trilha criada!', description: 'Sua trilha de aprendizagem foi gerada com IA.' });
       setGenerateOpen(false);
       setGenerateInput('');
       fetchRoadmaps();
@@ -161,15 +175,26 @@ export function RoadmapView() {
   const handleSuggestedRoadmap = async (suggestion: typeof SUGGESTED_ROADMAPS[0]) => {
     setGenerating(true);
     try {
-      // Generate steps locally based on topic
-      const defaultSteps: RoadmapStep[] = generateDefaultSteps(suggestion.topic);
+      // Call AI to generate senior-level steps
+      let steps: RoadmapStep[];
+      try {
+        const data = await apiFetch('/api/roadmaps/generate', {
+          method: 'POST',
+          body: JSON.stringify({ topic: suggestion.topic }),
+        });
+        steps = data.steps;
+      } catch {
+        // Fallback to local generation if AI fails
+        steps = generateDefaultSteps(suggestion.topic);
+      }
+
       await apiFetch('/api/roadmaps', {
         method: 'POST',
         body: JSON.stringify({
           title: suggestion.title,
           topic: suggestion.topic,
           description: suggestion.description,
-          steps: defaultSteps,
+          steps,
           isAI: true,
         }),
       });
@@ -638,73 +663,79 @@ export function RoadmapView() {
   );
 }
 
-// ===== HELPER: Generate default steps for suggested roadmaps =====
+// ===== HELPER: Generate detailed senior-level steps for suggested roadmaps =====
 function generateDefaultSteps(topic: string): RoadmapStep[] {
   const topicLower = topic.toLowerCase();
 
   if (topicLower.includes('backend') || topicLower.includes('desenvolvimento')) {
     return [
-      { name: 'Fundamentos de HTTP e APIs REST', description: 'Entenda como a web funciona por tras: protocolo HTTP, metodos, status codes e arquitetura REST.', estimatedHours: 4, difficulty: 'Iniciante' },
-      { name: 'Linguagem de programacao (Node.js/Python)', description: 'Domine os fundamentos da linguagem escolhida: sintaxe, estruturas de dados, funcoes e modulos.', estimatedHours: 8, difficulty: 'Iniciante' },
-      { name: 'Banco de dados relacional (SQL)', description: 'Aprenda a modelar, criar e consultar bancos relacionais com SQL. Entenda normalizacao e indices.', estimatedHours: 6, difficulty: 'Iniciante' },
-      { name: 'ORM e manipulacao de dados', description: 'Use um ORM (Prisma, Sequelize, SQLAlchemy) para interagir com o banco de forma eficiente e segura.', estimatedHours: 5, difficulty: 'Intermediario' },
-      { name: 'Autenticacao e autorizacao', description: 'Implemente login, registro, JWT, sessions e controle de acesso a recursos protegidos.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Validacao e seguranca', description: 'Proteja sua API contra injecao SQL, XSS, CSRF. Implemente validacao de dados e rate limiting.', estimatedHours: 5, difficulty: 'Intermediario' },
-      { name: 'Testes automatizados', description: 'Escreva testes unitarios e de integracao. Aprenda TDD e ferramentas como Jest, Vitest ou Pytest.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Arquitetura e padroes', description: 'Explore padroes como MVC, Repository, Services. Aprenda sobre clean architecture e SOLID.', estimatedHours: 5, difficulty: 'Avancado' },
-      { name: 'Deploy e DevOps basico', description: 'Configure CI/CD, Docker, deploy em cloud (AWS, Vercel, Railway). Monitore sua aplicacao.', estimatedHours: 6, difficulty: 'Avancado' },
+      { name: 'Protocolos de Rede e Arquitetura HTTP/2', description: 'Aprofunde-se nos fundamentos da comunicacao em rede: modelo OSI, TCP/IP, handshakes TLS 1.3, HTTP/2 multiplexing, server push e HPACK header compression. Entenda connection pooling keep-alive e como otimizar latencia em conexoes de alta concorrencia. Compare WebSocket, SSE e long-polling para comunicacao em tempo real.', estimatedHours: 6, difficulty: 'Fundamental' },
+      { name: 'Node.js Runtime Internals e Event Loop', description: 'Domine o event loop do libuv, microtask queue vs macrotask queue, nextTick, setImmediate e a interacao com o thread pool do C++. Entenda worker_threads para CPU-bound operations, SharedArrayBuffer para comunicacao inter-thread, e como profilear memory leaks com heap snapshots e Chrome DevTools.', estimatedHours: 10, difficulty: 'Fundamental' },
+      { name: 'Design de APIs RESTful e GraphQL Avancado', description: 'Va alem do CRUD: implemente HATEOAS, cursor-based pagination, sparse fieldsets, filtering avancado com operadores compostos e sorting multi-campo. Para GraphQL, domine schema stitching, federation, DataLoader para N+1, persisted queries e rate limiting por complexidade de query.', estimatedHours: 12, difficulty: 'Intermediario' },
+      { name: 'Banco de Dados: Modelagem Avancada e Performance Tuning', description: 'Domine normalizacao ate 5NF, denormalizacao estrategica para leituras de alta performance, partitioning horizontal e vertical, sharding strategies. Aprenda a analisar query execution plans, identificar full table scans, configurar indices compostos cobrindo e partial indexes. Explore CTEs recursivas, window functions e materialized views.', estimatedHours: 14, difficulty: 'Intermediario' },
+      { name: 'ORM Avancado: Prisma, Query Optimization e Transactions', description: 'Configure Prisma com connection pooling (PgBouncer), implemente transacoes distribuidas com saga pattern, use interactive transactions para consistencia de dados. Domine eager vs lazy loading, query deduplication, middlewares Prisma para soft-delete e audit logs. Implemente migrations zero-downtime com expand/rename.', estimatedHours: 10, difficulty: 'Intermediario' },
+      { name: 'Autenticacao OAuth2/OIDC e Seguranca em Profundidade', description: 'Implemente Authorization Code Flow com PKCE, Refresh Token Rotation, JWT com JWE (encrypted), JWKS key rotation. Configure RBAC granular com ABAC (Attribute-Based Access Control), implemente CSRF double-submit cookie, CORS strict, CSP nonce-based, e helmet.js. Entenda OAuth2 token introspection e revogacao.', estimatedHours: 12, difficulty: 'Avancado' },
+      { name: 'Testes: Estrategias de Cobertura e Contratos', description: 'Implemente testes de contrato com Pact ou Dredd para garantir compatibilidade entre microsservicos. Use testes de propriedade com fast-check para gerar inputs aleatorios. Configure mutation testing com Stryker para medir a qualidade real dos testes. Domine testes de integracao com containers Docker efemeros e testes E2E com Playwright.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'Clean Architecture e Domain-Driven Design', description: 'Estruture seu codigo com boundaries claros: Entities, Use Cases, Controllers e Infrastructure. Implemente Aggregate Roots, Value Objects, Domain Events e Repositories com CQRS. Separe comandos de queries, use Event Sourcing para auditabilidade e implemente Inversion of Control com dependency injection.', estimatedHours: 12, difficulty: 'Avancado' },
+      { name: 'Observabilidade: Logs Estruturados, Tracing e Metrics', description: 'Implemente distributed tracing com OpenTelemetry, crie dashboards de metricas com Prometheus/Grafana. Configure structured logging com correlation IDs para rastrear requisicoes entre servicos. Implemente health checks granulares, circuit breakers com resilience4j, e rate limiting adaptativo.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'CI/CD, Containerizacao e Orquestracao Kubernetes', description: 'Domine Docker multi-stage builds para imagens otimizadas, implemente Kubernetes deployments com rolling updates, HPA e PDB. Configure ArgoCD para GitOps, Helm charts para configuracao reutilizavel, e service mesh com Istio para mTLS, traffic shifting e observabilidade. Implemente canary deployments e feature flags.', estimatedHours: 16, difficulty: 'Especialista' },
+      { name: 'Arquitetura de Microsservicos: Event-Driven e SAGA', description: 'Projete microsservicos com bounded contexts bem definidos, implemente communication patterns: async com message brokers (RabbitMQ/Kafka) com dead letter queues e exactly-once semantics. Implemente SAGA orchestration e choreography, event sourcing com CQRS, e schema evolution com Apache Avro ou Protobuf.', estimatedHours: 18, difficulty: 'Especialista' },
     ];
   }
 
   if (topicLower.includes('machine learning') || topicLower.includes('ml') || topicLower.includes('ia')) {
     return [
-      { name: 'Fundamentos de Python para ML', description: 'Revise Python com foco em bibliotecas cientificas: NumPy, Pandas, Matplotlib.', estimatedHours: 5, difficulty: 'Iniciante' },
-      { name: 'Estatistica e probabilidade', description: 'Distribuicoes, teste de hipotese, correlacao e regressao linear — a base da ML.', estimatedHours: 6, difficulty: 'Iniciante' },
-      { name: 'Analise exploratoria de dados', description: 'Aprenda a limpar, visualizar e extrair insights de datasets reais.', estimatedHours: 5, difficulty: 'Iniciante' },
-      { name: 'Regressao linear e logistica', description: 'Seu primeiro modelo! Entenda como algoritmos aprendem relacoes nos dados.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Arvores de decisao e ensemble', description: 'Decision Trees, Random Forest e Gradient Boosting para problemas de classificacao e regressao.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Avaliacao de modelos', description: 'Metricas: acuracia, precision, recall, F1, ROC-AUC. Overfitting, underfitting e validacao cruzada.', estimatedHours: 4, difficulty: 'Intermediario' },
-      { name: 'Introducao ao Deep Learning', description: 'Redes neurais artificiais: perceptron, backpropagation e frameworks como PyTorch ou TensorFlow.', estimatedHours: 8, difficulty: 'Avancado' },
-      { name: 'Projeto pratico end-to-end', description: 'Construa um projeto completo: coleta de dados, preprocessamento, treinamento e deploy de um modelo.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'Python Avancado para Cientistas de Dados', description: 'Domine generators, decorators, descriptors, metaclasses e context managers. Otimize performance com numba JIT compilation, multiprocessing, asyncio e Cython. Implemente type hints avancados com Protocol, TypedDict e Generic. Use dataclasses e pydantic para validacao de schemas complexos.', estimatedHours: 8, difficulty: 'Fundamental' },
+      { name: 'Algebra Linear e Calculo Numerico Aplicado', description: 'Aprofunde-se em decomposicao SVD, autovalores/autovetores para PCA, gradient computation com autograd. Entenda condicionamento numerico, metodos iterativos (conjugate gradient, GMRES) e como evitar overflow/underflow em log-space. Implemente tudo com NumPy broadcasting e einsum.', estimatedHours: 10, difficulty: 'Fundamental' },
+      { name: 'Probabilidade Bayesiana e Inferencia Estatistica', description: 'Domine teorema de Bayes aplicado, prioris conjugados, MCMC (Metropolis-Hastings, HMC, NUTS) com PyMC. Implemente modelos hierarquicos bayesianos, compare modelos com WAIC e LOO-CV. Entenda hypothesis testing frequentista vs bayesiano, e intervalos de credibilidade vs confianca.', estimatedHours: 12, difficulty: 'Intermediario' },
+      { name: 'Feature Engineering Avancado e Pipelines', description: 'Implemente feature stores com Feast, encoding de variaveis categoricas com target encoding smoothing, feature crosses e polynomial features. Use PCA, t-SNE e UMAP para reducao de dimensionalidade. Automatize pipelines com scikit-learn Pipelines e ColumnTransformer. Domine tratamento de dados desbalanceados com SMOTE e class weights.', estimatedHours: 10, difficulty: 'Intermediario' },
+      { name: 'Ensemble Methods e Gradient Boosting em Profundidade', description: 'Entenda a matematica por tras de gradient boosting: gradient descent em funcao de perda, regularizacao L1/L2, shrinkage e stochastic gradient boosting. Compare XGBoost, LightGBM e CatBoost. Domine hyperparameter tuning com Optuna, implemente early stopping e calibration de probabilidades com Platt scaling e isotonic regression.', estimatedHours: 12, difficulty: 'Intermediario' },
+      { name: 'Deep Learning: Backpropagation, Regularizacao e Otimizacao', description: 'Derive backpropagation manualmente para redes fully-connected. Implemente regularization avancada: dropout, batch norm, layer norm, weight decay e data augmentation. Compare otimizadores (SGD+momentum, Adam, AdamW, Lion) e entenda learning rate schedules (cosine annealing, warmup). Use PyTorch autograd para custom loss functions.', estimatedHours: 14, difficulty: 'Avancado' },
+      { name: 'Arquiteturas de Redes Neurais Modernas', description: 'Implemente ResNet com skip connections, Attention mechanism do zero, Transformers com multi-head self-attention e positional encoding. Domine CNNs para visao computacional (ResNeXt, EfficientNet), RNNs/LSTMs para sequencias, e Graph Neural Networks. Entenda transfer learning, fine-tuning strategies e model distillation.', estimatedHours: 16, difficulty: 'Avancado' },
+      { name: 'NLP com Transformers e LLMs', description: 'Domine tokenization (BPE, WordPiece, SentencePiece), implemente fine-tuning de BERT/GPT com LoRA e QLoRA para efficient fine-tuning. Entenda RLHF, DPO e constitutional AI. Use LangChain ou LlamaIndex para RAG com vector databases (Pinecone, Weaviate). Implemente evaluation com RAGAS e HumanEval.', estimatedHours: 16, difficulty: 'Avancado' },
+      { name: 'MLOps: Treinamento, Versionamento e Deploy de Modelos', description: 'Implemente experiment tracking com MLflow, versionamento de datasets com DVC e modelos com model registry. Configure training pipelines com Kubeflow ou ZenML. Domine model serving com Triton Inference Server, ONNX Runtime e TensorRT para otimizacao de inferencia. Implemente A/B testing de modelos e monitoring de data drift.', estimatedHours: 14, difficulty: 'Especialista' },
+      { name: 'Projeto End-to-End: Do Problema de Negocio ao Deploy', description: 'Construa um pipeline completo: definicao do problema de negocio, coleta e limpeza de dados, EDA com dashboards interativos, feature engineering, model selection com cross-validation estratificado, treinamento com hyperparameter optimization, deploy com API REST, monitoring e documentacao tecnica.', estimatedHours: 20, difficulty: 'Especialista' },
     ];
   }
 
   if (topicLower.includes('dados') || topicLower.includes('data')) {
     return [
-      { name: 'Fundamentos de analise de dados', description: 'O que e ciencia de dados, ciclo de vida de um projeto e ferramentas essenciais.', estimatedHours: 3, difficulty: 'Iniciante' },
-      { name: 'Python e Pandas', description: 'Manipule DataFrames, limpe dados, faca agregacoes e merge de tabelas com confianca.', estimatedHours: 6, difficulty: 'Iniciante' },
-      { name: 'Visualizacao de dados', description: 'Crie graficos eficazes com Matplotlib, Seaborn ou Plotly. Storytelling com dados.', estimatedHours: 5, difficulty: 'Iniciante' },
-      { name: 'Estatistica aplicada', description: 'Medidas de tendencia central, dispersao, distribuicoes, correlacao e testes de hipotese.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'SQL avancado', description: 'Joins complexos, window functions, CTEs e otimizacao de queries para analise.', estimatedHours: 5, difficulty: 'Intermediario' },
-      { name: 'ETL e pipelines de dados', description: 'Extraia, transforme e carregue dados. Ferramentas como Airflow e dbt.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Dashboard e comunicacao', description: 'Crie dashboards interativos e aprenda a comunicar insights para stakeholders.', estimatedHours: 5, difficulty: 'Avancado' },
-      { name: 'Projeto portfolio', description: 'Construa um portfolio com 2-3 projetos de analise de dados reais com storytelling.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'Fundamentos de Engenharia de Dados e Data Mesh', description: 'Entenda o paradigma Data Mesh: domain ownership, data as a product, self-serve data platform e federated computational governance. Compare com Data Lakehouse architecture (Delta Lake, Apache Iceberg, Apache Hudi). Projete a arquitetura de um data platform moderno com separacao clara entre ingestion, processing, storage e serving.', estimatedHours: 8, difficulty: 'Fundamental' },
+      { name: 'Python para Data Engineering: Pandas, Polars e DuckDB', description: 'Otimize transformacoes de dados com Polars (lazy evaluation, parallel execution) e DuckDB para queries SQL analiticas diretamente em arquivos Parquet. Domine Pandas advanced: groupby multi-level, pivot tables, window functions com rolling e expanding, e integracao com PyArrow para zero-copy reads. Implemente data validation com Great Expectations ou Pandera.', estimatedHours: 12, difficulty: 'Fundamental' },
+      { name: 'SQL Avancado: Window Functions e Performance', description: 'Domine window functions (ROW_NUMBER, RANK, LAG/LEAD, FIRST_VALUE) com frames complexos. Implemente recursive CTEs para hierarquias, materialized views para query caching, e particionamento de tabelas. Otimize query plans com ANALYZE, entenda hash join vs merge join vs nested loop, e configure work_mem e parallel workers.', estimatedHours: 10, difficulty: 'Intermediario' },
+      { name: 'Batch Processing com Apache Spark', description: 'Configure Spark com cluster managers (YARN, K8s), otimize shuffle partitions e memory management. Implemente ETL robustos com Spark SQL, DataFrame API e Structured Streaming. Entenda execution plans com Spark UI, configure dynamic allocation e implemente write-ahead logs para exactly-once processing. Compare com Flink para streaming use cases.', estimatedHours: 14, difficulty: 'Intermediario' },
+      { name: 'Streaming e Processamento de Eventos em Tempo Real', description: 'Implemente pipelines com Apache Kafka: producers com idempotence e compression, consumers com consumer groups e rebalancing. Configure Kafka Connect para source/sink connectors, use Kafka Streams ou ksqlDB para stream processing com windowed aggregations e join streams-tables. Entenda exactly-once semantics e schema registry.', estimatedHours: 14, difficulty: 'Avancado' },
+      { name: 'Data Orchestration: Airflow, Dagster e dbt', description: 'Projete DAGs no Airflow com TaskFlow API, implemente custom operators e sensors. Use dbt para transformacoes SQL com versionamento, testes de dados, documentation generation e incremental models. Migre para Dagster para asset-based orchestration com software-defined assets, partitions e backfills.', estimatedHours: 12, difficulty: 'Avancado' },
+      { name: 'Data Quality, Lineage e Governanca', description: 'Implemente data quality frameworks com Great Expectations: suites de validacao, data docs e alerting. Configure data lineage com OpenLineage para rastrear dependencias entre datasets. Projete governanca com data catalogs (DataHub, Apache Atlas), implemente PII detection e masking automatizado, e configure RBAC no data platform.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'Visualizacao de Dados e Storytelling Avancado', description: 'Crie dashboards interativos com Plotly Dash ou Streamlit com callbacks reativos. Domine principios de visualizacao: pre-attentive attributes, Gestalt principles, chart selection framework. Implemente custom themes, embeddable components e real-time updates. Aprenda a contar historias com dados: contexto, narrativa e call-to-action.', estimatedHours: 10, difficulty: 'Avancado' },
+      { name: 'Projeto Portfolio: Data Platform End-to-End', description: 'Construa um data platform completo: ingestion de multiplas fontes (APIs, databases, files), processamento batch e streaming, data warehouse com dbt models, dashboards de monitoramento, data quality checks automatizados, CI/CD com GitHub Actions, e documentacao tecnica com arquitetura e decisoes de design justificadas.', estimatedHours: 20, difficulty: 'Especialista' },
     ];
   }
 
   if (topicLower.includes('frontend') || topicLower.includes('react') || topicLower.includes('web')) {
     return [
-      { name: 'HTML, CSS e responsividade', description: 'Domine a base da web: semantica, Flexbox, Grid e design responsivo.', estimatedHours: 4, difficulty: 'Iniciante' },
-      { name: 'JavaScript moderno (ES6+)', description: 'Destructuring, arrow functions, promises, async/await, modules.', estimatedHours: 5, difficulty: 'Iniciante' },
-      { name: 'TypeScript fundamentos', description: 'Tipagem estatica, interfaces, generics e configuracao de projetos TS.', estimatedHours: 5, difficulty: 'Iniciante' },
-      { name: 'React basico', description: 'Componentes, props, estado, hooks (useState, useEffect) e ciclo de vida.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'React avancado', description: 'Context API, custom hooks, useRef, useMemo, useCallback e padroes avancados.', estimatedHours: 6, difficulty: 'Intermediario' },
-      { name: 'Gerenciamento de estado', description: 'Zustand, Redux ou Jotai. Entenda quando e por que usar gerenciamento global de estado.', estimatedHours: 5, difficulty: 'Intermediario' },
-      { name: 'Performance e otimizacao', description: 'Code splitting, lazy loading, memoizacao, React Profiler e Core Web Vitals.', estimatedHours: 5, difficulty: 'Avancado' },
-      { name: 'Testes e qualidade', description: 'Testing Library, Jest, Cypress. Estrategias de testes para apps React.', estimatedHours: 6, difficulty: 'Avancado' },
-      { name: 'Arquitetura de apps', description: 'Clean architecture, feature-based structure, design patterns e escalabilidade.', estimatedHours: 5, difficulty: 'Avancado' },
+      { name: 'Fundamentos do DOM e Rendering Pipeline', description: 'Entenda como o navegador renderiza: HTML parsing -> DOM -> CSSOM -> Render Tree -> Layout -> Paint -> Composite. Domine reflow vs repaint, compositing layers, will-change e GPU acceleration. Implemente IntersectionObserver para lazy loading, ResizeObserver para responsive components e MutationObserver para integracoes de terceiros.', estimatedHours: 8, difficulty: 'Fundamental' },
+      { name: 'JavaScript: Closures, Prototypes e Event Loop Avancado', description: 'Domine closures para encapsulamento e factory functions, entenda prototype chain e como `new` funciona por baixo. Implemente event-driven patterns com EventEmitter, use WeakMap/WeakSet para memory-safe caching, e Proxy/Reflect para metaprogramacao. Entenda microtasks (Promise, queueMicrotask) vs macrotasks (setTimeout, MessageChannel).', estimatedHours: 10, difficulty: 'Fundamental' },
+      { name: 'TypeScript Avancado: Generics, Utility Types e Type Guards', description: 'Domine generics com constraints, conditional types, mapped types e template literal types. Implemente branded types para type-safe IDs, use discriminated unions para state machines, e crie utility types customizadas. Configure tsconfig strict mode com todos os checks, use satisfies operator e const assertions para maximum type safety.', estimatedHours: 10, difficulty: 'Intermediario' },
+      { name: 'React Internals: Fiber, Reconciliation e Concurrent Features', description: 'Entenda a arquitetura Fiber: work units, lanes de prioridade, interruptible rendering. Domine Suspense para data fetching com React Query/SWR, implemente error boundaries granulares, useTransition para atualizacoes nao-urgentes e useDeferredValue para listas grandes. Otimize re-renders com React.memo, useMemo e useCallback com profiling.', estimatedHours: 14, difficulty: 'Intermediario' },
+      { name: 'State Management Arquitetural', description: 'Compare e implemente: Zustand (atomic store com selectors), Jotai (atomic model), e Redux Toolkit com RTK Query para server state. Entenda quando usar cada abordagem: local state, lifted state, context, external store. Implemente optimistic updates, cache invalidation strategies e state persistence com hydration.', estimatedHours: 10, difficulty: 'Intermediario' },
+      { name: 'CSS Architecture: Design Systems e Tailwind Avancado', description: 'Crie um design system com design tokens CSS custom properties, implemente component variants com data-attributes e CSS layers. Domine Tailwind: custom plugins, JIT optimization, purge strategies, e integracao com theme switching. Implemente responsive design com container queries, subgrid e :has() selector para parent-based styling.', estimatedHours: 8, difficulty: 'Avancado' },
+      { name: 'Performance e Core Web Vitals', description: 'Otimize LCP com preload/preconnect, font display swap e server-side rendering. Reduza FID com code splitting dinamico, React.lazy com Suspense fallbacks, e web workers para offloading. Melhore CLS com dimensionamento explicito de imagens e fontes, e use Layout Shift Tracker. Configure Service Worker com Workbox para offline-first e precaching estrategico.', estimatedHours: 12, difficulty: 'Avancado' },
+      { name: 'Testes: Strategy, Patterns e E2E com Playwright', description: 'Implemente testing pyramid: unitarios com vitest, integracao com Testing Library (queries acessiveis, user-event), e E2E com Playwright (page objects, fixtures, parallel execution). Use MSW (Mock Service Worker) para mockar APIs sem interferir no codigo. Implemente visual regression testing com screenshots e diff detection.', estimatedHours: 12, difficulty: 'Avancado' },
+      { name: 'Next.js App Router: Server Components e Edge', description: 'Domine Server Components vs Client Components, implemente streaming com Suspense boundaries, parallel routes e intercepting routes. Configure middleware para auth/routing, use route handlers para API logic. Otimize com ISR, static generation e edge runtime. Implemente authentication com NextAuth.js e data fetching com server actions.', estimatedHours: 14, difficulty: 'Avancado' },
+      { name: 'Arquitetura e Deploy: Monorepo e CI/CD', description: 'Configure monorepo com Turborepo ou Nx: shared packages, task pipelines e remote caching. Implemente CI/CD com GitHub Actions: lint, type-check, test, build, preview e deploy. Configure Vercel com edge functions, environment secrets e analytics. Implemente feature flags com LaunchDarkly e error monitoring com Sentry.', estimatedHours: 14, difficulty: 'Especialista' },
     ];
   }
 
-  // Generic fallback
+  // Generic fallback — also senior-level
   return [
-    { name: 'Fundamentos e conceitos basicos', description: 'Entenda os conceitos centrais, terminologia e o panorama geral do tema.', estimatedHours: 4, difficulty: 'Iniciante' },
-    { name: 'Primeiros passos praticos', description: 'Coloque a mao na massa: configure o ambiente e crie seu primeiro projeto/exercicio.', estimatedHours: 5, difficulty: 'Iniciante' },
-    { name: 'Aprofundamento teorico', description: 'Estude os conceitos intermediarios que formam a base solida do conhecimento.', estimatedHours: 6, difficulty: 'Intermediario' },
-    { name: 'Pratica orientada', description: 'Resolva exercicios e desafios praticos para consolidar o aprendizado.', estimatedHours: 6, difficulty: 'Intermediario' },
-    { name: 'Projetos reais', description: 'Aplique tudo em projetos praticos que simulem situacoes reais.', estimatedHours: 8, difficulty: 'Intermediario' },
-    { name: 'Topicos avancados', description: 'Explore conceitos avancados e tendencias na area.', estimatedHours: 7, difficulty: 'Avancado' },
-    { name: 'Revisao e certificacao', description: 'Revise todo o conteudo e prepare-se para uma certificacao ou avaliacao final.', estimatedHours: 5, difficulty: 'Avancado' },
+    { name: 'Fundamentos Solidos e Contexto da Area', description: 'Construa uma base tecnica robusta: entenda os conceitos fundamentais, a historia e evolucao da area, e como ela se conecta com outras disciplinas. Mapeie as principais ferramentas, frameworks e comunidades. Identifique os pre-requisitos tecnicos e configure seu ambiente de desenvolvimento profissional.', estimatedHours: 8, difficulty: 'Fundamental' },
+    { name: 'Conceitos Core e Abstracoes Principais', description: 'Aprofunde-se nos conceitos centrais que formam a espinha dorsal da area. Entenda nao apenas o que sao, mas POR QUE existem, quais problemas resolvem e quais tradeoffs envolvem. Implemente os padroes basicos do zero para construir intuicao solida antes de usar abstracoes de alto nivel.', estimatedHours: 10, difficulty: 'Fundamental' },
+    { name: 'Ferramentas e Ecossistema Profissional', description: 'Domine as ferramentas que profissionais seniores usam diariamente: IDE avancado, debugger, profiler, version control com Git flow e conventional commits. Configure linting, formatting, pre-commit hooks e CI basico. Entenda package management, lock files e dependency resolution.', estimatedHours: 8, difficulty: 'Intermediario' },
+    { name: 'Padroes de Projeto e Arquitetura', description: 'Estude e implemente os padroes de projeto mais relevantes para a area: creational, structural e behavioral. Entenda principios SOLID, DRY, KISS e YAGNI na pratica. Projete sistemas modulares com baixo acoplamento e alta coesao. Aplique dependency inversion e open/closed principle em projetos reais.', estimatedHours: 12, difficulty: 'Intermediario' },
+    { name: 'Pratica Avancada com Projetos Realistas', description: 'Construa projetos que simulam complexidade real: lidar com dados reais (sujos, incompletos, desbalanceados), implementar error handling robusto, logging estruturado e monitoring. Documente decisoes de arquitetura com ADRs (Architecture Decision Records) e escreva documentacao tecnica de qualidade.', estimatedHours: 16, difficulty: 'Avancado' },
+    { name: 'Topicos de Ponta e Tendencias', description: 'Explore as fronteiras do conhecimento na area: leia papers recentes, experimente novas ferramentas e frameworks em beta. Entenda o roadmap de evolucao tecnologica e posicione-se estrategicamente. Contribua para open source ou escreva artigos tecnicos para consolidar e compartilhar conhecimento.', estimatedHours: 14, difficulty: 'Avancado' },
+    { name: 'Especializacao e Certificacao', description: 'Escolha uma sub-area para especializacao profunda. Prepare-se para certificacoes reconhecidas na industria com simulados praticos. Construa um estudo de caso completo que demonstre dominio senior: da concepcao a implementacao, passando por decisoes de tradeoff, otimizacao e documentacao.', estimatedHours: 16, difficulty: 'Especialista' },
   ];
 }
 

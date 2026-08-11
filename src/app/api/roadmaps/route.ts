@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         steps: JSON.stringify(steps),
         totalSteps: steps.length,
         currentStep: 0,
+        status: 'active',
         isAI: (typeof isAI === 'boolean' ? isAI : false) ? 1 : 0,
         createdAt: nowISO(),
         updatedAt: nowISO(),

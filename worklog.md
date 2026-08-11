@@ -1330,3 +1330,30 @@ Stage Summary:
 - Discover save-to-subject works (calls correct API endpoint)
 - Push: eb1b2f3..cce168f main -> main
 
+
+---
+Task ID: 3
+Agent: main
+Task: Fix admin panel plan change, upgrade roadmap to senior-level AI, restore logo, fix broken features
+
+Work Log:
+- Read worklog and analyzed project state from previous session
+- Analyzed uploaded image (studyai branding logo with dragon, bonsai, Japanese aesthetics)
+- Discovered admin panel plan change bug: API had validPlans=[FREE, PREMIUM, SENSEI, ADMIN_PLAN] but frontend sends SAMURAI - FIXED
+- Created /api/roadmaps/generate route that uses z-ai-web-dev-sdk LLM to generate dynamic senior-level roadmaps
+- Updated RoadmapView to call AI generate endpoint with fallback to local steps
+- Rewrote generateDefaultSteps() with 10-14 detailed senior-level steps per topic (4 topic areas + generic)
+- Updated difficulty levels: Fundamental, Intermediario, Avancado, Especialista (with red color for Especialista)
+- Fixed roadmap POST to explicitly set status='active'
+- Copied uploaded logo image to /public/studyai-logo.png
+- Updated logo references in HeaderZen, Sidebar, FooterZen, and layout.tsx (OpenGraph + Twitter cards)
+- Fixed Goal table missing columns (type, status, targetValue, unit) with ALTER TABLE migration in ensureSchema()
+- Set user Raphael to ADMIN/SENSEI role for testing
+- Verified all features with agent-browser: landing page, login, dashboard, roadmap AI generation, admin panel plan changes
+
+Stage Summary:
+- Admin panel plan change: Fixed validPlans to include SAMURAI (was PREMIUM)
+- Roadmap: Now generates 10-15 detailed senior-level steps via AI (LLM) with fallback to comprehensive local steps
+- Logo: Restored studyai branding image across all 4 locations (header, sidebar, footer, meta tags)
+- Goals API: Fixed 500 error by adding missing columns via migration
+- All features verified working via agent-browser end-to-end testing

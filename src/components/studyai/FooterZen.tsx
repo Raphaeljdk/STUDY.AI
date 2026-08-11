@@ -29,11 +29,11 @@ export function FooterZen() {
           <div className="lg:col-span-2">
             <div className="mb-4 flex items-center gap-3">
               <img
-                src="/logo.svg"
+                src="/studyai-logo.png"
                 alt="StudyAI Logo"
                 width={32}
                 height={32}
-                className="rounded-full"
+                className="rounded-full object-cover"
               />
               <span className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)]">
                 StudyAI

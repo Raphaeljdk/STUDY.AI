@@ -38,11 +38,11 @@ export function HeaderZen() {
         {/* Logo */}
         <a href="#" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <img
-            src="/logo.svg"
+            src="/studyai-logo.png"
             alt="StudyAI Logo"
             width={36}
             height={36}
-            className="rounded-full"
+            className="rounded-full object-cover"
           />
           <span className="font-serif-jp text-xl font-bold tracking-tight text-[var(--ws-text-primary)]">
             StudyAI
