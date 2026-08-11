@@ -14,12 +14,12 @@ export async function GET() {
     });
 
     // Manually add _count.flashcards for each notebook
-    const notebooksWithCount = notebooks.map((nb: any) => ({
+    const notebooksWithCount = await Promise.all(notebooks.map(async (nb: any) => ({
       ...nb,
       _count: {
         flashcards: await db.flashcard.count({ where: { notebookId: nb.id } }),
       },
-    }));
+    })));
 
     return NextResponse.json({ notebooks: notebooksWithCount });
   } catch (error) {

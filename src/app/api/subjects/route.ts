@@ -14,13 +14,14 @@ export async function GET() {
     });
 
     // Manually add _count (was include: { _count: { select: { topics: true, tasks: true } } })
-    const subjectsWithCount = subjects.map((s: any) => ({
+    const subjectsWithCount = await Promise.all(subjects.map(async (s: any) => ({
       ...s,
       _count: {
         topics: await db.topic.count({ where: { subjectId: s.id } }),
         tasks: await db.task.count({ where: { subjectId: s.id } }),
       },
-    }));
+    })));
+
 
     return NextResponse.json({ subjects: subjectsWithCount });
   } catch (error) {
