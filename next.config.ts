@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     'z-ai-web-dev-sdk',
     'sharp',
+    '@neondatabase/serverless',
+    '@libsql/client',
   ],
   transpilePackages: [
     '@tiptap/react',

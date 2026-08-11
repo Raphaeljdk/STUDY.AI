@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     const xpTx = await awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
 
     // Update user total questions answered (increment)
-    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?', args: [battle.totalQuestions, userId] });
+    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + $1 WHERE "id" = $2', args: [battle.totalQuestions, userId] });
 
     const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
 

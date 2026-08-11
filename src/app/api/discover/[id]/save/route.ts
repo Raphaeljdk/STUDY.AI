@@ -45,7 +45,7 @@ export async function POST(
       // Unsave
       await db.discoverSave.delete({ where: { id: existing.id } });
       // Decrement saves (raw SQL)
-      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" - 1 WHERE "id" = ?', args: [id] });
+      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" - 1 WHERE "id" = $1', args: [id] });
       return NextResponse.json({ isSaved: false });
     } else {
       // Save
@@ -53,7 +53,7 @@ export async function POST(
         data: { id: genId(), userId, discoverItemId: id, createdAt: nowISO() },
       });
       // Increment saves (raw SQL)
-      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" + 1 WHERE "id" = ?', args: [id] });
+      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" + 1 WHERE "id" = $1', args: [id] });
       return NextResponse.json({ isSaved: true });
     }
   } catch (error) {

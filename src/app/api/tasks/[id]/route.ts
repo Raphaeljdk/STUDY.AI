@@ -82,7 +82,7 @@ export async function PATCH(
       await awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
       xpAwarded = true;
       // Update user total tasks completed (was increment)
-      await sqlite.execute({ sql: 'UPDATE "User" SET "totalTasksCompleted" = "totalTasksCompleted" + 1 WHERE "id" = ?', args: [userId] });
+      await sqlite.execute({ sql: 'UPDATE "User" SET "totalTasksCompleted" = "totalTasksCompleted" + 1 WHERE "id" = $1', args: [userId] });
     }
 
     // If un-completing a task

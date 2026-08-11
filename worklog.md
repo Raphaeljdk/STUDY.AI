@@ -1281,3 +1281,31 @@ Stage Summary:
 - XP/level display shows correct values (0/100 for new user)
 - All 85+ auth check duplications eliminated via centralized requireUserAsync()
 - All 70+ fetch calls migrated to centralized apiFetch() with 401 handling
+---
+Task ID: 1
+Agent: main
+Task: Migrate database from SQLite to Neon PostgreSQL for persistent storage on Vercel
+
+Work Log:
+- Read and analyzed the existing db.ts which had a dual-backend system (Neon PostgreSQL + libsql SQLite)
+- Discovered that the @neondatabase/serverless v1.x changed API: `neon()` now only supports tagged template syntax
+- Converted all `sql()` calls to `sql.query()` for parameterized queries
+- Rewrote db.ts to be a clean dual-backend system:
+  - Production/Vercel: Uses Neon PostgreSQL (hardcoded fallback URL ensures it works without env config)
+  - Local dev: Uses libsql SQLite (when POSTGRES_URL env var is not set)
+  - All queries use $N PostgreSQL placeholders; SQLite backend auto-converts to ?
+- Fixed 5 API route files that used raw SQL with ? placeholders (battle/finish, pretest/finish, discover/save, teach, tasks/[id])
+- Updated .env.example with simplified instructions (no config needed, works out-of-the-box)
+- Added @neondatabase/serverless and @libsql/client to serverExternalPackages in next.config.ts
+- Verified registration works (curl test returned 200 with user data)
+- Verified schema creation for all 24 tables
+- Verified lint passes clean
+
+Stage Summary:
+- db.ts now supports both PostgreSQL (Neon) and SQLite backends
+- On Vercel: Automatically uses Neon PostgreSQL with hardcoded fallback URL
+- On local dev: Automatically uses SQLite file at db/custom.db
+- All 24 tables auto-created on first connection
+- Raw SQL queries in 5 API routes converted to use $N PostgreSQL placeholders
+- The Neon connection URL is hardcoded as fallback, so it works on Vercel without any env var setup
+

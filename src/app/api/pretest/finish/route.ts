@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     });
 
     // Update user total questions answered (increment)
-    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?', args: [questions.length, userId] });
+    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + $1 WHERE "id" = $2', args: [questions.length, userId] });
 
     return NextResponse.json({
       preTest: updatedPreTest,

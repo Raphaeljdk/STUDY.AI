@@ -142,7 +142,7 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
 
     // Update user XP if earned (increment via raw SQL)
     if (totalXP > 0) {
-      await sqlite.execute({ sql: 'UPDATE "User" SET "xp" = "xp" + ?, "totalQuestionsAnswered" = "totalQuestionsAnswered" + ?, "updatedAt" = ? WHERE "id" = ?', args: [totalXP, 1, nowISO(), userId] });
+      await sqlite.execute({ sql: 'UPDATE "User" SET "xp" = "xp" + $1, "totalQuestionsAnswered" = "totalQuestionsAnswered" + $2, "updatedAt" = $3 WHERE "id" = $4', args: [totalXP, 1, nowISO(), userId] });
 
       // Create XP transaction
       await db.xPTransaction.create({
