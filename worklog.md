@@ -1309,3 +1309,24 @@ Stage Summary:
 - Raw SQL queries in 5 API routes converted to use $N PostgreSQL placeholders
 - The Neon connection URL is hardcoded as fallback, so it works on Vercel without any env var setup
 
+---
+Task ID: 2
+Agent: main
+Task: Fix logo, roadmap, discover features + add logo to sidebar
+
+Work Log:
+- Fixed all logo.png references to logo.svg (HeaderZen, FooterZen, layout.tsx OG/Twitter)
+- Removed unused next/image imports from Header and Footer components
+- Added StudyAI logo + brand name to the top of the Sidebar component
+- Fixed RoadmapView generateRoadmap() which sent steps:[] (API rejects empty steps)
+- Fixed DiscoverView handleAddToSubject() which called non-existent /api/notes → changed to /api/notebooks
+- Cleaned up unused imports (FolderOpen, Brain) from Sidebar.tsx
+- Scanned all 8+ feature view components for bugs - only 2 found (both fixed)
+- All changes lint clean, committed and pushed to Git
+
+Stage Summary:
+- Logo displays correctly in landing page header, footer, and dashboard sidebar
+- Roadmap create/generate buttons work (steps are generated from topic)
+- Discover save-to-subject works (calls correct API endpoint)
+- Push: eb1b2f3..cce168f main -> main
+
