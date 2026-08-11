@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, UserPlus, Users } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { ZenButton } from './ZenButton';
-import Image from 'next/image';
 
 const navLinks = [
   { label: 'Recursos', href: '#features' },
@@ -38,13 +37,12 @@ export function HeaderZen() {
       <div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-4 lg:px-24">
         {/* Logo */}
         <a href="#" className="flex items-center gap-3 transition-opacity hover:opacity-80">
-          <Image
-            src="/logo.png"
+          <img
+            src="/logo.svg"
             alt="StudyAI Logo"
             width={36}
             height={36}
             className="rounded-full"
-            priority
           />
           <span className="font-serif-jp text-xl font-bold tracking-tight text-[var(--ws-text-primary)]">
             StudyAI

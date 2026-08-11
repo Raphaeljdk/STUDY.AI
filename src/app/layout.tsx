@@ -46,14 +46,14 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     siteName: "StudyAI",
-    images: [{ url: "/logo.png", width: 512, height: 512, alt: "StudyAI" }],
+    images: [{ url: "/logo.svg", width: 512, height: 512, alt: "StudyAI" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "StudyAI — A beleza de aprender na imperfeição",
     description:
       "Revolucione seus estudos com IA. Wabi-Sabi: a perfeicao esta na jornada.",
-    images: ["/logo.png"],
+    images: ["/logo.svg"],
   },
   other: {
     "mobile-web-app-capable": "yes",

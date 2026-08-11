@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, BookOpen, ListTodo, Target, CalendarDays,
-  FolderOpen, Brain, Timer, MessageCircle,
+  Timer, MessageCircle,
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   ChevronLeft, ChevronRight, LogOut, Crown, Shield, Users, ChevronDown,
   BookText, Layers, ScrollText,
@@ -105,9 +105,27 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       style={{ willChange: 'width' }}
     >
+      {/* Logo + Brand */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-[var(--ws-glass-border)] px-4 py-3">
+        <img src="/logo.svg" alt="StudyAI" width={32} height={32} className="shrink-0 rounded-full" />
+        <AnimatePresence mode="wait">
+          {!collapsed && (
+            <motion.span
+              className="font-serif-jp text-base font-bold tracking-tight text-[var(--ws-text-primary)]"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              StudyAI
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* User Info */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-[var(--ws-glass-border)] px-4 py-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] font-serif-jp text-sm font-bold text-[var(--ws-accent)]">
+      <div className="flex shrink-0 items-center gap-3 border-b border-[var(--ws-glass-border)] px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] font-serif-jp text-xs font-bold text-[var(--ws-accent)]">
           {user?.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
         <AnimatePresence mode="wait">

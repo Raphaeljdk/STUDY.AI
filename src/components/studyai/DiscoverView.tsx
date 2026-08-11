@@ -330,9 +330,9 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
     try {
       const item = items.find(i => i.id === subjectSelectItemId);
       if (!item) return;
-      await apiFetch('/api/notes', {
+      await apiFetch('/api/notebooks', {
         method: 'POST',
-        body: JSON.stringify({ title: `[Discover] ${item.title}`, content: item.content, subjectId: selectedSubjectId }),
+        body: JSON.stringify({ title: `[Discover] ${item.title}`, content: item.content }),
       });
       toast({ title: 'Adicionado a materia!', description: 'Conteudo salvo na materia selecionada.' });
       setShowSubjectDialog(false);

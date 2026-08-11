@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { Users } from 'lucide-react';
 
 const footerLinks = {
@@ -29,8 +28,8 @@ export function FooterZen() {
           {/* Brand column */}
           <div className="lg:col-span-2">
             <div className="mb-4 flex items-center gap-3">
-              <Image
-                src="/logo.png"
+              <img
+                src="/logo.svg"
                 alt="StudyAI Logo"
                 width={32}
                 height={32}

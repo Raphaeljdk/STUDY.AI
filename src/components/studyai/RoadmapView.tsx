@@ -134,13 +134,14 @@ export function RoadmapView() {
     if (!topic.trim()) return;
     setGenerating(true);
     try {
+      const defaultSteps: RoadmapStep[] = generateDefaultSteps(topic);
       await apiFetch('/api/roadmaps', {
         method: 'POST',
         body: JSON.stringify({
           title: `Trilha: ${topic.trim()}`,
           topic: topic.trim(),
           description: `Plano de estudo gerado por IA para ${topic.trim()}`,
-          steps: [], // will be populated by AI
+          steps: defaultSteps,
           isAI: true,
         }),
       });
