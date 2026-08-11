@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         id: genId(),
         userId,
         subject: subject.trim(),
+        topic: subject.trim(),
         totalQuestions: numQuestions,
         duration: battleDuration,
         createdAt: nowISO(),

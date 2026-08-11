@@ -39,14 +39,14 @@ export async function GET(request: Request) {
       where.source = source;
     }
 
-    const transactions = await db.xPTransaction.findMany({
+    const transactions = await db.xpTransaction.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
     });
 
     // Total XP breakdown by source (replaces groupBy)
-    const xpBreakdown = await db.xPTransaction.query(
+    const xpBreakdown = await db.xpTransaction.query(
       `SELECT "source", SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "amount" > 0 GROUP BY "source"`,
       userId
     );
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
     const finalSource = VALID_SOURCES.includes(source) ? source : 'MANUAL';
 
-    const xpTx = await db.xPTransaction.create({
+    const xpTx = await db.xpTransaction.create({
       data: {
         id: genId(),
         userId,

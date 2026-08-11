@@ -203,7 +203,8 @@ CREATE TABLE IF NOT EXISTS "Achievement" (
   "icon" TEXT NOT NULL,
   "category" TEXT NOT NULL,
   "requirement" INTEGER NOT NULL DEFAULT 1,
-  "xpReward" INTEGER NOT NULL DEFAULT 0
+  "xpReward" INTEGER NOT NULL DEFAULT 0,
+  "sortOrder" INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS "UserAchievement" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -333,10 +334,13 @@ CREATE TABLE IF NOT EXISTS "Battle" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
   "subjectId" TEXT,
-  "topic" TEXT NOT NULL,
+  "subject" TEXT NOT NULL DEFAULT '',
+  "topic" TEXT NOT NULL DEFAULT '',
   "difficulty" TEXT NOT NULL DEFAULT 'medium',
   "totalQuestions" INTEGER NOT NULL DEFAULT 5,
+  "duration" INTEGER NOT NULL DEFAULT 60,
   "correctAnswers" INTEGER NOT NULL DEFAULT 0,
+  "confidenceAvg" REAL NOT NULL DEFAULT 0,
   "score" INTEGER NOT NULL DEFAULT 0,
   "status" TEXT NOT NULL DEFAULT 'active',
   "questions" TEXT NOT NULL DEFAULT '[]',
@@ -422,6 +426,30 @@ export async function ensureSchema(): Promise<void> {
       `ALTER TABLE "Goal" ADD COLUMN "unit" TEXT`,
     ];
     for (const sql of goalMigrations) {
+      try {
+        await execQuery(sql);
+      } catch {
+        // column already exists — ignore
+      }
+    }
+    // Migration: add missing Battle columns
+    const battleMigrations = [
+      `ALTER TABLE "Battle" ADD COLUMN "subject" TEXT NOT NULL DEFAULT ''`,
+      `ALTER TABLE "Battle" ADD COLUMN "duration" INTEGER NOT NULL DEFAULT 60`,
+      `ALTER TABLE "Battle" ADD COLUMN "confidenceAvg" REAL NOT NULL DEFAULT 0`,
+    ];
+    for (const sql of battleMigrations) {
+      try {
+        await execQuery(sql);
+      } catch {
+        // column already exists — ignore
+      }
+    }
+    // Migration: add missing Achievement columns
+    const achievementMigrations = [
+      `ALTER TABLE "Achievement" ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0`,
+    ];
+    for (const sql of achievementMigrations) {
       try {
         await execQuery(sql);
       } catch {

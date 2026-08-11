@@ -220,6 +220,7 @@ export function DashboardView() {
     longestStreak: fullUser?.longestStreak ?? 0,
     totalStudyMinutes: fullUser?.totalStudyMinutes ?? 0,
     totalSessions: fullUser?.totalSessions ?? 0,
+    createdAt: fullUser?.createdAt || sessionUser?.createdAt || undefined,
     role: sessionUser?.role || 'USER',
     plan: sessionUser?.plan || 'FREE',
   };

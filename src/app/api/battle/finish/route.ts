@@ -3,7 +3,7 @@ import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = await db.xPTransaction.create({
+  const xpTx = await db.xpTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 

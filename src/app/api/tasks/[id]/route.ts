@@ -7,7 +7,7 @@ const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const XP_PER_TASK = 30;
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = await db.xPTransaction.create({
+  const xpTx = await db.xpTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 

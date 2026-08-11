@@ -7,7 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   Trophy, Flame, Target, Clock, Star, Lock, Unlock,
   TrendingUp, Award, Zap, Calendar, BookOpen,
-  BarChart3, Timer, AlertCircle,
+  BarChart3, Timer, AlertCircle, RotateCcw, Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -32,7 +32,7 @@ interface ProgressViewProps {
     longestStreak: number;
     totalStudyMinutes: number;
     totalSessions: number;
-    createdAt: string;
+    createdAt?: string;
   };
 }
 
@@ -279,36 +279,145 @@ export function ProgressView({ user }: ProgressViewProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [subjects, setSubjects] = useState<SubjectStat[]>([]);
 
-  // --- Loading State ---
+  // --- Per-section loading/error ---
   const [loading, setLoading] = useState(true);
+  const [loadingXP, setLoadingXP] = useState(true);
+  const [loadingAchievements, setLoadingAchievements] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
+  const [retrying, setRetrying] = useState(false);
 
-  // --- Data Fetching ---
+  // --- Data Fetching (resilient with Promise.allSettled) ---
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [gamRes, achRes, xpRes, statsRes, subRes] = await Promise.all([
-        apiFetch('/api/gamification'),
-        apiFetch('/api/achievements'),
-        apiFetch('/api/xp'),
-        apiFetch('/api/stats'),
-        apiFetch('/api/subjects'),
-      ]);
-      setGamification(gamRes);
-      setAchievements(achRes.achievements || []);
-      setXpData(xpRes);
-      setStats(statsRes);
-      setSubjects(subRes.subjects || []);
-    } catch {
-      setError('Nao foi possivel carregar os dados de progresso.');
-    } finally {
-      setLoading(false);
+    setSectionErrors({});
+    setLoadingXP(true);
+    setLoadingAchievements(true);
+    setLoadingStats(true);
+    setLoadingSubjects(true);
+
+    const results = await Promise.allSettled([
+      apiFetch('/api/gamification').catch(e => e),
+      apiFetch('/api/achievements').catch(e => e),
+      apiFetch('/api/xp').catch(e => e),
+      apiFetch('/api/stats').catch(e => e),
+      apiFetch('/api/subjects').catch(e => e),
+    ]);
+
+    // Process gamification
+    if (results[0].status === 'fulfilled' && !(results[0].value instanceof Error)) {
+      setGamification(results[0].value);
+    } else {
+      const err = results[0].status === 'rejected' ? results[0].reason : results[0].value;
+      if (err instanceof Error && err.name === 'ApiError' && (err as any).isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, gamification: 'Erro ao carregar gamificacao.' }));
     }
+
+    // Process achievements
+    if (results[1].status === 'fulfilled' && !(results[1].value instanceof Error)) {
+      setAchievements(results[1].value.achievements || []);
+      setLoadingAchievements(false);
+    } else {
+      const err = results[1].status === 'rejected' ? results[1].reason : results[1].value;
+      if (err instanceof Error && err.name === 'ApiError' && (err as any).isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, achievements: 'Erro ao carregar conquistas.' }));
+      setLoadingAchievements(false);
+    }
+
+    // Process XP
+    if (results[2].status === 'fulfilled' && !(results[2].value instanceof Error)) {
+      setXpData(results[2].value);
+      setLoadingXP(false);
+    } else {
+      const err = results[2].status === 'rejected' ? results[2].reason : results[2].value;
+      if (err instanceof Error && err.name === 'ApiError' && (err as any).isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, xp: 'Erro ao carregar dados de XP.' }));
+      setLoadingXP(false);
+    }
+
+    // Process stats
+    if (results[3].status === 'fulfilled' && !(results[3].value instanceof Error)) {
+      setStats(results[3].value);
+      setLoadingStats(false);
+    } else {
+      const err = results[3].status === 'rejected' ? results[3].reason : results[3].value;
+      if (err instanceof Error && err.name === 'ApiError' && (err as any).isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, stats: 'Erro ao carregar estatisticas.' }));
+      setLoadingStats(false);
+    }
+
+    // Process subjects
+    if (results[4].status === 'fulfilled' && !(results[4].value instanceof Error)) {
+      setSubjects(results[4].value.subjects || []);
+      setLoadingSubjects(false);
+    } else {
+      const err = results[4].status === 'rejected' ? results[4].reason : results[4].value;
+      if (err instanceof Error && err.name === 'ApiError' && (err as any).isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, subjects: 'Erro ao carregar materias.' }));
+      setLoadingSubjects(false);
+    }
+
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchAllData();
+  }, [fetchAllData]);
+
+  // --- Retry individual section ---
+  const retrySection = useCallback(async (section: string) => {
+    setSectionErrors(prev => {
+      const next = { ...prev };
+      delete next[section];
+      return next;
+    });
+    if (section === 'xp') setLoadingXP(true);
+    if (section === 'achievements') setLoadingAchievements(true);
+    if (section === 'stats') setLoadingStats(true);
+    if (section === 'subjects') setLoadingSubjects(true);
+
+    try {
+      if (section === 'gamification' || section === 'xp') {
+        if (section === 'gamification') {
+          const data = await apiFetch('/api/gamification');
+          setGamification(data);
+        }
+        if (section === 'xp') {
+          const data = await apiFetch('/api/xp');
+          setXpData(data);
+        }
+      }
+      if (section === 'achievements') {
+        const data = await apiFetch('/api/achievements');
+        setAchievements(data.achievements || []);
+      }
+      if (section === 'stats') {
+        const data = await apiFetch('/api/stats');
+        setStats(data);
+      }
+      if (section === 'subjects') {
+        const data = await apiFetch('/api/subjects');
+        setSubjects(data.subjects || []);
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      setSectionErrors(prev => ({ ...prev, [section]: `Erro ao carregar ${section}.` }));
+    } finally {
+      if (section === 'xp') setLoadingXP(false);
+      if (section === 'achievements') setLoadingAchievements(false);
+      if (section === 'stats') setLoadingStats(false);
+      if (section === 'subjects') setLoadingSubjects(false);
+    }
+  }, []);
+
+  // --- Full retry ---
+  const handleFullRetry = useCallback(async () => {
+    setRetrying(true);
+    await fetchAllData();
+    setRetrying(false);
   }, [fetchAllData]);
 
   // --- Derived Values ---
@@ -388,15 +497,35 @@ export function ProgressView({ user }: ProgressViewProps) {
 
   // ===== RENDER =====
 
+  // ===== SECTION ERROR COMPONENT =====
+  const SectionError = ({ section, message }: { section: string; message: string }) => (
+    <WabiSabiCard hover={false}>
+      <div className="flex flex-col items-center gap-3 py-6">
+        <AlertCircle size={24} className="text-[var(--ws-accent)]" />
+        <p className="text-sm text-[var(--ws-text-secondary)]">{message}</p>
+        <button
+          onClick={() => retrySection(section)}
+          className="flex items-center gap-1.5 rounded-ws-button px-4 py-2 text-xs font-medium text-white transition-ws"
+          style={{ background: 'var(--ws-accent)' }}
+        >
+          <RotateCcw size={14} />
+          Tentar novamente
+        </button>
+      </div>
+    </WabiSabiCard>
+  );
+
   if (error && !loading) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <AlertCircle size={40} className="text-[var(--ws-accent)]" />
         <p className="text-[var(--ws-text-secondary)]">{error}</p>
         <button
-          onClick={fetchAllData}
-          className="rounded-lg bg-[var(--ws-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ws-accent-hover)]"
+          onClick={handleFullRetry}
+          disabled={retrying}
+          className="flex items-center gap-2 rounded-lg bg-[var(--ws-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ws-accent-hover)]"
         >
+          {retrying ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
           Tentar novamente
         </button>
       </div>
@@ -449,6 +578,8 @@ export function ProgressView({ user }: ProgressViewProps) {
           <motion.div variants={itemVariants}>
             {loading ? (
               <ProfileSkeleton />
+            ) : sectionErrors.gamification ? (
+              <SectionError section="gamification" message={sectionErrors.gamification} />
             ) : (
               <WabiSabiCard hover={false} className="relative overflow-hidden">
                 <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
@@ -556,8 +687,10 @@ export function ProgressView({ user }: ProgressViewProps) {
 
           {/* SECTION 2: XP Breakdown */}
           <motion.div variants={itemVariants}>
-            {loading ? (
+            {loadingXP ? (
               <ChartSkeleton />
+            ) : sectionErrors.xp ? (
+              <SectionError section="xp" message={sectionErrors.xp} />
             ) : (
               <WabiSabiCard hover={false}>
                 <div className="mb-4 flex items-center gap-2">
@@ -632,7 +765,7 @@ export function ProgressView({ user }: ProgressViewProps) {
         <TabsContent value="analytics" className="space-y-6">
           {/* Stats Cards Grid */}
           <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {loading ? (
+            {loadingStats ? (
               [...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
@@ -671,8 +804,10 @@ export function ProgressView({ user }: ProgressViewProps) {
 
           {/* Weekly Chart */}
           <motion.div variants={itemVariants}>
-            {loading ? (
+            {loadingStats ? (
               <ChartSkeleton />
+            ) : sectionErrors.stats ? (
+              <SectionError section="stats" message={sectionErrors.stats} />
             ) : (
               <WabiSabiCard hover={false}>
                 <div className="mb-4 flex items-center justify-between">
@@ -732,7 +867,10 @@ export function ProgressView({ user }: ProgressViewProps) {
 
           {/* Best Study Day Card */}
           <motion.div variants={itemVariants}>
-            <WabiSabiCard hover={false}>
+            {loadingStats ? (
+              <ChartSkeleton />
+            ) : (
+              <WabiSabiCard hover={false}>
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--ws-bg-dark)]">
                   <Calendar size={24} className="text-[var(--ws-gold)]" />
@@ -744,7 +882,8 @@ export function ProgressView({ user }: ProgressViewProps) {
                   </p>
                 </div>
               </div>
-            </WabiSabiCard>
+              </WabiSabiCard>
+            )}
           </motion.div>
         </TabsContent>
 
@@ -752,7 +891,7 @@ export function ProgressView({ user }: ProgressViewProps) {
         <TabsContent value="achievements" className="space-y-6">
           {/* Achievement Summary */}
           <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-4">
-            {loading ? (
+            {loadingAchievements ? (
               <div className="flex items-center gap-3">
                 <Skeleton className="h-10 w-10 rounded-xl" />
                 <Skeleton className="h-6 w-48" />
@@ -773,14 +912,16 @@ export function ProgressView({ user }: ProgressViewProps) {
           </motion.div>
 
           {/* Achievements Grid */}
-          <motion.div
-            variants={containerVariants}
-            className="grid grid-cols-2 gap-4 lg:grid-cols-3"
-          >
-            {loading ? (
-              <AchievementGridSkeleton />
-            ) : (
-              mergedAchievements.map((ach) => (
+          {loadingAchievements ? (
+            <AchievementGridSkeleton />
+          ) : sectionErrors.achievements ? (
+            <SectionError section="achievements" message={sectionErrors.achievements} />
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              className="grid grid-cols-2 gap-4 lg:grid-cols-3"
+            >
+              {mergedAchievements.map((ach) => (
                 <motion.div
                   key={ach.key}
                   variants={itemVariants}
@@ -831,16 +972,18 @@ export function ProgressView({ user }: ProgressViewProps) {
                     </div>
                   </div>
                 </motion.div>
-              ))
-            )}
-          </motion.div>
+              ))}
+            </motion.div>
+          )}
         </TabsContent>
 
         {/* ========== TAB: SUBJECTS ========== */}
         <TabsContent value="subjects" className="space-y-6">
           <motion.div variants={itemVariants}>
-            {loading ? (
+            {loadingSubjects ? (
               <ChartSkeleton />
+            ) : sectionErrors.subjects ? (
+              <SectionError section="subjects" message={sectionErrors.subjects} />
             ) : (
               <WabiSabiCard hover={false}>
                 <div className="mb-5 flex items-center gap-2">
@@ -898,8 +1041,10 @@ export function ProgressView({ user }: ProgressViewProps) {
 
           {/* Subject Study Time Bars */}
           <motion.div variants={itemVariants}>
-            {loading ? (
+            {loadingSubjects ? (
               <ChartSkeleton />
+            ) : sectionErrors.subjects ? (
+              <SectionError section="subjects" message={sectionErrors.subjects} />
             ) : (
               <WabiSabiCard hover={false}>
                 <div className="mb-5 flex items-center gap-2">

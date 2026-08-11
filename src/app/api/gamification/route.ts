@@ -34,7 +34,7 @@ export async function GET() {
 
     // Today's XP earned (replaces aggregate with raw SQL)
     const todayStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString();
-    const todayXPRow = await db.xPTransaction.queryOne(
+    const todayXPRow = await db.xpTransaction.queryOne(
       `SELECT SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "createdAt" >= ? AND "amount" > 0`,
       userId, todayStartISO
     );

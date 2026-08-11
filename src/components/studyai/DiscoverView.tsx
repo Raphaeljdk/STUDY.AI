@@ -7,6 +7,7 @@ import {
   Search, Bookmark, BookmarkCheck, Sparkles,
   Loader2, Clock, ChevronDown, ChevronUp,
   BookPlus, Brain, FileQuestion, X, Plus, Check, RotateCcw,
+  Compass, Lightbulb,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -120,6 +121,99 @@ function SkeletonCard() {
   );
 }
 
+// ===== QUICK-START TOPICS =====
+const QUICK_TOPICS = ['JavaScript', 'Python', 'React', 'Matematica', 'Fisica', 'Historia', 'Ingles', 'Filosofia'];
+
+// ===== ONBOARDING SECTION =====
+function OnboardingSection({ onQuickTopic }: { onQuickTopic: (topic: string) => void }) {
+  const features = [
+    { icon: <Compass className="h-5 w-5" />, title: 'Explorar', desc: 'Descubra conteudos por tema', color: 'var(--ws-accent)' },
+    { icon: <Sparkles className="h-5 w-5" />, title: 'Gerar com IA', desc: 'Crie conteudos personalizados', color: 'var(--ws-gold)' },
+    { icon: <Bookmark className="h-5 w-5" />, title: 'Salvar', desc: 'Guarde o que importa para revisar', color: 'var(--ws-verdigris)' },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+      className="mb-6"
+    >
+      {/* Main onboarding card */}
+      <div
+        className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5 mb-4"
+        style={{ borderRadius: 'var(--ws-radius-card)' }}
+      >
+        <div className="flex items-center gap-2.5 mb-3">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-xl"
+            style={{ background: 'color-mix(in srgb, var(--ws-accent) 12%, transparent)' }}
+          >
+            <Lightbulb className="h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
+          </div>
+          <div>
+            <h2 className="font-serif-jp text-base font-semibold" style={{ color: 'var(--ws-text-primary)' }}>
+              O que e o Discover?
+            </h2>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--ws-text-secondary)' }}>
+          Explore conteudos educacionais gerados por IA ou pela comunidade. Encontre dicas, conceitos e trechos de codigo para ampliar seus estudos.
+        </p>
+        {/* Feature cards row */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="flex flex-col items-center gap-2 rounded-ws-button p-3 text-center transition-ws"
+              style={{
+                background: `color-mix(in srgb, ${f.color} 6%, var(--ws-bg))`,
+                border: `1px solid color-mix(in srgb, ${f.color} 15%, transparent)`,
+              }}
+            >
+              <div style={{ color: f.color }}>{f.icon}</div>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--ws-text-primary)' }}>{f.title}</p>
+                <p className="text-[10px] leading-tight mt-0.5" style={{ color: 'var(--ws-text-tertiary)' }}>{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick-start topics */}
+      <div
+        className="border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl p-5"
+        style={{ borderRadius: 'var(--ws-radius-card)' }}
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="h-4 w-4" style={{ color: 'var(--ws-gold)' }} />
+          <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>
+            Topicos populares
+          </h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_TOPICS.map((topic) => (
+            <motion.button
+              key={topic}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => onQuickTopic(topic)}
+              className="rounded-ws-button px-3.5 py-1.5 text-xs font-medium transition-ws"
+              style={{
+                background: 'var(--ws-glass)',
+                color: 'var(--ws-text-secondary)',
+                border: '1px solid var(--ws-glass-border)',
+              }}
+            >
+              {topic}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ===== EMPTY STATE =====
 function EmptyState({ hasFilter, onGenerateClick }: { hasFilter: boolean; onGenerateClick: () => void }) {
   return (
@@ -131,28 +225,28 @@ function EmptyState({ hasFilter, onGenerateClick }: { hasFilter: boolean; onGene
       <div
         className="mb-6 flex h-20 w-20 items-center justify-center text-4xl"
         style={{
-          background: 'var(--ws-glass)',
+          background: hasFilter ? 'color-mix(in srgb, var(--ws-accent) 8%, var(--ws-glass))' : 'var(--ws-glass)',
           borderRadius: '50%',
-          border: '1px solid var(--ws-glass-border)',
+          border: `1px solid ${hasFilter ? 'color-mix(in srgb, var(--ws-accent) 20%, transparent)' : 'var(--ws-glass-border)'}`,
         }}
       >
-        {hasFilter ? '🔍' : '🌿'}
+        {hasFilter ? <Search className="h-8 w-8" style={{ color: 'var(--ws-accent)' }} /> : <Compass className="h-8 w-8" style={{ color: 'var(--ws-text-tertiary)' }} />}
       </div>
       <h3
         className="font-serif-jp text-xl font-semibold mb-2"
         style={{ color: 'var(--ws-text-primary)' }}
       >
-        {hasFilter ? 'Nenhum resultado encontrado' : 'Explore o Discover'}
+        {hasFilter ? 'Nenhum conteudo encontrado' : 'Explore o Discover'}
       </h3>
       <p
         className="text-sm max-w-xs"
         style={{ color: 'var(--ws-text-tertiary)' }}
       >
         {hasFilter
-          ? 'Tente ajustar os filtros ou buscar por outro termo.'
+          ? 'Nenhum conteudo encontrado. Tente outro filtro ou gere um novo conteudo com IA.'
           : 'Conteudo educacional incrivel esta esperando por voce. Gere seu primeiro conteudo com IA!'}
       </p>
-      {!hasFilter && (
+      {hasFilter && (
         <button
           onClick={onGenerateClick}
           className="mt-6 flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws"
@@ -433,6 +527,11 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
           })}
         </div>
       </div>
+
+      {/* Onboarding - shown when no items loaded yet and not loading */}
+      {!loading && !fetchError && items.length === 0 && !hasActiveFilter && (
+        <OnboardingSection onQuickTopic={(topic) => { setAiSubject(topic); setAiType('dica'); setAiDifficulty('medio'); setShowAIDialog(true); }} />
+      )}
 
       {/* Feed */}
       {loading && items.length === 0 ? (

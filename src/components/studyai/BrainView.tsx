@@ -7,7 +7,7 @@ import {
   Play, RotateCcw, Sparkles, Clock, Zap, Shield,
   Target, TrendingDown, AlertTriangle, CheckCircle2,
   BookOpen, Timer, RefreshCw, ArrowRight, Lightbulb,
-  Battery, BarChart3, Heart, Link2, Eye,
+  Battery, BarChart3, Heart, Link2, Eye, X, Check,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -132,6 +132,8 @@ export function BrainView({ onNavigate }: BrainViewProps) {
   const [preTestScore, setPreTestScore] = useState(0);
   const [preTestCorrect, setPreTestCorrect] = useState(0);
   const [preTestTotal, setPreTestTotal] = useState(0);
+  const [preTestResults, setPreTestResults] = useState<any[]>([]);
+  const [expandedWrong, setExpandedWrong] = useState<number | null>(null);
 
   // Expanded state
   const [expandedGap, setExpandedGap] = useState<string | null>(null);
@@ -214,6 +216,7 @@ export function BrainView({ onNavigate }: BrainViewProps) {
       setPreTestScore(data.score);
       setPreTestCorrect(data.correct);
       setPreTestTotal(data.total);
+      setPreTestResults(data.results || []);
       setPreTestFinished(true);
     } catch {
       toast({ title: 'Erro', description: 'Nao foi possivel finalizar o pre-teste.', variant: 'destructive' });
@@ -230,6 +233,8 @@ export function BrainView({ onNavigate }: BrainViewProps) {
     setCurrentQIndex(0);
     setAnswers([]);
     setPreTestFinished(false);
+    setPreTestResults([]);
+    setExpandedWrong(null);
   };
 
   // DNA metrics computed from brain data
@@ -866,6 +871,153 @@ export function BrainView({ onNavigate }: BrainViewProps) {
                   {preTestCorrect} de {preTestTotal} corretas
                 </p>
               </div>
+
+              {/* All correct - congratulatory message */}
+              {preTestResults.length > 0 && preTestResults.every((r: any) => r.isCorrect) && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-lg p-4"
+                  style={{ background: 'color-mix(in srgb, #22c55e 8%, transparent)', border: '1px solid color-mix(in srgb, #22c55e 20%, transparent)' }}
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <CheckCircle2 className="h-5 w-5" style={{ color: '#22c55e' }} />
+                    <p className="text-sm font-semibold" style={{ color: '#22c55e' }}>Perfeito! Todas corretas!</p>
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--ws-text-tertiary)' }}>
+                    Voce ja domina esse topico. Continue assim!
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Wrong answers section */}
+              {preTestResults.length > 0 && !preTestResults.every((r: any) => r.isCorrect) && (() => {
+                const wrongResults = preTestResults.filter((r: any) => !r.isCorrect);
+                return (
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-center gap-2 pb-1">
+                      <AlertTriangle className="h-4 w-4" style={{ color: '#ef4444' }} />
+                      <p className="text-xs font-semibold" style={{ color: 'var(--ws-text-secondary)' }}>
+                        {wrongResults.length} {wrongResults.length === 1 ? 'resposta incorreta' : 'respostas incorretas'} - revise esses topicos
+                      </p>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto space-y-2 pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--ws-glass-border) transparent' }}>
+                      {wrongResults.map((r: any) => (
+                        <motion.div
+                          key={r.questionIndex}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: r.questionIndex * 0.05 }}
+                        >
+                          <button
+                            className="w-full text-left rounded-lg p-3 transition-all duration-200 cursor-pointer"
+                            style={{
+                              background: expandedWrong === r.questionIndex
+                                ? 'color-mix(in srgb, #ef4444 6%, var(--ws-glass))'
+                                : 'var(--ws-glass)',
+                              border: '1px solid ' + (expandedWrong === r.questionIndex
+                                ? 'color-mix(in srgb, #ef4444 25%, transparent)'
+                                : 'var(--ws-glass-border)'),
+                            }}
+                            onClick={() => setExpandedWrong(expandedWrong === r.questionIndex ? null : r.questionIndex)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <X className="h-3.5 w-3.5 shrink-0" style={{ color: '#ef4444' }} />
+                                <span className="text-xs font-medium truncate" style={{ color: 'var(--ws-text-primary)' }}>
+                                  Questao {r.questionIndex + 1}
+                                </span>
+                              </div>
+                              {expandedWrong === r.questionIndex
+                                ? <ChevronUp className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ws-text-tertiary)' }} />
+                                : <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--ws-text-tertiary)' }} />
+                              }
+                            </div>
+
+                            <AnimatePresence>
+                              {expandedWrong === r.questionIndex && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mt-3 space-y-2.5">
+                                    <p className="text-xs leading-relaxed" style={{ color: 'var(--ws-text-secondary)' }}>
+                                      {r.questionText}
+                                    </p>
+
+                                    <div className="space-y-1.5">
+                                      {r.options && r.options.map((opt: string, idx: number) => {
+                                        const isUserAnswer = r.userAnswer === idx;
+                                        const isCorrectAnswer = r.correctAnswer === idx;
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs"
+                                            style={{
+                                              background: isCorrectAnswer
+                                                ? 'color-mix(in srgb, #22c55e 12%, transparent)'
+                                                : isUserAnswer
+                                                  ? 'color-mix(in srgb, #ef4444 12%, transparent)'
+                                                  : 'transparent',
+                                              border: isCorrectAnswer
+                                                ? '1px solid color-mix(in srgb, #22c55e 30%, transparent)'
+                                                : isUserAnswer
+                                                  ? '1px solid color-mix(in srgb, #ef4444 30%, transparent)'
+                                                  : '1px solid transparent',
+                                            }}
+                                          >
+                                            {isCorrectAnswer ? (
+                                              <Check className="h-3 w-3 shrink-0" style={{ color: '#22c55e' }} />
+                                            ) : isUserAnswer ? (
+                                              <X className="h-3 w-3 shrink-0" style={{ color: '#ef4444' }} />
+                                            ) : (
+                                              <span className="h-3 w-3 shrink-0" />
+                                            )}
+                                            <span style={{
+                                              color: isCorrectAnswer
+                                                ? '#22c55e'
+                                                : isUserAnswer
+                                                  ? '#ef4444'
+                                                  : 'var(--ws-text-tertiary)',
+                                              fontWeight: (isCorrectAnswer || isUserAnswer) ? 500 : 400,
+                                            }}>
+                                              {opt}
+                                              {isCorrectAnswer && <span className="ml-1 opacity-70">(correta)</span>}
+                                              {isUserAnswer && !isCorrectAnswer && <span className="ml-1 opacity-70">(sua resposta)</span>}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {r.userAnswer === null && (
+                                      <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs" style={{ background: 'color-mix(in srgb, #f59e0b 10%, transparent)', border: '1px solid color-mix(in srgb, #f59e0b 20%, transparent)' }}>
+                                        <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: '#f59e0b' }} />
+                                        <span style={{ color: '#f59e0b' }}>Voce nao respondeu esta questao</span>
+                                      </div>
+                                    )}
+
+                                    <div className="rounded-md p-2.5 flex items-start gap-2" style={{ background: 'color-mix(in srgb, var(--ws-accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--ws-accent) 15%, transparent)' }}>
+                                      <BookOpen className="h-3 w-3 mt-0.5 shrink-0" style={{ color: 'var(--ws-accent)' }} />
+                                      <p className="text-xs leading-relaxed" style={{ color: 'var(--ws-text-tertiary)' }}>
+                                        <span className="font-medium" style={{ color: 'var(--ws-accent)' }}>Dica de estudo: </span>
+                                        Revise o conteudo relacionado a esta questao para consolidar seu conhecimento. Foque em entender o conceito por tras da resposta correta.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="rounded-lg p-4" style={{ background: 'color-mix(in srgb, var(--ws-gold) 6%, transparent)' }}>
                 <p className="text-sm font-medium" style={{ color: 'var(--ws-text-primary)' }}>Conhecimento inicial: {preTestScore}%</p>

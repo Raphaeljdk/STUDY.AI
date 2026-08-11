@@ -48,6 +48,8 @@ export async function POST(request: Request) {
       if (isCorrect) correct++;
       return {
         questionIndex: idx,
+        questionText: q.question,
+        options: q.options,
         userAnswer,
         correctAnswer: q.correctIndex,
         isCorrect,

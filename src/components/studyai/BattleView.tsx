@@ -193,7 +193,7 @@ function SubjectSelection({ onStart }: { onStart: (subject: string) => Promise<v
           Duelo de Conhecimento
         </h1>
         <p className="text-sm" style={{ color: 'var(--ws-text-secondary)' }}>
-          5 questoes · 12 segundos cada · Gane XP
+          5 questoes · 12 segundos cada · Ganhe XP
         </p>
       </div>
 

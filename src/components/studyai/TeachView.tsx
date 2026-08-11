@@ -8,7 +8,8 @@ import {
   Zap, Target, TrendingUp, Award, Clock, Star,
   Lightbulb, AlertCircle, CheckCircle2, HelpCircle,
   MessageSquare, History, PenLine, BarChart3, Shield,
-  ArrowLeft, Flame, Eye,
+  ArrowLeft, Flame, Eye, BookMarked, ChevronDown,
+  ListChecks, FileText, Wrench, Compass, Notebook,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -38,6 +39,16 @@ interface AnalysisResult {
   questionsToExplore: string[];
   nextTopics: string[];
   encouragement: string;
+  improvementSteps?: string[];
+  relatedTopicsToStudy?: string[];
+}
+
+interface StudyGuide {
+  outline: string[];
+  keyConcepts: string[];
+  practiceQuestions: string[];
+  commonMistakes: string[];
+  resources: string[];
 }
 
 interface TeachingHistory {
@@ -209,6 +220,108 @@ function XPCelebration({ xp, onDone }: { xp: number; onDone: () => void }) {
     >
       <Sparkles className="w-4 h-4" style={{ color: 'var(--ws-gold)' }} />
       <span className="font-bold text-sm" style={{ color: 'var(--ws-gold)' }}>+{xp} XP</span>
+    </motion.div>
+  );
+}
+
+// ===== STUDY GUIDE CARD =====
+function StudyGuideCard({ guide, onClose }: { guide: StudyGuide; onClose: () => void }) {
+  const [openSection, setOpenSection] = useState<string | null>('outline');
+
+  const sections = [
+    { key: 'outline', label: 'Roteiro de estudo', icon: ListChecks, color: 'var(--ws-accent)', items: guide.outline },
+    { key: 'keyConcepts', label: 'Conceitos-chave', icon: Brain, color: 'var(--ws-verdigris)', items: guide.keyConcepts },
+    { key: 'practiceQuestions', label: 'Perguntas para praticar', icon: HelpCircle, color: 'var(--ws-gold)', items: guide.practiceQuestions },
+    { key: 'commonMistakes', label: 'Erros comuns', icon: AlertCircle, color: 'var(--ws-accent)', items: guide.commonMistakes },
+    { key: 'resources', label: 'Dicas de estudo', icon: Lightbulb, color: 'var(--ws-gold)', items: guide.resources },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="overflow-hidden"
+    >
+      <div className="rounded-xl p-4 space-y-3"
+        style={{
+          background: 'color-mix(in srgb, var(--ws-accent) 5%, var(--ws-glass))',
+          border: '1px solid color-mix(in srgb, var(--ws-accent) 15%, transparent)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: 'color-mix(in srgb, var(--ws-accent) 15%, transparent)' }}>
+              <FileText className="w-4 h-4" style={{ color: 'var(--ws-accent)' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>Guia de Estudo</p>
+              <p className="text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>Preparacao para Tecnica de Feynman</p>
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+            onClick={onClose}
+            className="w-6 h-6 rounded-full flex items-center justify-center"
+            style={{ background: 'var(--ws-glass-border)' }}
+          >
+            <X className="w-3 h-3" style={{ color: 'var(--ws-text-tertiary)' }} />
+          </motion.button>
+        </div>
+
+        <div className="space-y-1.5">
+          {sections.map((section) => {
+            const isOpen = openSection === section.key;
+            const SectionIcon = section.icon;
+            return (
+              <div key={section.key}>
+                <button
+                  onClick={() => setOpenSection(isOpen ? null : section.key)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all"
+                  style={{
+                    background: isOpen ? 'color-mix(in srgb, var(--ws-glass) 80%, transparent)' : 'transparent',
+                  }}
+                >
+                  <span className="flex items-center gap-2 text-xs font-medium" style={{ color: section.color }}>
+                    <SectionIcon className="w-3.5 h-3.5" />
+                    {section.label}
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                      style={{ background: 'color-mix(in srgb, var(--ws-glass-border) 50%, transparent)', color: 'var(--ws-text-tertiary)' }}>
+                      {section.items?.length || 0}
+                    </span>
+                  </span>
+                  <motion.div
+                    animate={{ rotate: isOpen ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--ws-text-tertiary)' }} />
+                  </motion.div>
+                </button>
+                <AnimatePresence>
+                  {isOpen && section.items && section.items.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 pb-2 space-y-1.5">
+                        {section.items.map((item, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs pl-1" style={{ color: 'var(--ws-text-secondary)' }}>
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: section.color }} />
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -493,10 +606,51 @@ function ExplainScreen({ topic, subject, difficulty, onBack, onSubmit }: {
 }) {
   const [explanation, setExplanation] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [guide, setGuide] = useState<StudyGuide | null>(null);
+  const [loadingGuide, setLoadingGuide] = useState(false);
+  const [notebookCount, setNotebookCount] = useState(0);
+  const [notebookNames, setNotebookNames] = useState<string[]>([]);
 
   const charCount = explanation.length;
   const minChars = 30;
   const isValid = charCount >= minChars;
+
+  // Fetch notebook count for this subject/topic
+  useEffect(() => {
+    async function fetchNotebookCount() {
+      if (!subject && !topic) return;
+      try {
+        const params = new URLSearchParams();
+        if (subject) params.set('subject', subject);
+        if (topic) params.set('topic', topic);
+        const data = await apiFetch(`/api/teach/notebook-count?${params.toString()}`);
+        setNotebookCount(data.count || 0);
+        setNotebookNames(data.notebookNames || []);
+      } catch {
+        // silent
+      }
+    }
+    fetchNotebookCount();
+  }, [subject, topic]);
+
+  const handleGenerateGuide = async () => {
+    setLoadingGuide(true);
+    try {
+      const data = await apiFetch('/api/teach/guide', {
+        method: 'POST',
+        body: JSON.stringify({ topic, subject, difficulty }),
+      });
+      if (data.guide) {
+        setGuide(data.guide);
+        toast({ title: 'Guia gerado!', description: 'Use o guia para se preparar antes de explicar.' });
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      toast({ title: 'Erro ao gerar guia', description: err instanceof Error ? err.message : 'Tente novamente.' });
+    } finally {
+      setLoadingGuide(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!isValid) {
@@ -545,6 +699,71 @@ function ExplainScreen({ topic, subject, difficulty, onBack, onSubmit }: {
           Escrevendo
         </Badge>
       </div>
+
+      {/* Notebook Notes Indicator */}
+      <AnimatePresence>
+        {notebookCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{
+              background: 'color-mix(in srgb, var(--ws-gold) 8%, var(--ws-glass))',
+              border: '1px solid color-mix(in srgb, var(--ws-gold) 18%, transparent)',
+            }}
+          >
+            <BookMarked className="w-4 h-4" style={{ color: 'var(--ws-gold)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--ws-gold)' }}>
+              📚 {notebookCount} {notebookCount === 1 ? 'nota encontrada' : 'notas encontradas'} nos seus cadernos
+              {notebookNames.length > 0 && (
+                <span style={{ color: 'var(--ws-text-tertiary)' }}> — {notebookNames.slice(0, 2).join(', ')}{notebookNames.length > 2 ? '...' : ''}</span>
+              )}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Generate Study Guide Button */}
+      <motion.button
+        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+        onClick={handleGenerateGuide}
+        disabled={loadingGuide || !!guide}
+        className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all disabled:opacity-60"
+        style={{
+          background: guide
+            ? 'color-mix(in srgb, var(--ws-verdigris) 8%, var(--ws-glass))'
+            : 'var(--ws-glass)',
+          border: `1px solid ${guide
+            ? 'color-mix(in srgb, var(--ws-verdigris) 20%, transparent)'
+            : 'var(--ws-glass-border)'}`,
+          color: guide ? 'var(--ws-verdigris)' : 'var(--ws-text-secondary)',
+        }}
+      >
+        {loadingGuide ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Gerando guia de estudo...
+          </>
+        ) : guide ? (
+          <>
+            <CheckCircle2 className="w-4 h-4" />
+            Guia de estudo gerado (veja abaixo)
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-4 h-4" />
+            Gerar Guia de Estudo
+          </>
+        )}
+      </motion.button>
+
+      {/* Study Guide Card (collapsible) */}
+      <AnimatePresence>
+        {guide && (
+          <StudyGuideCard guide={guide} onClose={() => setGuide(null)} />
+        )}
+      </AnimatePresence>
 
       {/* Prompt */}
       <div className="rounded-xl p-4" style={{
@@ -641,9 +860,98 @@ function ExplainScreen({ topic, subject, difficulty, onBack, onSubmit }: {
   );
 }
 
+// ===== IMPROVEMENT CARD =====
+function ImprovementCard({ analysis, onNavigate }: { analysis: AnalysisResult; onNavigate: (tab: string) => void }) {
+  const improvementSteps = analysis.improvementSteps || [];
+  const relatedTopics = analysis.relatedTopicsToStudy || analysis.nextTopics || [];
+
+  if (improvementSteps.length === 0 && relatedTopics.length === 0) return null;
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="rounded-xl p-4 space-y-4"
+      style={{
+        background: 'color-mix(in srgb, var(--ws-accent) 5%, var(--ws-glass))',
+        border: '1px solid color-mix(in srgb, var(--ws-accent) 12%, transparent)',
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ background: 'color-mix(in srgb, var(--ws-accent) 15%, transparent)' }}>
+          <Wrench className="w-4 h-4" style={{ color: 'var(--ws-accent)' }} />
+        </div>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--ws-text-primary)' }}>
+          Como melhorar
+        </h3>
+      </div>
+
+      {/* Actionable improvement steps */}
+      {improvementSteps.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>
+            Passos para estudar
+          </p>
+          <div className="space-y-2">
+            {improvementSteps.map((step, i) => (
+              <motion.div
+                key={i}
+                variants={itemVariants}
+                className="flex items-start gap-2.5 rounded-lg px-3 py-2"
+                style={{ background: 'color-mix(in srgb, var(--ws-glass) 60%, transparent)' }}
+              >
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold mt-0.5"
+                  style={{ background: 'color-mix(in srgb, var(--ws-accent) 15%, transparent)', color: 'var(--ws-accent)' }}>
+                  {i + 1}
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--ws-text-secondary)' }}>
+                  {step}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Related topics to study */}
+      {relatedTopics.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>
+            Topicos relacionados para estudar
+          </p>
+          <div className="space-y-1.5">
+            {relatedTopics.map((relTopic, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg"
+                style={{ color: 'var(--ws-text-secondary)' }}>
+                <Compass className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--ws-verdigris)' }} />
+                {relTopic}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Study now button */}
+      <motion.button
+        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+        onClick={() => onNavigate('cadernos')}
+        className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all"
+        style={{
+          background: 'color-mix(in srgb, var(--ws-accent) 10%, var(--ws-glass))',
+          border: '1px solid color-mix(in srgb, var(--ws-accent) 20%, transparent)',
+          color: 'var(--ws-accent)',
+        }}
+      >
+        <Notebook className="w-4 h-4" />
+        Estudar agora nos cadernos
+      </motion.button>
+    </motion.div>
+  );
+}
+
 // ===== RESULTS SCREEN =====
-function ResultsScreen({ topic, analysis, xpEarned, onDone, onNewTopic }: {
-  topic: string; analysis: AnalysisResult; xpEarned: number; onDone: () => void; onNewTopic: () => void;
+function ResultsScreen({ topic, analysis, xpEarned, onDone, onNewTopic, onNavigate }: {
+  topic: string; analysis: AnalysisResult; xpEarned: number; onDone: () => void; onNewTopic: () => void; onNavigate: (tab: string) => void;
 }) {
   const grade = analysis.overallGrade || 'F';
   const gradeColor = GRADE_COLORS[grade] || '#8A8A8A';
@@ -700,6 +1008,9 @@ function ResultsScreen({ topic, analysis, xpEarned, onDone, onNewTopic }: {
           </div>
         </div>
       </motion.div>
+
+      {/* Improvement Card (Como melhorar) */}
+      <ImprovementCard analysis={analysis} onNavigate={onNavigate} />
 
       {/* Strengths */}
       {analysis.strengths && analysis.strengths.length > 0 && (
@@ -1089,6 +1400,7 @@ export function TeachView({ onNavigate }: TeachViewProps) {
             xpEarned={xpEarned}
             onDone={handleNewTopic}
             onNewTopic={handleNewTopic}
+            onNavigate={onNavigate}
           />
         )}
 

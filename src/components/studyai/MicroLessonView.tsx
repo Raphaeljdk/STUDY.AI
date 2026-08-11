@@ -33,10 +33,18 @@ interface MicroLessonData {
 
 // ===== TOPIC SUGGESTIONS =====
 const TOPIC_SUGGESTIONS = [
-  'API', 'REST', 'Polimorfismo', 'Funcoes', 'Docker',
-  'Git', 'SQL', 'Recursao', 'Heranca', 'Arrays',
-  'Pilhas', 'Filas', 'Graphql', 'Typescript', 'Linux',
-  'React', 'Node.js', 'Ordenacao', 'Busca binaria', 'POO',
+  // Programacao & Tecnologia
+  'React', 'Typescript', 'Node.js', 'Docker', 'Git',
+  'API', 'REST', 'SQL', 'GraphQL', 'POO',
+  'Polimorfismo', 'Recursao', 'Heranca', 'Busca binaria',
+  // Ciencias
+  'Fotossintese', 'Cellula', 'Energia Cinematica',
+  // Matematica
+  'Derivadas', 'Equacoes do 2 grau', 'Estatistica', 'Logica Proposicional',
+  // Historia & Humanidades
+  'Revolucao Francesa', 'Periodo Colonial', 'Filosofia',
+  // Portugues & Geral
+  'Gramatica', 'Imposto de Renda',
 ];
 
 const PHASE_CONFIG = [
@@ -116,7 +124,7 @@ function TopicInputScreen({ onGenerate }: { onGenerate: (topic: string) => void 
       {/* Input */}
       <div className="relative">
         <Input
-          placeholder="O que voce quer aprender?"
+          placeholder="Qualquer topico: React, Calculo, Historia, Biologia..."
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
