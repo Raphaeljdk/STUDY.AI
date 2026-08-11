@@ -1357,3 +1357,26 @@ Stage Summary:
 - Logo: Restored studyai branding image across all 4 locations (header, sidebar, footer, meta tags)
 - Goals API: Fixed 500 error by adding missing columns via migration
 - All features verified working via agent-browser end-to-end testing
+
+---
+Task ID: 2-a through 7
+Agent: main
+Task: Fix multiple features - Battle, PreTest, MicroAula, Teach, Discover, Progresso
+
+Work Log:
+- Fixed Battle schema: added `subject`, `duration`, `confidenceAvg` columns to Battle table + migrations
+- Fixed battle API: set `topic: subject.trim()` to match NOT NULL constraint
+- Fixed typo: "Gane XP" → "Ganhe XP" in BattleView line 196
+- Fixed Achievement table: added missing `sortOrder` column + migration
+- Fixed `db.xPTransaction` → `db.xpTransaction` casing bug in 7 API routes (gamification, xp, tasks, goals, missions, battle/finish, teach)
+- Improved PreTest: wrong questions now shown with correct answers, expandable cards, study tips
+- Improved MicroAula: rewrote AI prompt for 5-phase structure, accurate explanations, any topic support
+- Improved Teach: added notebook integration, study guide generation, improvement steps, notebook count badge
+- Improved Discover: added onboarding section explaining the feature, popular topic buttons, better empty state
+- Fixed Progresso: replaced Promise.all with Promise.allSettled, per-section error handling with retry buttons
+
+Stage Summary:
+- 20 files changed, 1183 insertions, 75 deletions
+- All features verified via agent-browser E2E testing
+- Lint passes clean
+- Pushed to GitHub: commit c09a61c
