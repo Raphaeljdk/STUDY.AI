@@ -32,10 +32,15 @@ function createLibsqlClient(): Client {
     });
   }
 
-  // Local dev: use local SQLite file
-  const dir = join(process.cwd(), 'db');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const dbPath = join(dir, 'custom.db');
+  // Fallback: use /tmp/ (Vercel writable) or local db/ dir (dev)
+  let dbPath: string;
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    dbPath = '/tmp/studyai.db';
+  } else {
+    const dir = join(process.cwd(), 'db');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    dbPath = join(dir, 'custom.db');
+  }
   console.log(`[db] Using local SQLite at ${dbPath}`);
   return createClient({
     url: `file:${dbPath}`,
