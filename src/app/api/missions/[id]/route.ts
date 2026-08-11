@@ -14,7 +14,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.mission.findFirst({ where: { id, userId } });
+    const existing = await db.mission.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Missao nao encontrada' }, { status: 404 });
     }
@@ -41,7 +41,7 @@ export async function PATCH(
       data.completedSteps = Math.min(completedSteps, existing.totalSteps);
     }
 
-    const mission = db.mission.update({
+    const mission = await db.mission.update({
       where: { id },
       data,
     });
@@ -63,12 +63,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.mission.findFirst({ where: { id, userId } });
+    const existing = await db.mission.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Missao nao encontrada' }, { status: 404 });
     }
 
-    db.mission.delete({ where: { id } });
+    await db.mission.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

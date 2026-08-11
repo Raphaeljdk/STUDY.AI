@@ -28,14 +28,14 @@ export async function POST(request: Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedName = name.trim();
 
-    const existing = db.user.findUnique({ where: { email: normalizedEmail } });
+    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: 'Este email já está cadastrado' }, { status: 409 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = db.user.create({
+    const user = await db.user.create({
       data: {
         id: genId(),
         name: trimmedName,

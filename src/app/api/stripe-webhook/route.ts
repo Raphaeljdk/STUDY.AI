@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        db.user.update({
+        await db.user.update({
           where: { id: userId },
           data: {
             plan: 'PREMIUM',
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       }
       case 'customer.subscription.updated': {
         if (event.data.object.status === 'active') {
-          db.user.update({
+          await db.user.update({
             where: { id: userId },
             data: { plan: 'PREMIUM', stripeCurrentPeriodEnd: new Date(event.data.object.current_period_end * 1000).toISOString(), updatedAt: nowISO() },
           });
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       }
       case 'customer.subscription.deleted':
       case 'customer.subscription.paused': {
-        db.user.update({
+        await db.user.update({
           where: { id: userId },
           data: { plan: 'FREE', stripeCurrentPeriodEnd: null, updatedAt: nowISO() },
         });

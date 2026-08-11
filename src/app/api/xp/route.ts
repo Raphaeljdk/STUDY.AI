@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const source = searchParams.get('source');
 
     // Fetch user for level info
-    const userData = db.user.findUnique({
+    const userData = await db.user.findUnique({
       where: { id: userId },
       select: ['xp', 'level'],
     });
@@ -39,14 +39,14 @@ export async function GET(request: Request) {
       where.source = source;
     }
 
-    const transactions = db.xPTransaction.findMany({
+    const transactions = await db.xPTransaction.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
     });
 
     // Total XP breakdown by source (replaces groupBy)
-    const xpBreakdown = db.xPTransaction.query(
+    const xpBreakdown = await db.xPTransaction.query(
       `SELECT "source", SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "amount" > 0 GROUP BY "source"`,
       userId
     );
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
     const finalSource = VALID_SOURCES.includes(source) ? source : 'MANUAL';
 
-    const xpTx = db.xPTransaction.create({
+    const xpTx = await db.xPTransaction.create({
       data: {
         id: genId(),
         userId,
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     });
 
     // Recalculate level
-    const userData = db.user.findUnique({
+    const userData = await db.user.findUnique({
       where: { id: userId },
       select: ['xp', 'level'],
     });
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
       newLevel = newLevel + 1;
     }
 
-    db.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { xp: newXP, level: newLevel, updatedAt: nowISO() },
     });

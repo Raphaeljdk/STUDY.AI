@@ -12,20 +12,20 @@ export async function GET(
     const userId = user.id;
 
     const { id } = await params;
-    const item = db.discoverItem.findUnique({ where: { id } });
+    const item = await db.discoverItem.findUnique({ where: { id } });
 
     if (!item) {
       return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 });
     }
 
     // Get save count separately (was include._count)
-    const saveCount = db.discoverSave.count({ where: { discoverItemId: id } });
+    const saveCount = await db.discoverSave.count({ where: { discoverItemId: id } });
 
     // Get user info separately (was include.user)
-    const author = item.userId ? db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
+    const author = item.userId ? await db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
 
     // Check if user saved this item (composite unique → use AND)
-    const save = db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
+    const save = await db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
 
     return NextResponse.json({ item: { ...item, _count: { discoverSaves: saveCount }, user: author, isSaved: !!save } });
   } catch (error) {
@@ -44,7 +44,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.discoverItem.findFirst({ where: { id, userId } });
+    const existing = await db.discoverItem.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 });
     }
@@ -69,7 +69,7 @@ export async function PATCH(
     if (typeof tags === 'string') data.tags = tags;
     if (typeof isPublic === 'boolean') data.isPublic = isPublic ? 1 : 0;
 
-    const item = db.discoverItem.update({
+    const item = await db.discoverItem.update({
       where: { id },
       data,
     });
@@ -91,12 +91,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.discoverItem.findFirst({ where: { id, userId } });
+    const existing = await db.discoverItem.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 });
     }
 
-    db.discoverItem.delete({ where: { id } });
+    await db.discoverItem.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

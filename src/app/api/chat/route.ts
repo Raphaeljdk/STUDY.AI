@@ -8,7 +8,7 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const messages = db.chatMessage.findMany({
+    const messages = await db.chatMessage.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
       take: 200,
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mensagem muito longa' }, { status: 400 });
     }
 
-    const chatMessage = db.chatMessage.create({
+    const chatMessage = await db.chatMessage.create({
       data: { id: genId(), userId, role, content: message, createdAt: nowISO() },
     });
 
@@ -67,7 +67,7 @@ export async function DELETE() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    db.chatMessage.deleteMany({ where: { userId } });
+    await db.chatMessage.deleteMany({ where: { userId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Route error:', error);

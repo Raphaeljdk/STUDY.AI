@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const where: any = { userId };
     if (notebookId) {
       // Cross-user notebook injection fix: verify ownership
-      const ownedNotebook = db.notebook.findFirst({
+      const ownedNotebook = await db.notebook.findFirst({
         where: { id: notebookId, userId },
         select: ['id'],
       });
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
     if (dueOnly) where.nextReview = { lte: new Date().toISOString() };
 
-    const flashcards = db.flashcard.findMany({
+    const flashcards = await db.flashcard.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
       }
       // Cross-user notebook injection fix
-      const ownedNotebook = db.notebook.findFirst({
+      const ownedNotebook = await db.notebook.findFirst({
         where: { id: notebookId, userId },
         select: ['id'],
       });
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       finalNotebookId = notebookId;
     }
 
-    const flashcard = db.flashcard.create({
+    const flashcard = await db.flashcard.create({
       data: { id: genId(), front: front.trim(), back: back.trim(), notebookId: finalNotebookId, userId, createdAt: nowISO(), updatedAt: nowISO() },
     });
 

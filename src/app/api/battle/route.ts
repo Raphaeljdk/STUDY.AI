@@ -9,7 +9,7 @@ export async function GET(_request: Request) {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const battles = db.battle.findMany({
+    const battles = await db.battle.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao gerar questoes com IA' }, { status: 500 });
     }
 
-    const battle = db.battle.create({
+    const battle = await db.battle.create({
       data: {
         id: genId(),
         userId,

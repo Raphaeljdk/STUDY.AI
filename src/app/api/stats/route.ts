@@ -15,7 +15,7 @@ export async function GET() {
 
     // Synchronous db calls (no Promise.all needed)
     // User gamification data
-    const userData = db.user.findUnique({
+    const userData = await db.user.findUnique({
       where: { id: userId },
       select: [
         'xp', 'level', 'currentStreak', 'longestStreak',
@@ -24,44 +24,44 @@ export async function GET() {
       ],
     });
     // Subject stats
-    const subjectCount = db.subject.count({ where: { userId, isActive: true } });
+    const subjectCount = await db.subject.count({ where: { userId, isActive: true } });
     // Pending tasks
-    const pendingTasksCount = db.task.count({ where: { userId, status: 'PENDING' } });
+    const pendingTasksCount = await db.task.count({ where: { userId, status: 'PENDING' } });
     // Tasks completed today
-    const tasksCompletedToday = db.task.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } });
+    const tasksCompletedToday = await db.task.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } });
     // Flashcards due
-    const flashcardDueCount = db.flashcard.count({ where: { userId, nextReview: { lte: nowIsoStr } } });
+    const flashcardDueCount = await db.flashcard.count({ where: { userId, nextReview: { lte: nowIsoStr } } });
     // Total flashcards
-    const totalFlashcards = db.flashcard.count({ where: { userId } });
+    const totalFlashcards = await db.flashcard.count({ where: { userId } });
     // Notebook count
-    const notebookCount = db.notebook.count({ where: { userId } });
+    const notebookCount = await db.notebook.count({ where: { userId } });
     // Studied flashcards (repetitions > 0)
-    const studiedFlashcards = db.flashcard.count({ where: { userId, repetitions: { gt: 0 } } });
+    const studiedFlashcards = await db.flashcard.count({ where: { userId, repetitions: { gt: 0 } } });
     // Mastered cards (repetitions >= 5)
-    const masteredCards = db.flashcard.count({ where: { userId, repetitions: { gte: 5 } } });
+    const masteredCards = await db.flashcard.count({ where: { userId, repetitions: { gte: 5 } } });
     // Sessions this week
-    const sessions = db.studySession.findMany({
+    const sessions = await db.studySession.findMany({
       where: { userId, createdAt: { gte: oneWeekAgoISO } },
       select: ['duration', 'createdAt'],
     });
     // All sessions (for streak)
-    const allSessions = db.studySession.findMany({
+    const allSessions = await db.studySession.findMany({
       where: { userId },
       select: ['createdAt'],
     });
     // Today sessions
-    const todaySessions = db.studySession.findMany({
+    const todaySessions = await db.studySession.findMany({
       where: { userId, createdAt: { gte: todayStartISO } },
       select: ['duration'],
     });
     // Chat count
-    const chatCount = db.chatMessage.count({ where: { userId, role: 'user' } });
+    const chatCount = await db.chatMessage.count({ where: { userId, role: 'user' } });
     // In-progress goals
-    const inProgressGoals = db.goal.count({ where: { userId, status: 'IN_PROGRESS' } });
+    const inProgressGoals = await db.goal.count({ where: { userId, status: 'IN_PROGRESS' } });
     // Goals completed today
-    const completedGoalsToday = db.goal.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } });
+    const completedGoalsToday = await db.goal.count({ where: { userId, status: 'COMPLETED', completedAt: { gte: todayStartISO } } });
     // Weekly session count
-    const weeklySessions = db.studySession.count({ where: { userId, createdAt: { gte: oneWeekAgoISO } } });
+    const weeklySessions = await db.studySession.count({ where: { userId, createdAt: { gte: oneWeekAgoISO } } });
 
     if (!userData) {
       return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
@@ -112,21 +112,21 @@ export async function GET() {
     const levelProgress = Math.min(100, Math.max(0, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100)));
 
     // Subject stats with task counts (replaces _count with separate queries)
-    const subjects = db.subject.findMany({
+    const subjects = await db.subject.findMany({
       where: { userId, isActive: true },
       select: ['id', 'name', 'color', 'icon', 'sortOrder'],
       orderBy: { sortOrder: 'asc' },
     });
-    const subjectStats = subjects.map(s => ({
+    const subjectStats = await Promise.all(subjects.map(async s => ({
       id: s.id,
       name: s.name,
       color: s.color,
       icon: s.icon,
       _count: {
-        tasks: db.task.count({ where: { subjectId: s.id } }),
-        topics: db.topic.count({ where: { subjectId: s.id } }),
+        tasks: await db.task.count({ where: { subjectId: s.id } }),
+        topics: await db.topic.count({ where: { subjectId: s.id } }),
       },
-    }));
+    })));
 
     return NextResponse.json({
       // Legacy stats (preserved)

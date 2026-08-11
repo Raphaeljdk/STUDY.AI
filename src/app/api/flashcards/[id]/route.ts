@@ -26,7 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Qualidade invalida' }, { status: 400 });
       }
 
-      const card = db.flashcard.findFirst({ where: { id, userId } });
+      const card = await db.flashcard.findFirst({ where: { id, userId } });
       if (!card) {
         return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
       }
@@ -54,7 +54,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const nextReviewISO = nextReview.toISOString();
 
       // TOCTOU-safe updateMany with userId filter
-      const result = db.flashcard.updateMany({
+      const result = await db.flashcard.updateMany({
         where: { id, userId },
         data: {
           easeFactor: newEF,
@@ -69,7 +69,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
       }
 
-      const updated = db.flashcard.findFirst({ where: { id, userId } });
+      const updated = await db.flashcard.findFirst({ where: { id, userId } });
       return NextResponse.json({ flashcard: updated });
     }
 
@@ -96,7 +96,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
       }
       // Cross-user notebook injection fix
-      const ownedNotebook = db.notebook.findFirst({
+      const ownedNotebook = await db.notebook.findFirst({
         where: { id: notebookId, userId },
         select: ['id'],
       });
@@ -111,7 +111,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     // TOCTOU-safe updateMany with userId filter
-    const result = db.flashcard.updateMany({
+    const result = await db.flashcard.updateMany({
       where: { id, userId },
       data,
     });
@@ -120,7 +120,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });
     }
 
-    const flashcard = db.flashcard.findFirst({ where: { id, userId } });
+    const flashcard = await db.flashcard.findFirst({ where: { id, userId } });
     return NextResponse.json({ flashcard });
   } catch (error) {
     console.error('Route error:', error);
@@ -137,7 +137,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { id } = await params;
 
     // TOCTOU-safe deleteMany with userId filter
-    const result = db.flashcard.deleteMany({ where: { id, userId } });
+    const result = await db.flashcard.deleteMany({ where: { id, userId } });
 
     if (result.count === 0) {
       return NextResponse.json({ error: 'Flashcard nao encontrado' }, { status: 404 });

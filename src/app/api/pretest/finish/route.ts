@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Respostas obrigatorias (array)' }, { status: 400 });
     }
 
-    const preTest = db.preTest.findFirst({ where: { id: preTestId, userId } });
+    const preTest = await db.preTest.findFirst({ where: { id: preTestId, userId } });
     if (!preTest) {
       return NextResponse.json({ error: 'Pre-teste nao encontrado' }, { status: 404 });
     }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
 
-    const updatedPreTest = db.preTest.update({
+    const updatedPreTest = await db.preTest.update({
       where: { id: preTestId },
       data: {
         initialScore: score,
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     });
 
     // Update user total questions answered (increment)
-    sqlite.prepare('UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?').run(questions.length, userId);
+    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?', args: [questions.length, userId] });
 
     return NextResponse.json({
       preTest: updatedPreTest,

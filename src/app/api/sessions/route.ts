@@ -10,7 +10,7 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const sessions = db.studySession.findMany({
+    const sessions = await db.studySession.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       ? type
       : 'pomodoro';
 
-    const studySession = db.studySession.create({
+    const studySession = await db.studySession.create({
       data: { id: genId(), userId, duration: Math.round(duration), type: finalType, createdAt: nowISO() },
     });
 

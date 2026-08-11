@@ -14,12 +14,12 @@ export async function GET(
     const { id } = await params;
 
     // Verify subject belongs to user
-    const subject = db.subject.findFirst({ where: { id, userId } });
+    const subject = await db.subject.findFirst({ where: { id, userId } });
     if (!subject) {
       return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 404 });
     }
 
-    const topics = db.topic.findMany({
+    const topics = await db.topic.findMany({
       where: { subjectId: id },
       orderBy: { sortOrder: 'asc' },
     });
@@ -43,7 +43,7 @@ export async function POST(
     const { id } = await params;
 
     // Verify subject belongs to user
-    const subject = db.subject.findFirst({ where: { id, userId } });
+    const subject = await db.subject.findFirst({ where: { id, userId } });
     if (!subject) {
       return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 404 });
     }
@@ -61,7 +61,7 @@ export async function POST(
       return NextResponse.json({ error: 'Nome do topico obrigatorio' }, { status: 400 });
     }
 
-    const topic = db.topic.create({
+    const topic = await db.topic.create({
       data: {
         id: genId(),
         name: name.trim(),

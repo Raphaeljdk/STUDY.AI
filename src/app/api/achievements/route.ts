@@ -9,12 +9,12 @@ export async function GET() {
     const userId = user.id;
 
     // Replace Prisma include with separate queries
-    const achievements = db.achievement.findMany({
+    const achievements = await db.achievement.findMany({
       orderBy: { sortOrder: 'asc' },
     });
 
     // Get user's unlocked achievements for this user
-    const userAchievements = db.userAchievement.findMany({
+    const userAchievements = await db.userAchievement.findMany({
       where: { userId },
       select: ['achievementId', 'unlockedAt'],
     });

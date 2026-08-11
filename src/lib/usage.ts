@@ -17,7 +17,7 @@ function getTodayStart(): Date {
 export async function getUsage(userId: string) {
   const today = getTodayStart().toISOString();
   // findUnique with compound key → use findFirst (unique index on userId+date)
-  const usage = db.dailyUsage.findFirst({
+  const usage = await db.dailyUsage.findFirst({
     where: { userId, date: today },
   });
   return {
@@ -27,7 +27,7 @@ export async function getUsage(userId: string) {
 }
 
 export async function canUse(userId: string, type: UsageType): Promise<{ allowed: boolean; used: number; limit: number }> {
-  const user = db.user.findUnique({ where: { id: userId }, select: ['plan', 'role'] });
+  const user = await db.user.findUnique({ where: { id: userId }, select: ['plan', 'role'] });
   if (!user) return { allowed: false, used: 0, limit: 0 };
 
   // Admin and premium bypass limits
@@ -47,15 +47,15 @@ export async function incrementUsage(userId: string, type: UsageType): Promise<v
   const field = type === 'chatMessages' ? 'chatMessages' : 'flashcards';
 
   // Replace Prisma upsert with findFirst + create/update
-  const existing = db.dailyUsage.findFirst({ where: { userId, date: today } });
+  const existing = await db.dailyUsage.findFirst({ where: { userId, date: today } });
   if (existing) {
     // Atomic increment via raw SQL
-    db.dailyUsage.exec(
+    await db.dailyUsage.exec(
       `UPDATE "DailyUsage" SET "${field}" = "${field}" + 1 WHERE "userId" = ? AND "date" = ?`,
       userId, today
     );
   } else {
-    db.dailyUsage.create({
+    await db.dailyUsage.create({
       data: { id: genId(), userId, date: today, [field]: 1 },
     });
   }
@@ -64,7 +64,7 @@ export async function incrementUsage(userId: string, type: UsageType): Promise<v
 export async function getSessionUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return null;
-  const user = db.user.findUnique({ where: { email: session.user.email } });
+  const user = await db.user.findUnique({ where: { email: session.user.email } });
   return user;
 }
 

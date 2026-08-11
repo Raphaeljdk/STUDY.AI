@@ -8,7 +8,7 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const subjects = db.subject.findMany({
+    const subjects = await db.subject.findMany({
       where: { userId },
       orderBy: { sortOrder: 'asc' },
     });
@@ -17,8 +17,8 @@ export async function GET() {
     const subjectsWithCount = subjects.map((s: any) => ({
       ...s,
       _count: {
-        topics: db.topic.count({ where: { subjectId: s.id } }),
-        tasks: db.task.count({ where: { subjectId: s.id } }),
+        topics: await db.topic.count({ where: { subjectId: s.id } }),
+        tasks: await db.task.count({ where: { subjectId: s.id } }),
       },
     }));
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome obrigatorio' }, { status: 400 });
     }
 
-    const subject = db.subject.create({
+    const subject = await db.subject.create({
       data: {
         id: genId(),
         name: name.trim(),

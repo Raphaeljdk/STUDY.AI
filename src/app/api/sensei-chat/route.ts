@@ -111,7 +111,7 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
     for (const m of mems.slice(0, 5)) {
       if (!m.content || m.content.length < 5 || m.content.length > 200) continue;
       const cat = valid.includes(m.category?.toLowerCase()) ? m.category.toLowerCase() : 'general';
-      const existing = db.userMemory.findMany({ where: { userId, category }, select: ['content'] });
+      const existing = await db.userMemory.findMany({ where: { userId, category }, select: ['content'] });
       const dup = existing.some(e => {
         const w1 = e.content.toLowerCase().split(/\s+/);
         const w2 = m.content.toLowerCase().split(/\s+/);
@@ -119,7 +119,7 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
         return common.length / Math.max(w1.length, w2.length) > 0.6;
       });
       if (!dup) {
-        db.userMemory.create({ data: { id: genId(), userId, category: cat, content: m.content.trim(), source: 'conversation', createdAt: nowISO(), updatedAt: nowISO() } });
+        await db.userMemory.create({ data: { id: genId(), userId, category: cat, content: m.content.trim(), source: 'conversation', createdAt: nowISO(), updatedAt: nowISO() } });
       }
     }
   } catch (err) {
@@ -160,9 +160,9 @@ export async function POST(request: Request) {
     }
 
     // 1. Carregar memorias e historico (synchronous, no Promise.all needed)
-    const memories = db.userMemory.findMany({ where: { userId }, select: ['category', 'content'], orderBy: { createdAt: 'desc' }, take: 30 });
-    const recentMsgs = db.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 16, select: ['role', 'content'] });
-    const notebooks = db.notebook.findMany({ where: { userId }, select: ['title', 'content'] });
+    const memories = await db.userMemory.findMany({ where: { userId }, select: ['category', 'content'], orderBy: { createdAt: 'desc' }, take: 30 });
+    const recentMsgs = await db.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 16, select: ['role', 'content'] });
+    const notebooks = await db.notebook.findMany({ where: { userId }, select: ['title', 'content'] });
     const history = recentMsgs.reverse();
 
     // 2. Calcular sabedoria
@@ -247,8 +247,8 @@ ${wisdom.min >= 150 ? '- Voce e infinito — fale como o proprio universo conver
     incrementUsage(userId, 'chatMessages').catch(() => {});
 
     // 8. Salvar mensagens (createMany not available, use individual creates)
-    db.chatMessage.create({ data: { id: genId(), userId, role: 'user', content: message, createdAt: nowISO() } });
-    db.chatMessage.create({ data: { id: genId(), userId, role: 'assistant', content: reply, createdAt: nowISO() } });
+    await db.chatMessage.create({ data: { id: genId(), userId, role: 'user', content: message, createdAt: nowISO() } });
+    await db.chatMessage.create({ data: { id: genId(), userId, role: 'assistant', content: reply, createdAt: nowISO() } });
 
     // 9. Extrair memorias (nao-bloqueante)
     extractMemories(userId, message, reply).catch(() => {});

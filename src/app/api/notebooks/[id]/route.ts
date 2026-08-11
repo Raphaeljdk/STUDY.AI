@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const { id } = await params;
 
-    const notebook = db.notebook.findFirst({
+    const notebook = await db.notebook.findFirst({
       where: { id, userId },
     });
 
@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     }
 
     // Separate query for flashcards (was include)
-    const flashcards = db.flashcard.findMany({
+    const flashcards = await db.flashcard.findMany({
       where: { notebookId: id },
       orderBy: { createdAt: 'desc' },
     });
@@ -58,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     // TOCTOU-safe updateMany with userId filter
-    const result = db.notebook.updateMany({
+    const result = await db.notebook.updateMany({
       where: { id, userId },
       data,
     });
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
     }
 
-    const notebook = db.notebook.findFirst({ where: { id, userId } });
+    const notebook = await db.notebook.findFirst({ where: { id, userId } });
     return NextResponse.json({ notebook });
   } catch (error) {
     console.error('Route error:', error);
@@ -84,7 +84,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { id } = await params;
 
     // TOCTOU-safe deleteMany with userId filter
-    const result = db.notebook.deleteMany({ where: { id, userId } });
+    const result = await db.notebook.deleteMany({ where: { id, userId } });
 
     if (result.count === 0) {
       return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });

@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const { id } = await params;
 
-    const notebook = db.notebook.findFirst({
+    const notebook = await db.notebook.findFirst({
       where: { id, userId },
       select: ['id'],
     });
@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Caderno nao encontrado' }, { status: 404 });
     }
 
-    const pages = db.notebookPage.findMany({
+    const pages = await db.notebookPage.findMany({
       where: { notebookId: id },
       orderBy: { pageNumber: 'asc' },
     });
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const { id } = await params;
 
-    const notebook = db.notebook.findFirst({
+    const notebook = await db.notebook.findFirst({
       where: { id, userId },
       select: ['id'],
     });
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
     }
 
-    const lastPage = db.notebookPage.findFirst({
+    const lastPage = await db.notebookPage.findFirst({
       where: { notebookId: id },
       orderBy: { pageNumber: 'desc' },
       select: ['pageNumber'],
@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const nextPageNumber = (lastPage?.pageNumber ?? 0) + 1;
 
-    const page = db.notebookPage.create({
+    const page = await db.notebookPage.create({
       data: {
         id: genId(),
         notebookId: id,

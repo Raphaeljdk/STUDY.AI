@@ -8,14 +8,14 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const memories = db.userMemory.findMany({
+    const memories = await db.userMemory.findMany({
       where: { userId },
       select: ['id', 'category', 'content', 'createdAt'],
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
 
-    const count = db.userMemory.count({ where: { userId } });
+    const count = await db.userMemory.count({ where: { userId } });
 
     return NextResponse.json({ memories, count });
   } catch {

@@ -23,18 +23,18 @@ export async function POST(request: Request) {
     }
 
     // Gather user's existing data for context (no include — separate queries)
-    const userSubjects = db.subject.findMany({
+    const userSubjects = await db.subject.findMany({
       where: { userId },
     });
 
     // Get topics for each subject separately
-    const subjectsContext = userSubjects.map(s => {
-      const topics = db.topic.findMany({ select: ['name', 'mastery'], where: { subjectId: s.id } });
+    const subjectsContext = await Promise.all(userSubjects.map(async s => {
+      const topics = await db.topic.findMany({ select: ['name', 'mastery'], where: { subjectId: s.id } });
       return {
         name: s.name,
         topics: topics.map(t => ({ name: t.name, mastery: t.mastery })),
       };
-    });
+    }));
 
     const studyHours = typeof studyHoursPerDay === 'number' ? studyHoursPerDay : 3;
     const level = typeof currentLevel === 'string' ? currentLevel : 'intermediario';

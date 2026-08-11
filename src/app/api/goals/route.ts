@@ -5,10 +5,10 @@ import { db, genId, nowISO } from '@/lib/db';
 const VALID_TYPES = ['DAILY', 'WEEKLY', 'MONTHLY', 'SUBJECT', 'EXAM'];
 const VALID_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'ABANDONED'];
 
-function attachSubjects(goals: any[]) {
+async function attachSubjects(goals: any[]) {
   const subjectIds = [...new Set(goals.map((g: any) => g.subjectId).filter(Boolean))];
   const subjects = subjectIds.length > 0
-    ? db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
+    ? await db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
     : [];
   const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
   return goals.map((g: any) => ({ ...g, subject: g.subjectId ? subjectMap.get(g.subjectId) || null : null }));
@@ -32,12 +32,12 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    const goals = db.goal.findMany({
+    const goals = await db.goal.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
 
-    const goalsWithSubjects = attachSubjects(goals);
+    const goalsWithSubjects = await attachSubjects(goals);
 
     return NextResponse.json({ goals: goalsWithSubjects });
   } catch (error) {
@@ -67,13 +67,13 @@ export async function POST(request: Request) {
 
     // Validate subjectId if provided
     if (subjectId) {
-      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
       if (!subject) {
         return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 400 });
       }
     }
 
-    const goal = db.goal.create({
+    const goal = await db.goal.create({
       data: {
         id: genId(),
         title: title.trim(),
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     });
 
     // Attach subject (was include)
-    const goalsWithSubjects = attachSubjects([goal]);
+    const goalsWithSubjects = await attachSubjects([goal]);
 
     return NextResponse.json({ goal: goalsWithSubjects[0] }, { status: 201 });
   } catch (error) {

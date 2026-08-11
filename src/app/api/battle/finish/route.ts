@@ -3,17 +3,17 @@ import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = db.xPTransaction.create({
+  const xpTx = await db.xPTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!userData) return xpTx;
 
   const newXP = userData.xp + amount;
   const newLevel = Math.floor(newXP / 500) + 1;
 
-  db.user.update({
+  await db.user.update({
     where: { id: userId },
     data: { xp: newXP, level: newLevel, updatedAt: nowISO() },
   });
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ID da batalha obrigatorio' }, { status: 400 });
     }
 
-    const battle = db.battle.findFirst({ where: { id: battleId, userId } });
+    const battle = await db.battle.findFirst({ where: { id: battleId, userId } });
     if (!battle) {
       return NextResponse.json({ error: 'Batalha nao encontrada' }, { status: 404 });
     }
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     else if (percentage >= 60) xpAmount += 10;
     if (percentage === 100) xpAmount += 20; // Perfect bonus
 
-    const updatedBattle = db.battle.update({
+    const updatedBattle = await db.battle.update({
       where: { id: battleId },
       data: {
         correctAnswers: correct,
@@ -69,12 +69,12 @@ export async function POST(request: Request) {
     });
 
     // Award XP
-    const xpTx = awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
+    const xpTx = await awardXP(userId, xpAmount, 'SIMULADO_COMPLETED', `Duelo: ${battle.subject} - ${percentage}%`);
 
     // Update user total questions answered (increment)
-    sqlite.prepare('UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?').run(battle.totalQuestions, userId);
+    await sqlite.execute({ sql: 'UPDATE "User" SET "totalQuestionsAnswered" = "totalQuestionsAnswered" + ? WHERE "id" = ?', args: [battle.totalQuestions, userId] });
 
-    const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+    const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
 
     return NextResponse.json({
       battle: updatedBattle,

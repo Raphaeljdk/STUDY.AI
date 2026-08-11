@@ -1,24 +1,53 @@
-import Database from 'better-sqlite3'
-import { join } from 'path'
-import { existsSync, mkdirSync } from 'fs'
-import { randomUUID } from 'crypto'
+import { createClient, Client } from '@libsql/client';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { randomUUID } from 'crypto';
 
 // ═══════════════════════════════════════════════════════════════
-// DATABASE PATH
+// DATABASE CLIENT (libSQL — works with local files AND Turso cloud)
 // ═══════════════════════════════════════════════════════════════
+//
+// Production (Vercel): set TURSO_URL + TURSO_AUTH_TOKEN env vars
+//   e.g. TURSO_URL=libsql://studyai-raphael.turso.io
+// Development: uses local file db/custom.db automatically
+//
+// To create a free Turso database:
+//   1. Install: curl -sSfL https://get.tur.so/install.sh | bash
+//   2. Signup:  turso auth signup
+//   3. Create:  turso db create studyai
+//   4. Token:   turso db tokens create studyai
+//   5. URL:     turso db show studyai --url
+//   6. Set TURSO_URL and TURSO_AUTH_TOKEN in Vercel env
 
-function getDbPath(): string {
-  // In production (Vercel), use /tmp/ which is writable
-  if (process.env.NODE_ENV === 'production') {
-    return '/tmp/studyai.db'
+function createLibsqlClient(): Client {
+  const tursoUrl = process.env.TURSO_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (tursoUrl) {
+    // Production: connect to Turso cloud
+    console.log(`[db] Connecting to Turso at ${tursoUrl.replace(/\/\/.*@/, '//***@')}`);
+    return createClient({
+      url: tursoUrl,
+      authToken: tursoToken,
+    });
   }
-  // Local dev
-  const dir = join(process.cwd(), 'db')
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  return join(dir, 'custom.db')
+
+  // Local dev: use local SQLite file
+  const dir = join(process.cwd(), 'db');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const dbPath = join(dir, 'custom.db');
+  console.log(`[db] Using local SQLite at ${dbPath}`);
+  return createClient({
+    url: `file:${dbPath}`,
+  });
 }
 
-const DB_PATH = getDbPath()
+// Global singleton to survive HMR in dev
+const globalForDb = globalThis as unknown as { _libsqlClient: Client | undefined };
+const client: Client = globalForDb._libsqlClient ?? createLibsqlClient();
+if (!globalForDb._libsqlClient) {
+  globalForDb._libsqlClient = client;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // RAW SQL SCHEMA
@@ -50,33 +79,18 @@ CREATE TABLE IF NOT EXISTS "User" (
   "totalQuestionsAnswered" INTEGER NOT NULL DEFAULT 0,
   "reputation" INTEGER NOT NULL DEFAULT 0,
   "reputationLevel" TEXT NOT NULL DEFAULT 'Aprendiz',
-  "learningStyle" TEXT,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
 
-CREATE TABLE IF NOT EXISTS "Achievement" (
-  "id" TEXT NOT NULL PRIMARY KEY,
-  "key" TEXT NOT NULL,
-  "title" TEXT NOT NULL,
-  "description" TEXT NOT NULL,
-  "icon" TEXT NOT NULL DEFAULT 'trophy',
-  "xpReward" INTEGER NOT NULL DEFAULT 0,
-  "category" TEXT NOT NULL DEFAULT 'general',
-  "sortOrder" INTEGER NOT NULL DEFAULT 0,
-  "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-CREATE UNIQUE INDEX IF NOT EXISTS "Achievement_key_key" ON "Achievement"("key");
-
 CREATE TABLE IF NOT EXISTS "Subject" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "userId" TEXT NOT NULL,
   "name" TEXT NOT NULL,
   "description" TEXT,
   "color" TEXT NOT NULL DEFAULT '#6366f1',
   "icon" TEXT NOT NULL DEFAULT 'book',
-  "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  "userId" TEXT NOT NULL,
   "isActive" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -86,13 +100,13 @@ CREATE INDEX IF NOT EXISTS "Subject_userId_idx" ON "Subject"("userId");
 
 CREATE TABLE IF NOT EXISTS "Topic" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "subjectId" TEXT NOT NULL,
-  "name" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
   "description" TEXT,
-  "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  "content" TEXT,
+  "subjectId" TEXT NOT NULL,
   "mastery" REAL NOT NULL DEFAULT 0,
-  "totalQuestions" INTEGER NOT NULL DEFAULT 0,
-  "correctAnswers" INTEGER NOT NULL DEFAULT 0,
+  "status" TEXT NOT NULL DEFAULT 'active',
+  "order" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE
@@ -101,77 +115,80 @@ CREATE INDEX IF NOT EXISTS "Topic_subjectId_idx" ON "Topic"("subjectId");
 
 CREATE TABLE IF NOT EXISTS "Task" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "userId" TEXT NOT NULL,
   "title" TEXT NOT NULL,
   "description" TEXT,
-  "subjectId" TEXT,
-  "priority" TEXT NOT NULL DEFAULT 'MEDIUM',
-  "status" TEXT NOT NULL DEFAULT 'PENDING',
+  "status" TEXT NOT NULL DEFAULT 'pending',
+  "priority" TEXT NOT NULL DEFAULT 'medium',
   "dueDate" TEXT,
-  "estimatedMinutes" INTEGER,
-  "actualMinutes" INTEGER,
-  "sortOrder" INTEGER NOT NULL DEFAULT 0,
   "completedAt" TEXT,
+  "subjectId" TEXT,
+  "userId" TEXT NOT NULL,
+  "xpReward" INTEGER NOT NULL DEFAULT 10,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
   FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS "Task_userId_idx" ON "Task"("userId");
+CREATE INDEX IF NOT EXISTS "Task_subjectId_idx" ON "Task"("subjectId");
 CREATE INDEX IF NOT EXISTS "Task_status_idx" ON "Task"("status");
 
 CREATE TABLE IF NOT EXISTS "Goal" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "userId" TEXT NOT NULL,
   "title" TEXT NOT NULL,
   "description" TEXT,
-  "type" TEXT NOT NULL DEFAULT 'DAILY',
-  "status" TEXT NOT NULL DEFAULT 'IN_PROGRESS',
-  "targetValue" INTEGER,
-  "currentValue" INTEGER NOT NULL DEFAULT 0,
-  "unit" TEXT,
-  "subjectId" TEXT,
-  "startDate" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "targetDate" TEXT,
   "completedAt" TEXT,
+  "progress" REAL NOT NULL DEFAULT 0,
+  "subjectId" TEXT,
+  "userId" TEXT NOT NULL,
+  "xpReward" INTEGER NOT NULL DEFAULT 25,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
   FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS "Goal_userId_idx" ON "Goal"("userId");
-CREATE INDEX IF NOT EXISTS "Goal_status_idx" ON "Goal"("status");
+CREATE INDEX IF NOT EXISTS "Goal_subjectId_idx" ON "Goal"("subjectId");
 
 CREATE TABLE IF NOT EXISTS "CalendarEvent" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "userId" TEXT NOT NULL,
   "title" TEXT NOT NULL,
   "description" TEXT,
-  "type" TEXT NOT NULL DEFAULT 'STUDY_SESSION',
   "date" TEXT NOT NULL,
   "endDate" TEXT,
-  "subjectId" TEXT,
+  "type" TEXT NOT NULL DEFAULT 'study',
   "isAllDay" INTEGER NOT NULL DEFAULT 0,
-  "color" TEXT,
+  "color" TEXT NOT NULL DEFAULT '#6366f1',
+  "subjectId" TEXT,
+  "userId" TEXT NOT NULL,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
   FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS "CalendarEvent_userId_idx" ON "CalendarEvent"("userId");
-CREATE INDEX IF NOT EXISTS "CalendarEvent_date_idx" ON "CalendarEvent"("date");
 
 CREATE TABLE IF NOT EXISTS "XPTransaction" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "userId" TEXT NOT NULL,
   "amount" INTEGER NOT NULL,
   "source" TEXT NOT NULL,
   "description" TEXT,
+  "userId" TEXT NOT NULL,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "XPTransaction_userId_idx" ON "XPTransaction"("userId");
-CREATE INDEX IF NOT EXISTS "XPTransaction_createdAt_idx" ON "XPTransaction"("createdAt");
+
+CREATE TABLE IF NOT EXISTS "Achievement" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "description" TEXT NOT NULL,
+  "icon" TEXT NOT NULL,
+  "category" TEXT NOT NULL,
+  "requirement" INTEGER NOT NULL DEFAULT 1,
+  "xpReward" INTEGER NOT NULL DEFAULT 0
+);
 
 CREATE TABLE IF NOT EXISTS "UserAchievement" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -179,20 +196,20 @@ CREATE TABLE IF NOT EXISTS "UserAchievement" (
   "achievementId" TEXT NOT NULL,
   "unlockedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
-  FOREIGN KEY ("achievementId") REFERENCES "Achievement"("id") ON DELETE CASCADE
+  FOREIGN KEY ("achievementId") REFERENCES "Achievement"("id") ON DELETE CASCADE,
+  UNIQUE("userId", "achievementId")
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "UserAchievement_userId_achievementId_key" ON "UserAchievement"("userId", "achievementId");
 CREATE INDEX IF NOT EXISTS "UserAchievement_userId_idx" ON "UserAchievement"("userId");
 
 CREATE TABLE IF NOT EXISTS "StreakRecord" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
   "date" TEXT NOT NULL,
-  "streak" INTEGER NOT NULL,
+  "minutes" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
+  UNIQUE("userId", "date")
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "StreakRecord_userId_date_key" ON "StreakRecord"("userId", "date");
 CREATE INDEX IF NOT EXISTS "StreakRecord_userId_idx" ON "StreakRecord"("userId");
 
 CREATE TABLE IF NOT EXISTS "Notebook" (
@@ -302,23 +319,20 @@ CREATE INDEX IF NOT EXISTS "UserMemory_userId_idx" ON "UserMemory"("userId");
 
 CREATE TABLE IF NOT EXISTS "DiscoverItem" (
   "id" TEXT NOT NULL PRIMARY KEY,
-  "type" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
   "title" TEXT NOT NULL,
-  "content" TEXT NOT NULL,
-  "summary" TEXT,
-  "subject" TEXT,
-  "difficulty" TEXT NOT NULL DEFAULT 'medio',
-  "duration" INTEGER,
-  "emoji" TEXT NOT NULL DEFAULT '💡',
-  "tags" TEXT,
-  "isPublic" INTEGER NOT NULL DEFAULT 1,
-  "likes" INTEGER NOT NULL DEFAULT 0,
+  "description" TEXT,
+  "type" TEXT NOT NULL DEFAULT 'roadmap',
+  "content" TEXT NOT NULL DEFAULT '{}',
+  "tags" TEXT NOT NULL DEFAULT '[]',
+  "isPublic" INTEGER NOT NULL DEFAULT 0,
   "saves" INTEGER NOT NULL DEFAULT 0,
-  "userId" TEXT,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   "updatedAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS "DiscoverItem_userId_idx" ON "DiscoverItem"("userId");
+CREATE INDEX IF NOT EXISTS "DiscoverItem_isPublic_idx" ON "DiscoverItem"("isPublic");
 
 CREATE TABLE IF NOT EXISTS "DiscoverSave" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -326,23 +340,26 @@ CREATE TABLE IF NOT EXISTS "DiscoverSave" (
   "discoverItemId" TEXT NOT NULL,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
-  FOREIGN KEY ("discoverItemId") REFERENCES "DiscoverItem"("id") ON DELETE CASCADE
+  FOREIGN KEY ("discoverItemId") REFERENCES "DiscoverItem"("id") ON DELETE CASCADE,
+  UNIQUE("userId", "discoverItemId")
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "DiscoverSave_userId_discoverItemId_key" ON "DiscoverSave"("userId", "discoverItemId");
-CREATE INDEX IF NOT EXISTS "DiscoverSave_userId_idx" ON "DiscoverSave"("userId");
 
 CREATE TABLE IF NOT EXISTS "Battle" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
-  "subject" TEXT NOT NULL,
+  "subjectId" TEXT,
+  "topic" TEXT NOT NULL,
+  "difficulty" TEXT NOT NULL DEFAULT 'medium',
   "totalQuestions" INTEGER NOT NULL DEFAULT 5,
   "correctAnswers" INTEGER NOT NULL DEFAULT 0,
-  "confidenceAvg" REAL NOT NULL DEFAULT 0,
-  "duration" INTEGER NOT NULL DEFAULT 60,
-  "xpEarned" INTEGER NOT NULL DEFAULT 0,
+  "score" INTEGER NOT NULL DEFAULT 0,
+  "status" TEXT NOT NULL DEFAULT 'active',
+  "questions" TEXT NOT NULL DEFAULT '[]',
+  "answers" TEXT NOT NULL DEFAULT '[]',
   "completedAt" TEXT,
   "createdAt" TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS "Battle_userId_idx" ON "Battle"("userId");
 
@@ -402,26 +419,31 @@ CREATE INDEX IF NOT EXISTS "Roadmap_userId_idx" ON "Roadmap"("userId");
 `
 
 // ═══════════════════════════════════════════════════════════════
-// DATABASE SINGLETON (better-sqlite3 — synchronous, no ORM)
+// SCHEMA INITIALIZATION (async — called once on first import)
 // ═══════════════════════════════════════════════════════════════
 
-const globalForDb = globalThis as unknown as { _sqliteDb: Database.Database | undefined }
+let schemaReady: Promise<void> | null = null
 
-const sqlite: Database.Database =
-  globalForDb._sqliteDb ?? new Database(DB_PATH, { fileMustExist: false })
+export async function ensureSchema(): Promise<void> {
+  if (schemaReady) return schemaReady
 
-if (!globalForDb._sqliteDb) {
-  globalForDb._sqliteDb = sqlite
-  // Enable WAL mode for better concurrent read performance
-  sqlite.pragma('journal_mode = WAL')
-  sqlite.pragma('foreign_keys = ON')
-  // Create all tables
-  const statements = SCHEMA_SQL.split(';').map(s => s.trim()).filter(s => s.length > 0)
-  for (const sql of statements) {
-    try { sqlite.exec(sql) } catch (e: any) { /* table/index already exists */ }
-  }
-  console.log(`[db] SQLite ready at ${DB_PATH}`)
+  schemaReady = (async () => {
+    const statements = SCHEMA_SQL.split(';').map(s => s.trim()).filter(s => s.length > 0)
+    for (const sql of statements) {
+      try {
+        await client.execute(sql)
+      } catch (e: any) {
+        // table/index already exists — ignore
+      }
+    }
+    console.log('[db] Schema ensured — all 24 tables ready')
+  })()
+
+  return schemaReady
 }
+
+// Auto-initialize schema on module load
+ensureSchema().catch(console.error)
 
 // ═══════════════════════════════════════════════════════════════
 // UTILITY
@@ -430,30 +452,23 @@ if (!globalForDb._sqliteDb) {
 export const nowISO = () => new Date().toISOString()
 export const genId = () => randomUUID()
 
-// Convert SQLite row (snake_case integers for booleans) to JS object
+// Convert SQLite row to JS object
 function rowToObj(row: any): any {
   if (!row) return null
-  const obj: any = { ...row }
-  // SQLite stores booleans as 0/1
-  for (const key of Object.keys(obj)) {
-    if (obj[key] === 0 && ['isActive', 'isAllDay', 'isAI', 'isPublic'].includes(key)) {
-      // Keep as 0/1 for now — let the API routes handle boolean conversion if needed
-    }
-  }
-  return obj
+  return { ...row }
 }
 
 function rowsToObjs(rows: any[]): any[] {
-  return rows.map(rowToObj)
+  return (rows || []).map(rowToObj)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// QUERY BUILDER — Prisma-compatible API using better-sqlite3
+// QUERY BUILDER
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Build WHERE clause from Prisma-style where object.
- * Supports: equality, { gte, lte, gt, lt, contains, in, not, notIn, startsWith }, AND, OR
+ * Build WHERE clause from where object.
+ * Supports: equality, { gte, lte, gt, lt, contains, in, not, notIn, startsWith, endsWith }, AND, OR
  */
 export function buildWhere(where: Record<string, any>, params: any[] = [], tablePrefix = ''): string {
   if (!where || Object.keys(where).length === 0) return '1=1'
@@ -474,7 +489,6 @@ export function buildWhere(where: Record<string, any>, params: any[] = [], table
     } else if (value === null || value === undefined) {
       clauses.push(`${col} IS NULL`)
     } else if (typeof value === 'object' && !Array.isArray(value)) {
-      // Comparison operators
       for (const [op, opVal] of Object.entries(value)) {
         switch (op) {
           case 'gte': clauses.push(`${col} >= ?`); params.push(opVal); break
@@ -489,7 +503,7 @@ export function buildWhere(where: Record<string, any>, params: any[] = [], table
               clauses.push(`${col} IN (${opVal.map(() => '?').join(', ')})`)
               params.push(...opVal)
             } else {
-              clauses.push('1=0') // empty IN = no results
+              clauses.push('1=0')
             }
             break
           case 'notIn':
@@ -505,8 +519,7 @@ export function buildWhere(where: Record<string, any>, params: any[] = [], table
         }
       }
     } else {
-      // Simple equality — convert booleans to 0/1 for SQLite
-      const paramValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+      const paramValue = typeof value === 'boolean' ? (value ? 1 : 0) : value
       clauses.push(`${col} = ?`)
       params.push(paramValue)
     }
@@ -515,7 +528,7 @@ export function buildWhere(where: Record<string, any>, params: any[] = [], table
   return clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 }
 
-/** Build ORDER BY clause from Prisma-style orderBy */
+/** Build ORDER BY clause */
 function buildOrderBy(orderBy: any): string {
   if (!orderBy) return ''
   if (typeof orderBy === 'string') return `ORDER BY "${orderBy}" ASC`
@@ -526,118 +539,155 @@ function buildOrderBy(orderBy: any): string {
       return `"${key}" ${dir}`
     }).join(', ')
   }
-  // Single object: { field: 'asc' | 'desc' }
   const key = Object.keys(orderBy)[0]
   const dir = orderBy[key] === 'desc' ? 'DESC' : 'ASC'
   return `ORDER BY "${key}" ${dir}`
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MODEL CLASS — Provides Prisma-like API for each table
+// MODEL CLASS — Async Prisma-like API using libSQL
 // ═══════════════════════════════════════════════════════════════
 
 export class Model {
   constructor(public table: string) {}
 
-  findUnique({ where, select }: { where: Record<string, any>; select?: string[] } = {} as any): any {
+  async findUnique({ where, select }: { where: Record<string, any>; select?: string[] } = {} as any): Promise<any> {
+    await ensureSchema()
     const params: any[] = []
     const sel = select && select.length > 0 ? select.map(s => `"${s}"`).join(', ') : '*'
     const whereClause = buildWhere(where, params)
-    const row = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause} LIMIT 1`).get(...params)
-    return rowToObj(row)
+    const result = await client.execute({
+      sql: `SELECT ${sel} FROM "${this.table}" WHERE ${whereClause} LIMIT 1`,
+      args: params,
+    })
+    return rowToObj(result.rows[0])
   }
 
-  findFirst({ where, orderBy, select }: any = {}): any {
+  async findFirst({ where, orderBy, select }: any = {}): Promise<any> {
+    await ensureSchema()
     const params: any[] = []
     const sel = select && select.length > 0 ? select.map(s => `"${s}"`).join(', ') : '*'
     const whereClause = buildWhere(where, params)
     const orderClause = orderBy ? ' ' + buildOrderBy(orderBy) : ''
-    const row = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause} LIMIT 1`).get(...params)
-    return rowToObj(row)
+    const result = await client.execute({
+      sql: `SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause} LIMIT 1`,
+      args: params,
+    })
+    return rowToObj(result.rows[0])
   }
 
-  findMany({ where, select, orderBy, take, skip, distinct }: any = {}): any[] {
+  async findMany({ where, select, orderBy, take, skip, distinct }: any = {}): Promise<any[]> {
+    await ensureSchema()
     const params: any[] = []
     let sel = select && select.length > 0 ? select.map((s: string) => `"${s}"`).join(', ') : '*'
     if (distinct) sel = `DISTINCT ${sel}`
     const whereClause = buildWhere(where, params)
     const orderClause = orderBy ? ' ' + buildOrderBy(orderBy) : ''
-    const limitClause = take ? ` LIMIT ${take}` : ''
-    const offsetClause = skip ? ` OFFSET ${skip}` : ''
-    const rows = sqlite.prepare(`SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause}${limitClause}${offsetClause}`).all(...params)
-    return rowsToObjs(rows)
+    const limitClause = take ? ` LIMIT ${Number(take)}` : ''
+    const offsetClause = skip ? ` OFFSET ${Number(skip)}` : ''
+    const result = await client.execute({
+      sql: `SELECT ${sel} FROM "${this.table}" WHERE ${whereClause}${orderClause}${limitClause}${offsetClause}`,
+      args: params,
+    })
+    return rowsToObjs(result.rows)
   }
 
-  create({ data }: { data: Record<string, any> }): any {
+  async create({ data }: { data: Record<string, any> }): Promise<any> {
+    await ensureSchema()
     const keys = Object.keys(data)
     const values = Object.values(data)
     const placeholders = keys.map(() => '?').join(', ')
     const cols = keys.map(k => `"${k}"`).join(', ')
-    sqlite.prepare(`INSERT INTO "${this.table}" (${cols}) VALUES (${placeholders})`).run(...values)
-    // Return the created row
+    await client.execute({
+      sql: `INSERT INTO "${this.table}" (${cols}) VALUES (${placeholders})`,
+      args: values,
+    })
     return this.findUnique({ where: { id: data.id } })
   }
 
-  update({ where, data }: { where: Record<string, any>; data: Record<string, any> }): any {
+  async update({ where, data }: { where: Record<string, any>; data: Record<string, any> }): Promise<any> {
+    await ensureSchema()
     const params: any[] = []
     const setClause = Object.keys(data).map(k => { params.push(data[k]); return `"${k}" = ?` }).join(', ')
     const whereClause = buildWhere(where, params)
-    sqlite.prepare(`UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`).run(...params)
+    await client.execute({
+      sql: `UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`,
+      args: params,
+    })
     return this.findUnique({ where })
   }
 
-  updateMany({ where, data }: { where: Record<string, any>; data: Record<string, any> }): { count: number } {
+  async updateMany({ where, data }: { where: Record<string, any>; data: Record<string, any> }): Promise<{ count: number }> {
+    await ensureSchema()
     const params: any[] = []
     const setClause = Object.keys(data).map(k => { params.push(data[k]); return `"${k}" = ?` }).join(', ')
     const whereClause = buildWhere(where, params)
-    const result = sqlite.prepare(`UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`).run(...params)
-    return { count: result.changes }
+    const result = await client.execute({
+      sql: `UPDATE "${this.table}" SET ${setClause} WHERE ${whereClause}`,
+      args: params,
+    })
+    return { count: result.rowsAffected ?? 0 }
   }
 
-  delete({ where }: { where: Record<string, any> }): any {
-    const row = this.findUnique({ where })
+  async delete({ where }: { where: Record<string, any> }): Promise<any> {
+    const row = await this.findUnique({ where })
     if (!row) return null
+    await ensureSchema()
     const params: any[] = []
     const whereClause = buildWhere(where, params)
-    sqlite.prepare(`DELETE FROM "${this.table}" WHERE ${whereClause}`).run(...params)
+    await client.execute({
+      sql: `DELETE FROM "${this.table}" WHERE ${whereClause}`,
+      args: params,
+    })
     return row
   }
 
-  deleteMany({ where }: { where?: Record<string, any> } = {}): { count: number } {
+  async deleteMany({ where }: { where?: Record<string, any> } = {}): Promise<{ count: number }> {
+    await ensureSchema()
     const params: any[] = []
     const whereClause = buildWhere(where || {}, params)
-    const result = sqlite.prepare(`DELETE FROM "${this.table}" WHERE ${whereClause}`).run(...params)
-    return { count: result.changes }
+    const result = await client.execute({
+      sql: `DELETE FROM "${this.table}" WHERE ${whereClause}`,
+      args: params,
+    })
+    return { count: result.rowsAffected ?? 0 }
   }
 
-  count({ where }: { where?: Record<string, any> } = {}): number {
+  async count({ where }: { where?: Record<string, any> } = {}): Promise<number> {
+    await ensureSchema()
     const params: any[] = []
     const whereClause = buildWhere(where || {}, params)
-    const row = sqlite.prepare(`SELECT COUNT(*) as count FROM "${this.table}" WHERE ${whereClause}`).get(...params) as any
-    return row?.count ?? 0
+    const result = await client.execute({
+      sql: `SELECT COUNT(*) as count FROM "${this.table}" WHERE ${whereClause}`,
+      args: params,
+    })
+    return result.rows[0]?.count ?? 0
   }
 
-  /** Raw SQL execution */
-  exec(sql: string, ...params: any[]) {
-    return sqlite.prepare(sql).run(...params)
+  /** Raw SQL execution (returns rowsAffected) */
+  async exec(sql: string, ...params: any[]): Promise<any> {
+    await ensureSchema()
+    const result = await client.execute({ sql, args: params })
+    return { changes: result.rowsAffected ?? 0 }
   }
 
   /** Raw SQL query */
-  query(sql: string, ...params: any[]) {
-    return rowsToObjs(sqlite.prepare(sql).all(...params))
+  async query(sql: string, ...params: any[]): Promise<any[]> {
+    await ensureSchema()
+    const result = await client.execute({ sql, args: params })
+    return rowsToObjs(result.rows)
   }
 
   /** Raw SQL query - single row */
-  queryOne(sql: string, ...params: any[]) {
-    return rowToObj(sqlite.prepare(sql).get(...params))
+  async queryOne(sql: string, ...params: any[]): Promise<any> {
+    await ensureSchema()
+    const result = await client.execute({ sql, args: params })
+    return rowToObj(result.rows[0])
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// EXPORTED MODELS (drop-in Prisma replacement)
-// Usage: import { db } from '@/lib/db'
-//        db.user.findUnique({ where: { id: '...' } })
-//        db.user.create({ data: { name: '...', email: '...' } })
+// EXPORTED MODELS (drop-in Prisma replacement — now async)
 // ═══════════════════════════════════════════════════════════════
 
 export const db = {
@@ -667,5 +717,5 @@ export const db = {
   roadmap: new Model('Roadmap'),
 }
 
-// Also export the raw sqlite instance for advanced queries
-export { sqlite }
+// Export the raw client for advanced queries
+export { client as sqlite }

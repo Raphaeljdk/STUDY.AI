@@ -10,7 +10,7 @@ export async function GET(_request: Request) {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const teachings = db.chatMessage.findMany({
+    const teachings = await db.chatMessage.findMany({
       where: {
         userId,
         role: 'teaching',
@@ -52,22 +52,22 @@ export async function POST(request: Request) {
     }
 
     // Get user's subjects (no include — separate queries)
-    const subjects = db.subject.findMany({
+    const subjects = await db.subject.findMany({
       where: { userId },
       take: 10,
     });
 
     // Get topics for each subject separately
-    const subjectsWithTopics = subjects.map(s => {
+    const subjectsWithTopics = await Promise.all(subjects.map(async s => {
       const topicWhere: any = { subjectId: s.id };
       if (topic) topicWhere.name = { contains: topic };
-      const topics = db.topic.findMany({
+      const topics = await db.topic.findMany({
         where: topicWhere,
         select: ['name', 'mastery'],
         take: 5,
       });
       return { ...s, topics };
-    });
+    }));
 
     const relatedTopics = subjectsWithTopics.flatMap(s => s.topics).filter(t => t.name.toLowerCase().includes(topic.toLowerCase()));
 
@@ -142,10 +142,10 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
 
     // Update user XP if earned (increment via raw SQL)
     if (totalXP > 0) {
-      sqlite.prepare('UPDATE "User" SET "xp" = "xp" + ?, "totalQuestionsAnswered" = "totalQuestionsAnswered" + ?, "updatedAt" = ? WHERE "id" = ?').run(totalXP, 1, nowISO(), userId);
+      await sqlite.execute({ sql: 'UPDATE "User" SET "xp" = "xp" + ?, "totalQuestionsAnswered" = "totalQuestionsAnswered" + ?, "updatedAt" = ? WHERE "id" = ?', args: [totalXP, 1, nowISO(), userId] });
 
       // Create XP transaction
-      db.xPTransaction.create({
+      await db.xPTransaction.create({
         data: {
           id: genId(),
           userId,
@@ -160,11 +160,11 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
       if (relatedTopics.length > 0) {
         // Find topic in database by name match
         for (const rel of relatedTopics) {
-          const dbTopic = db.topic.findFirst({
+          const dbTopic = await db.topic.findFirst({
             where: { name: rel.name },
           });
           if (dbTopic && (analysis.mastery || 0) > dbTopic.mastery) {
-            db.topic.update({
+            await db.topic.update({
               where: { id: dbTopic.id },
               data: { mastery: analysis.mastery || 0, updatedAt: nowISO() },
             });
@@ -174,7 +174,7 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
     }
 
     // Save teaching session as memory
-    db.chatMessage.create({
+    await db.chatMessage.create({
       data: {
         id: genId(),
         userId,
@@ -193,11 +193,11 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
     });
 
     // Recalculate level
-    const updatedUser = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+    const updatedUser = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
     if (updatedUser) {
       const newLevel = Math.floor(updatedUser.xp / 500) + 1;
       if (newLevel > updatedUser.level) {
-        db.user.update({ where: { id: userId }, data: { level: newLevel, updatedAt: nowISO() } });
+        await db.user.update({ where: { id: userId }, data: { level: newLevel, updatedAt: nowISO() } });
       }
     }
 

@@ -22,27 +22,27 @@ export async function GET(request: Request) {
       where.type = type;
     }
 
-    const items = db.discoverItem.findMany({
+    const items = await db.discoverItem.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip,
       take: Math.min(limit, 50),
     });
 
-    const total = db.discoverItem.count({ where });
+    const total = await db.discoverItem.count({ where });
 
     // Get save counts for each item
-    const itemsWithCounts = items.map(item => {
-      const saveCount = db.discoverSave.count({ where: { discoverItemId: item.id } });
-      const author = item.userId ? db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
+    const itemsWithCounts = await Promise.all(items.map(async item => {
+      const saveCount = await db.discoverSave.count({ where: { discoverItemId: item.id } });
+      const author = item.userId ? await db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
       return { ...item, _count: { discoverSaves: saveCount }, user: author };
-    });
+    }));
 
     // Check which items the current user saved
     const itemIds = items.map(i => i.id);
     let savedSet = new Set<string>();
     if (itemIds.length > 0) {
-      const savedItems = db.discoverSave.findMany({
+      const savedItems = await db.discoverSave.findMany({
         where: { userId, discoverItemId: { in: itemIds } },
         select: ['discoverItemId'],
       });
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Erro ao gerar conteudo com IA' }, { status: 500 });
       }
 
-      const item = db.discoverItem.create({
+      const item = await db.discoverItem.create({
         data: {
           id: genId(),
           type: itemType,
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Conteudo obrigatorio' }, { status: 400 });
     }
 
-    const item = db.discoverItem.create({
+    const item = await db.discoverItem.create({
       data: {
         id: genId(),
         type: type && VALID_TYPES.includes(type) ? type : 'dica',

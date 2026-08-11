@@ -5,12 +5,12 @@ import { db, genId, nowISO } from '@/lib/db';
 const VALID_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'ABANDONED'];
 const XP_PER_GOAL = 50;
 
-function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = db.xPTransaction.create({
+async function awardXP(userId: string, amount: number, source: any, description: string) {
+  const xpTx = await db.xPTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!userData) return;
 
   const newXP = userData.xp + amount;
@@ -21,7 +21,7 @@ function awardXP(userId: string, amount: number, source: any, description: strin
     newLevel = newLevel + 1;
   }
 
-  db.user.update({
+  await db.user.update({
     where: { id: userId },
     data: { xp: newXP, level: newLevel },
   });
@@ -29,9 +29,9 @@ function awardXP(userId: string, amount: number, source: any, description: strin
   return xpTx;
 }
 
-function attachSubject(goal: any) {
+async function attachSubject(goal: any) {
   if (!goal?.subjectId) return { ...goal, subject: null };
-  const subject = db.subject.findUnique({ where: { id: goal.subjectId }, select: ['id', 'name', 'color', 'icon'] });
+  const subject = await db.subject.findUnique({ where: { id: goal.subjectId }, select: ['id', 'name', 'color', 'icon'] });
   return { ...goal, subject: subject || null };
 }
 
@@ -45,7 +45,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.goal.findFirst({ where: { id, userId } });
+    const existing = await db.goal.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Meta nao encontrada' }, { status: 404 });
     }
@@ -76,7 +76,7 @@ export async function PATCH(
     if (newTargetValue && newCurrentValue >= newTargetValue && existing.status !== 'COMPLETED') {
       data.status = 'COMPLETED';
       data.completedAt = new Date().toISOString();
-      awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
+      await awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
       xpAwarded = true;
     }
 
@@ -84,17 +84,17 @@ export async function PATCH(
     if (status === 'COMPLETED' && existing.status !== 'COMPLETED') {
       data.completedAt = new Date().toISOString();
       if (!xpAwarded) {
-        awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
+        await awardXP(userId, XP_PER_GOAL, 'GOAL_COMPLETED', `Meta concluida: ${existing.title}`);
         xpAwarded = true;
       }
     }
 
-    const goal = db.goal.update({
+    const goal = await db.goal.update({
       where: { id },
       data,
     });
 
-    const goalWithSubject = attachSubject(goal);
+    const goalWithSubject = await attachSubject(goal);
 
     return NextResponse.json({ goal: goalWithSubject, xpAwarded });
   } catch (error) {
@@ -113,12 +113,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.goal.findFirst({ where: { id, userId } });
+    const existing = await db.goal.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Meta nao encontrada' }, { status: 404 });
     }
 
-    db.goal.delete({ where: { id } });
+    await db.goal.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

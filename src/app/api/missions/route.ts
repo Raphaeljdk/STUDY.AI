@@ -9,7 +9,7 @@ export async function GET(_request: Request) {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const missions = db.mission.findMany({
+    const missions = await db.mission.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       }
 
       const stepsArr = Array.isArray(aiData.steps) ? aiData.steps : [];
-      const mission = db.mission.create({
+      const mission = await db.mission.create({
         data: {
           id: genId(),
           userId,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Etapas obrigatorias' }, { status: 400 });
     }
 
-    const mission = db.mission.create({
+    const mission = await db.mission.create({
       data: {
         id: genId(),
         userId,

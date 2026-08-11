@@ -4,10 +4,10 @@ import { db, genId, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['EXAM', 'HOMEWORK', 'SEMINAR', 'DELIVERY', 'CLASS', 'REVIEW', 'STUDY_SESSION', 'OTHER'];
 
-function attachSubjects(events: any[]) {
+async function attachSubjects(events: any[]) {
   const subjectIds = [...new Set(events.map((e: any) => e.subjectId).filter(Boolean))];
   const subjects = subjectIds.length > 0
-    ? db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
+    ? await db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
     : [];
   const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
   return events.map((e: any) => ({ ...e, subject: e.subjectId ? subjectMap.get(e.subjectId) || null : null }));
@@ -39,12 +39,12 @@ export async function GET(request: Request) {
       };
     }
 
-    const events = db.calendarEvent.findMany({
+    const events = await db.calendarEvent.findMany({
       where,
       orderBy: { date: 'asc' },
     });
 
-    const eventsWithSubjects = attachSubjects(events);
+    const eventsWithSubjects = await attachSubjects(events);
 
     return NextResponse.json({ events: eventsWithSubjects });
   } catch (error) {
@@ -78,13 +78,13 @@ export async function POST(request: Request) {
 
     // Validate subjectId if provided
     if (subjectId) {
-      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
       if (!subject) {
         return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 400 });
       }
     }
 
-    const event = db.calendarEvent.create({
+    const event = await db.calendarEvent.create({
       data: {
         id: genId(),
         title: title.trim(),
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     });
 
     // Attach subject (was include)
-    const eventsWithSubjects = attachSubjects([event]);
+    const eventsWithSubjects = await attachSubjects([event]);
 
     return NextResponse.json({ event: eventsWithSubjects[0] }, { status: 201 });
   } catch (error) {

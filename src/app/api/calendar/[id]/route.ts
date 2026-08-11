@@ -4,9 +4,9 @@ import { db, nowISO } from '@/lib/db';
 
 const VALID_TYPES = ['EXAM', 'HOMEWORK', 'SEMINAR', 'DELIVERY', 'CLASS', 'REVIEW', 'STUDY_SESSION', 'OTHER'];
 
-function attachSubject(event: any) {
+async function attachSubject(event: any) {
   if (!event?.subjectId) return { ...event, subject: null };
-  const subject = db.subject.findUnique({ where: { id: event.subjectId }, select: ['id', 'name', 'color', 'icon'] });
+  const subject = await db.subject.findUnique({ where: { id: event.subjectId }, select: ['id', 'name', 'color', 'icon'] });
   return { ...event, subject: subject || null };
 }
 
@@ -20,7 +20,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.calendarEvent.findFirst({ where: { id, userId } });
+    const existing = await db.calendarEvent.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Evento nao encontrado' }, { status: 404 });
     }
@@ -42,19 +42,19 @@ export async function PATCH(
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate).toISOString() : null;
     if (subjectId === null) data.subjectId = null;
     if (typeof subjectId === 'string' && subjectId) {
-      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
       if (subject) data.subjectId = subjectId;
     }
     if (typeof isAllDay === 'boolean') data.isAllDay = isAllDay ? 1 : 0;
     if (typeof color === 'string' && color) data.color = color;
     if (color === null) data.color = null;
 
-    const event = db.calendarEvent.update({
+    const event = await db.calendarEvent.update({
       where: { id },
       data,
     });
 
-    const eventWithSubject = attachSubject(event);
+    const eventWithSubject = await attachSubject(event);
 
     return NextResponse.json({ event: eventWithSubject });
   } catch (error) {
@@ -73,12 +73,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.calendarEvent.findFirst({ where: { id, userId } });
+    const existing = await db.calendarEvent.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Evento nao encontrado' }, { status: 404 });
     }
 
-    db.calendarEvent.delete({ where: { id } });
+    await db.calendarEvent.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

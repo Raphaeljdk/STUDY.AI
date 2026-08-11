@@ -10,36 +10,36 @@ export async function GET(_request: Request) {
     const userId = user.id;
 
     // Gather all subject data (no include — separate queries)
-    const subjects = db.subject.findMany({
+    const subjects = await db.subject.findMany({
       where: { userId },
     });
 
     // Get topics for each subject separately
-    const subjectsWithTopics = subjects.map(subject => {
-      const topics = db.topic.findMany({
+    const subjectsWithTopics = await Promise.all(subjects.map(async subject => {
+      const topics = await db.topic.findMany({
         where: { subjectId: subject.id },
         select: ['id', 'name', 'mastery', 'totalQuestions', 'correctAnswers'],
       });
-      const taskCount = db.task.count({ where: { subjectId: subject.id } });
+      const taskCount = await db.task.count({ where: { subjectId: subject.id } });
       return { ...subject, topics, _count: { tasks: taskCount } };
-    });
+    }));
 
     // Get recent battle performance
-    const recentBattles = db.battle.findMany({
+    const recentBattles = await db.battle.findMany({
       where: { userId, completedAt: { not: null } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
     // Get recent pre-test scores
-    const recentPreTests = db.preTest.findMany({
+    const recentPreTests = await db.preTest.findMany({
       where: { userId, completedAt: { not: null } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
     // Get active missions
-    const activeMissions = db.mission.findMany({
+    const activeMissions = await db.mission.findMany({
       where: { userId, status: 'active' },
     });
 

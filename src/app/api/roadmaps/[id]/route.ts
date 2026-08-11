@@ -14,7 +14,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.roadmap.findFirst({ where: { id, userId } });
+    const existing = await db.roadmap.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Trilha nao encontrada' }, { status: 404 });
     }
@@ -47,7 +47,7 @@ export async function PATCH(
       data.status = 'completed';
     }
 
-    const roadmap = db.roadmap.update({
+    const roadmap = await db.roadmap.update({
       where: { id },
       data,
     });
@@ -69,12 +69,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.roadmap.findFirst({ where: { id, userId } });
+    const existing = await db.roadmap.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Trilha nao encontrada' }, { status: 404 });
     }
 
-    db.roadmap.delete({ where: { id } });
+    await db.roadmap.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

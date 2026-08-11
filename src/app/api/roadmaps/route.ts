@@ -8,7 +8,7 @@ export async function GET(_request: Request) {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const roadmaps = db.roadmap.findMany({
+    const roadmaps = await db.roadmap.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Etapas obrigatorias' }, { status: 400 });
     }
 
-    const roadmap = db.roadmap.create({
+    const roadmap = await db.roadmap.create({
       data: {
         id: genId(),
         userId,

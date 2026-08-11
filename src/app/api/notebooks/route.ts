@@ -8,7 +8,7 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const notebooks = db.notebook.findMany({
+    const notebooks = await db.notebook.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
     });
@@ -17,7 +17,7 @@ export async function GET() {
     const notebooksWithCount = notebooks.map((nb: any) => ({
       ...nb,
       _count: {
-        flashcards: db.flashcard.count({ where: { notebookId: nb.id } }),
+        flashcards: await db.flashcard.count({ where: { notebookId: nb.id } }),
       },
     }));
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Titulo obrigatorio' }, { status: 400 });
     }
 
-    const notebook = db.notebook.create({
+    const notebook = await db.notebook.create({
       data: {
         id: genId(),
         title: title.trim(),

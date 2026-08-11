@@ -3,17 +3,17 @@ import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = db.xPTransaction.create({
+  const xpTx = await db.xPTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!userData) return xpTx;
 
   const newXP = userData.xp + amount;
   const newLevel = Math.floor(newXP / 500) + 1;
 
-  db.user.update({
+  await db.user.update({
     where: { id: userId },
     data: { xp: newXP, level: newLevel, updatedAt: nowISO() },
   });
@@ -31,7 +31,7 @@ export async function POST(
     const userId = user.id;
 
     const { id } = await params;
-    const mission = db.mission.findFirst({ where: { id, userId } });
+    const mission = await db.mission.findFirst({ where: { id, userId } });
     if (!mission) {
       return NextResponse.json({ error: 'Missao nao encontrada' }, { status: 404 });
     }
@@ -41,7 +41,7 @@ export async function POST(
 
     const xpAmount = mission.xpReward || 100;
 
-    const updatedMission = db.mission.update({
+    const updatedMission = await db.mission.update({
       where: { id },
       data: {
         status: 'completed',
@@ -52,9 +52,9 @@ export async function POST(
     });
 
     // Award XP
-    const xpTx = awardXP(userId, xpAmount, 'GOAL_COMPLETED', `Missao concluida: ${mission.title}`);
+    const xpTx = await awardXP(userId, xpAmount, 'GOAL_COMPLETED', `Missao concluida: ${mission.title}`);
 
-    const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+    const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
 
     return NextResponse.json({
       mission: updatedMission,

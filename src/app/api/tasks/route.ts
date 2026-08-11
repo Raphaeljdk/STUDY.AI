@@ -5,10 +5,10 @@ import { db, genId, nowISO } from '@/lib/db';
 const VALID_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
-function attachSubjects(tasks: any[]) {
+async function attachSubjects(tasks: any[]) {
   const subjectIds = [...new Set(tasks.map((t: any) => t.subjectId).filter(Boolean))];
   const subjects = subjectIds.length > 0
-    ? db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
+    ? await db.subject.findMany({ where: { id: { in: subjectIds } }, select: ['id', 'name', 'color', 'icon'] })
     : [];
   const subjectMap = new Map(subjects.map((s: any) => [s.id, s]));
   return tasks.map((t: any) => ({ ...t, subject: t.subjectId ? subjectMap.get(t.subjectId) || null : null }));
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       where.subjectId = subjectId;
     }
 
-    const tasks = db.task.findMany({
+    const tasks = await db.task.findMany({
       where,
       orderBy: [
         { sortOrder: 'asc' },
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       ],
     });
 
-    const tasksWithSubjects = attachSubjects(tasks);
+    const tasksWithSubjects = await attachSubjects(tasks);
 
     return NextResponse.json({ tasks: tasksWithSubjects });
   } catch (error) {
@@ -74,13 +74,13 @@ export async function POST(request: Request) {
 
     // Validate subjectId if provided
     if (subjectId) {
-      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
       if (!subject) {
         return NextResponse.json({ error: 'Disciplina nao encontrada' }, { status: 400 });
       }
     }
 
-    const task = db.task.create({
+    const task = await db.task.create({
       data: {
         id: genId(),
         title: title.trim(),
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     });
 
     // Attach subject (was include)
-    const tasksWithSubjects = attachSubjects([task]);
+    const tasksWithSubjects = await attachSubjects([task]);
 
     return NextResponse.json({ task: tasksWithSubjects[0] }, { status: 201 });
   } catch (error) {

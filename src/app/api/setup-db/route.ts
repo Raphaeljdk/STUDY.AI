@@ -14,7 +14,7 @@ export async function GET() {
     ];
 
     // Get existing columns from SQLite table_info
-    const tableInfo = sqlite.prepare(`PRAGMA table_info("User")`).all() as any[];
+    const tableInfo = (await sqlite.execute({ sql: `PRAGMA table_info("User")` })).rows as any[];
     const existingCols = new Set(tableInfo.map((r: any) => r.name));
 
     for (const col of userCols) {
@@ -22,7 +22,7 @@ export async function GET() {
         results.push(`User.${col.name} already exists (ok)`);
       } else {
         try {
-          sqlite.exec(`ALTER TABLE "User" ADD COLUMN "${col.name}" ${col.type}`);
+          await sqlite.execute({ sql: `ALTER TABLE "User" ADD COLUMN "${col.name}" ${col.type}` });
           results.push(`Added User.${col.name}`);
         } catch (e: any) {
           results.push(`User.${col.name}: ${e?.message || 'error'}`);
@@ -35,7 +35,7 @@ export async function GET() {
     const tables = ['NotebookPage', 'NotebookTag', 'DailyUsage'];
     for (const table of tables) {
       try {
-        sqlite.prepare(`SELECT 1 FROM "${table}" LIMIT 1`).get();
+        await sqlite.execute({ sql: `SELECT 1 FROM "${table}" LIMIT 1` });
         results.push(`${table} table exists (ok)`);
       } catch {
         results.push(`${table}: table not found`);
@@ -52,7 +52,7 @@ export async function GET() {
 
     try {
       for (const idx of indexes) {
-        sqlite.prepare(idx).run();
+        await sqlite.execute({ sql: idx });
       }
       results.push('Indexes created/verified');
     } catch (e: any) {
@@ -61,7 +61,7 @@ export async function GET() {
 
     // Test: try to query User table
     try {
-      db.user.count();
+      await db.user.count();
       results.push('DB connection OK - User table accessible');
     } catch (e: any) {
       results.push(`DB test FAILED: ${e?.message || 'error'}`);

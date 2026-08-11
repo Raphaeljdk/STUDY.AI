@@ -13,7 +13,7 @@ export async function GET(
 
     const { id } = await params;
     // Composite unique → use AND (was userId_discoverItemId)
-    const save = db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
+    const save = await db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
 
     return NextResponse.json({ isSaved: !!save });
   } catch (error) {
@@ -33,27 +33,27 @@ export async function POST(
 
     const { id } = await params;
 
-    const item = db.discoverItem.findUnique({ where: { id } });
+    const item = await db.discoverItem.findUnique({ where: { id } });
     if (!item) {
       return NextResponse.json({ error: 'Item nao encontrado' }, { status: 404 });
     }
 
     // Check if already saved (composite unique → use AND)
-    const existing = db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
+    const existing = await db.discoverSave.findFirst({ where: { userId, discoverItemId: id } });
 
     if (existing) {
       // Unsave
-      db.discoverSave.delete({ where: { id: existing.id } });
+      await db.discoverSave.delete({ where: { id: existing.id } });
       // Decrement saves (raw SQL)
-      sqlite.prepare('UPDATE "DiscoverItem" SET "saves" = "saves" - 1 WHERE "id" = ?').run(id);
+      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" - 1 WHERE "id" = ?', args: [id] });
       return NextResponse.json({ isSaved: false });
     } else {
       // Save
-      db.discoverSave.create({
+      await db.discoverSave.create({
         data: { id: genId(), userId, discoverItemId: id, createdAt: nowISO() },
       });
       // Increment saves (raw SQL)
-      sqlite.prepare('UPDATE "DiscoverItem" SET "saves" = "saves" + 1 WHERE "id" = ?').run(id);
+      await sqlite.execute({ sql: 'UPDATE "DiscoverItem" SET "saves" = "saves" + 1 WHERE "id" = ?', args: [id] });
       return NextResponse.json({ isSaved: true });
     }
   } catch (error) {

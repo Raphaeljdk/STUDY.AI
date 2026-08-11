@@ -8,7 +8,7 @@ export async function GET() {
     if (user instanceof NextResponse) return user;
     const userId = user.id;
 
-    const userData = db.user.findUnique({
+    const userData = await db.user.findUnique({
       where: { id: userId },
       select: [
         'xp', 'level', 'currentStreak', 'longestStreak', 'lastStudyDate',
@@ -29,19 +29,19 @@ export async function GET() {
     const progressPercent = Math.min(100, Math.max(0, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100)));
 
     // Achievement count
-    const unlockedCount = db.userAchievement.count({ where: { userId } });
-    const totalAchievements = db.achievement.count();
+    const unlockedCount = await db.userAchievement.count({ where: { userId } });
+    const totalAchievements = await db.achievement.count();
 
     // Today's XP earned (replaces aggregate with raw SQL)
     const todayStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString();
-    const todayXPRow = db.xPTransaction.queryOne(
+    const todayXPRow = await db.xPTransaction.queryOne(
       `SELECT SUM("amount") as total FROM "XPTransaction" WHERE "userId" = ? AND "createdAt" >= ? AND "amount" > 0`,
       userId, todayStartISO
     );
     const todayXP = todayXPRow?.total || 0;
 
     // Recent streak record
-    const recentStreak = db.streakRecord.findFirst({
+    const recentStreak = await db.streakRecord.findFirst({
       where: { userId },
       orderBy: { date: 'desc' },
     });

@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pag
 
     const { pageId } = await params;
 
-    const page = db.notebookPage.findFirst({
+    const page = await db.notebookPage.findFirst({
       where: { id: pageId },
     });
 
@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pag
     }
 
     // Separate query for notebook ownership check (was include)
-    const notebook = db.notebook.findUnique({
+    const notebook = await db.notebook.findUnique({
       where: { id: page.notebookId },
       select: ['userId'],
     });
@@ -43,7 +43,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
 
     const { pageId } = await params;
 
-    const existingPage = db.notebookPage.findFirst({
+    const existingPage = await db.notebookPage.findFirst({
       where: { id: pageId },
     });
 
@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
     }
 
     // Separate query for notebook ownership check (was include)
-    const notebook = db.notebook.findUnique({
+    const notebook = await db.notebook.findUnique({
       where: { id: existingPage.notebookId },
       select: ['userId'],
     });
@@ -81,7 +81,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ page
       return NextResponse.json({ error: 'Nenhum campo valido para atualizar' }, { status: 400 });
     }
 
-    const page = db.notebookPage.update({
+    const page = await db.notebookPage.update({
       where: { id: pageId },
       data,
     });
@@ -101,7 +101,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     const { pageId } = await params;
 
-    const existingPage = db.notebookPage.findFirst({
+    const existingPage = await db.notebookPage.findFirst({
       where: { id: pageId },
     });
 
@@ -110,7 +110,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
 
     // Separate query for notebook ownership check (was include)
-    const notebook = db.notebook.findUnique({
+    const notebook = await db.notebook.findUnique({
       where: { id: existingPage.notebookId },
       select: ['userId'],
     });
@@ -119,7 +119,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Pagina nao encontrada' }, { status: 404 });
     }
 
-    db.notebookPage.delete({
+    await db.notebookPage.delete({
       where: { id: pageId },
     });
 

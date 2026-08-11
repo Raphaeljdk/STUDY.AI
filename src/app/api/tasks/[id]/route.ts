@@ -6,12 +6,12 @@ const VALID_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const XP_PER_TASK = 30;
 
-function awardXP(userId: string, amount: number, source: any, description: string) {
-  const xpTx = db.xPTransaction.create({
+async function awardXP(userId: string, amount: number, source: any, description: string) {
+  const xpTx = await db.xPTransaction.create({
     data: { id: genId(), userId, amount, source, description, createdAt: nowISO() },
   });
 
-  const userData = db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+  const userData = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
   if (!userData) return;
 
   const newXP = userData.xp + amount;
@@ -22,7 +22,7 @@ function awardXP(userId: string, amount: number, source: any, description: strin
     newLevel = newLevel + 1;
   }
 
-  db.user.update({
+  await db.user.update({
     where: { id: userId },
     data: { xp: newXP, level: newLevel },
   });
@@ -30,9 +30,9 @@ function awardXP(userId: string, amount: number, source: any, description: strin
   return xpTx;
 }
 
-function attachSubject(task: any) {
+async function attachSubject(task: any) {
   if (!task?.subjectId) return { ...task, subject: null };
-  const subject = db.subject.findUnique({ where: { id: task.subjectId }, select: ['id', 'name', 'color', 'icon'] });
+  const subject = await db.subject.findUnique({ where: { id: task.subjectId }, select: ['id', 'name', 'color', 'icon'] });
   return { ...task, subject: subject || null };
 }
 
@@ -46,7 +46,7 @@ export async function PATCH(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.task.findFirst({ where: { id, userId } });
+    const existing = await db.task.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Tarefa nao encontrada' }, { status: 404 });
     }
@@ -65,7 +65,7 @@ export async function PATCH(
     if (typeof description === 'string') data.description = description.trim();
     if (subjectId === null) data.subjectId = null;
     if (typeof subjectId === 'string' && subjectId) {
-      const subject = db.subject.findFirst({ where: { id: subjectId, userId } });
+      const subject = await db.subject.findFirst({ where: { id: subjectId, userId } });
       if (subject) data.subjectId = subjectId;
     }
     if (priority && VALID_PRIORITIES.includes(priority)) data.priority = priority;
@@ -79,10 +79,10 @@ export async function PATCH(
     let xpAwarded = false;
     if (status === 'COMPLETED' && existing.status !== 'COMPLETED') {
       data.completedAt = new Date().toISOString();
-      awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
+      await awardXP(userId, XP_PER_TASK, 'TASK_COMPLETED', `Tarefa concluida: ${existing.title}`);
       xpAwarded = true;
       // Update user total tasks completed (was increment)
-      sqlite.prepare('UPDATE "User" SET "totalTasksCompleted" = "totalTasksCompleted" + 1 WHERE "id" = ?').run(userId);
+      await sqlite.execute({ sql: 'UPDATE "User" SET "totalTasksCompleted" = "totalTasksCompleted" + 1 WHERE "id" = ?', args: [userId] });
     }
 
     // If un-completing a task
@@ -90,12 +90,12 @@ export async function PATCH(
       data.completedAt = null;
     }
 
-    const task = db.task.update({
+    const task = await db.task.update({
       where: { id },
       data,
     });
 
-    const taskWithSubject = attachSubject(task);
+    const taskWithSubject = await attachSubject(task);
 
     return NextResponse.json({ task: taskWithSubject, xpAwarded });
   } catch (error) {
@@ -114,12 +114,12 @@ export async function DELETE(
     const userId = user.id;
 
     const { id } = await params;
-    const existing = db.task.findFirst({ where: { id, userId } });
+    const existing = await db.task.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Tarefa nao encontrada' }, { status: 404 });
     }
 
-    db.task.delete({ where: { id } });
+    await db.task.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

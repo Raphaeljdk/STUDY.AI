@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         metadata: { userId: user.id },
       });
       customerId = customer.id;
-      db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId, updatedAt: nowISO() } });
+      await db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId, updatedAt: nowISO() } });
     }
 
     const origin = request.headers.get('origin') || 'https://study-ai-nine-xi.vercel.app';
