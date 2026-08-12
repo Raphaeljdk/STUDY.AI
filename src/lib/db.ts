@@ -448,8 +448,36 @@ export async function ensureSchema(): Promise<void> {
     // Migration: add missing Achievement columns
     const achievementMigrations = [
       `ALTER TABLE "Achievement" ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE "Achievement" ADD COLUMN "key" TEXT NOT NULL DEFAULT ''`,
+      `ALTER TABLE "Achievement" ADD COLUMN "title" TEXT NOT NULL DEFAULT ''`,
     ];
     for (const sql of achievementMigrations) {
+      try {
+        await execQuery(sql);
+      } catch {
+        // column already exists — ignore
+      }
+    }
+    // Migration: add missing Mission columns
+    const missionMigrations = [
+      `ALTER TABLE "Mission" ADD COLUMN "topic" TEXT NOT NULL DEFAULT ''`,
+    ];
+    for (const sql of missionMigrations) {
+      try {
+        await execQuery(sql);
+      } catch {
+        // column already exists — ignore
+      }
+    }
+    // Migration: add missing DiscoverItem columns
+    const discoverItemMigrations = [
+      `ALTER TABLE "DiscoverItem" ADD COLUMN "summary" TEXT`,
+      `ALTER TABLE "DiscoverItem" ADD COLUMN "subject" TEXT`,
+      `ALTER TABLE "DiscoverItem" ADD COLUMN "difficulty" TEXT NOT NULL DEFAULT 'medio'`,
+      `ALTER TABLE "DiscoverItem" ADD COLUMN "duration" INTEGER`,
+      `ALTER TABLE "DiscoverItem" ADD COLUMN "emoji" TEXT NOT NULL DEFAULT '💡'`,
+    ];
+    for (const sql of discoverItemMigrations) {
       try {
         await execQuery(sql);
       } catch {
