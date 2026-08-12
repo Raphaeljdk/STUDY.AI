@@ -1,25 +1,27 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'studyai-v1';
+const CACHE_NAME = 'studyai-v2';
 const OFFLINE_URL = '/';
 
-// Assets to pre-cache on install
+// Assets to pre-cache on install (graceful — won't fail if any is missing)
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/logo.svg',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
 ];
 
-// Install: pre-cache critical assets
+// Install: pre-cache critical assets — skip failures silently
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS);
+      return Promise.allSettled(
+        PRECACHE_ASSETS.map((url) =>
+          cache.add(url).catch(() => console.warn('[SW] Skipping precache:', url))
+        )
+      );
     })
   );
-  // Activate the new service worker immediately
   self.skipWaiting();
 });
 
@@ -34,7 +36,6 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  // Take control of all clients immediately
   self.clients.claim();
 });
 
@@ -60,10 +61,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       try {
-        // Try network first
         const networkResponse = await fetch(request);
 
-        // Cache successful responses
         if (networkResponse.ok) {
           const cache = await caches.open(CACHE_NAME);
           cache.put(request, networkResponse.clone());
@@ -71,14 +70,12 @@ self.addEventListener('fetch', (event) => {
 
         return networkResponse;
       } catch {
-        // Network failed — try cache
         const cachedResponse = await caches.match(request);
 
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        // For navigation requests, serve the offline page
         if (request.mode === 'navigate') {
           const offlineResponse = await caches.match(OFFLINE_URL);
           if (offlineResponse) return offlineResponse;

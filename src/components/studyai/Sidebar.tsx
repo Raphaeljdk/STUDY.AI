@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { UsageBar } from './PremiumUpgrade';
+import { PWAInstallButton } from '@/components/PWAInstallPrompt';
 import type { Tab } from './DashboardView';
 import { canAccess, TAB_FEATURE_MAP, FEATURE_MIN_PLAN, type Plan } from '@/lib/plan-gating';
 
@@ -206,6 +207,11 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
 
       {/* Footer */}
       <div className="shrink-0 border-t border-[var(--ws-glass-border)] px-2 py-3">
+        {/* PWA Install Button */}
+        <div className="mb-2">
+          <PWAInstallButton collapsed={collapsed} />
+        </div>
+
         {/* Active users */}
         <AnimatePresence mode="wait">
           {!collapsed && (
