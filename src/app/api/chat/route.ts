@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
+import { PLAN_LIMITS } from '@/lib/plan-gating';
 
 export async function GET() {
   try {
@@ -48,6 +49,22 @@ export async function POST(request: Request) {
     // Content length limit
     if (message.length > 10000) {
       return NextResponse.json({ error: 'Mensagem muito longa' }, { status: 400 });
+    }
+
+    // Plan limit check: FREE users are limited to 20 chat messages per day
+    const plan = (user.plan || 'FREE') as keyof typeof PLAN_LIMITS;
+    const chatLimit = PLAN_LIMITS[plan]?.chatMessagesPerDay;
+    if (chatLimit !== undefined && isFinite(chatLimit)) {
+      const today = new Date().toISOString().split('T')[0];
+      const usage = await db.dailyUsage.findFirst({
+        where: { userId, date: today },
+      });
+      if ((usage?.chatMessages || 0) >= chatLimit) {
+        return NextResponse.json({
+          error: 'Limite de 20 mensagens/dia atingido. Upgrade para Samurai!',
+          code: 'PLAN_LIMIT',
+        }, { status: 403 });
+      }
     }
 
     const chatMessage = await db.chatMessage.create({

@@ -64,6 +64,7 @@ export async function POST(
     const topic = await db.topic.create({
       data: {
         id: genId(),
+        title: name.trim(),
         name: name.trim(),
         description: typeof description === 'string' ? description.trim() : null,
         sortOrder: typeof sortOrder === 'number' ? sortOrder : 0,

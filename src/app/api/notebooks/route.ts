@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
+import { PLAN_LIMITS } from '@/lib/plan-gating';
 
 export async function GET() {
   try {
@@ -47,6 +48,19 @@ export async function POST(request: Request) {
     // Type validation + empty check
     if (typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ error: 'Titulo obrigatorio' }, { status: 400 });
+    }
+
+    // Plan limit check: FREE users are limited to 3 notebooks
+    const plan = (user.plan || 'FREE') as keyof typeof PLAN_LIMITS;
+    const notebookLimit = PLAN_LIMITS[plan]?.notebooks;
+    if (notebookLimit !== undefined && isFinite(notebookLimit)) {
+      const count = await db.notebook.count({ where: { userId } });
+      if (count >= notebookLimit) {
+        return NextResponse.json({
+          error: 'Limite de 3 cadernos atingido no plano gratuito. Upgrade para Samurai!',
+          code: 'PLAN_LIMIT',
+        }, { status: 403 });
+      }
     }
 
     const notebook = await db.notebook.create({

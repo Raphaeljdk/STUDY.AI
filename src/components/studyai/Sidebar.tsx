@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,11 +8,12 @@ import {
   Timer, MessageCircle,
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   ChevronLeft, ChevronRight, LogOut, Crown, Shield, Users, ChevronDown,
-  BookText, Layers, ScrollText,
+  BookText, Layers, ScrollText, Lock,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { UsageBar } from './PremiumUpgrade';
 import type { Tab } from './DashboardView';
+import { canAccess, TAB_FEATURE_MAP, FEATURE_MIN_PLAN, type Plan } from '@/lib/plan-gating';
 
 type LucideIcon = typeof Home;
 
@@ -20,6 +21,8 @@ interface NavItem {
   id: Tab;
   label: string;
   icon: LucideIcon;
+  /** If set, this feature key is checked against the user's plan */
+  featureGate?: string;
 }
 
 interface NavGroup {
@@ -54,13 +57,13 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Explorar',
     defaultOpen: true,
     items: [
-      { id: 'battle', label: 'Batalha', icon: Swords },
-      { id: 'microlesson', label: 'MicroAula', icon: GraduationCap },
-      { id: 'missions', label: 'Missões', icon: Rocket },
-      { id: 'teach', label: 'Ensinar', icon: ScrollText },
-      { id: 'brain', label: 'Cérebro', icon: Dna },
-      { id: 'roadmap', label: 'Roadmap', icon: Route },
-      { id: 'discover', label: 'Discover', icon: Compass },
+      { id: 'battle', label: 'Batalha', icon: Swords, featureGate: 'battle' },
+      { id: 'microlesson', label: 'MicroAula', icon: GraduationCap, featureGate: 'microLesson' },
+      { id: 'missions', label: 'Missões', icon: Rocket, featureGate: 'missions' },
+      { id: 'teach', label: 'Ensinar', icon: ScrollText, featureGate: 'teach' },
+      { id: 'brain', label: 'Cérebro', icon: Dna, featureGate: 'brain' },
+      { id: 'roadmap', label: 'Roadmap', icon: Route, featureGate: 'roadmapAI' },
+      { id: 'discover', label: 'Discover', icon: Compass, featureGate: 'discover' },
     ],
   },
   {
@@ -68,7 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: false,
     items: [
       { id: 'emergency', label: 'Emergência', icon: Siren },
-      { id: 'progress', label: 'Progresso', icon: Trophy },
+      { id: 'progress', label: 'Progresso', icon: Trophy, featureGate: 'dashboardFull' },
     ],
   },
 ];
@@ -91,6 +94,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
   const { data: session } = useSession();
   const user = session?.user as any;
   const [collapsed, setCollapsed] = useState(false);
+  const plan = (user?.plan || 'FREE') as Plan;
 
   const isActive = useCallback((id: Tab) => {
     if (id === 'notebooks') return activeTab === 'notebooks' || activeTab === 'notebook-edit';
@@ -159,6 +163,8 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
                 isActive={isActive}
                 onTabChange={onTabChange}
                 hasActive={hasActive}
+                plan={plan}
+                onUpgrade={onUpgrade}
               />
             );
           })}
@@ -246,29 +252,37 @@ function NavGroupSection({
   isActive,
   onTabChange,
   hasActive,
+  plan,
+  onUpgrade,
 }: {
   group: NavGroup;
   collapsed: boolean;
   isActive: (id: Tab) => boolean;
   onTabChange: (tab: Tab) => void;
   hasActive: boolean;
+  plan: Plan;
+  onUpgrade: () => void;
 }) {
   const [open, setOpen] = useState(group.defaultOpen ?? false);
 
   if (collapsed) {
     return (
       <div className="flex flex-col gap-0.5">
-        {group.items.map(item => (
-          <SidebarItem
-            key={item.id}
-            id={item.id}
-            label={item.label}
-            icon={item.icon}
-            active={isActive(item.id)}
-            collapsed={collapsed}
-            onClick={() => onTabChange(item.id)}
-          />
-        ))}
+        {group.items.map(item => {
+          const locked = item.featureGate ? !canAccess(plan, item.featureGate) : false;
+          return (
+            <SidebarItem
+              key={item.id}
+              id={item.id}
+              label={item.label}
+              icon={item.icon}
+              active={isActive(item.id)}
+              collapsed={collapsed}
+              locked={locked}
+              onClick={() => locked ? onUpgrade() : onTabChange(item.id)}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -290,17 +304,21 @@ function NavGroupSection({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ml-1 flex flex-col gap-0.5 border-l border-[var(--ws-glass-border)] pl-2 pt-0.5">
-          {group.items.map(item => (
-            <SidebarItem
-              key={item.id}
-              id={item.id}
-              label={item.label}
-              icon={item.icon}
-              active={isActive(item.id)}
-              collapsed={collapsed}
-              onClick={() => onTabChange(item.id)}
-            />
-          ))}
+          {group.items.map(item => {
+            const locked = item.featureGate ? !canAccess(plan, item.featureGate) : false;
+            return (
+              <SidebarItem
+                key={item.id}
+                id={item.id}
+                label={item.label}
+                icon={item.icon}
+                active={isActive(item.id)}
+                collapsed={collapsed}
+                locked={locked}
+                onClick={() => locked ? onUpgrade() : onTabChange(item.id)}
+              />
+            );
+          })}
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -316,6 +334,7 @@ function SidebarItem({
   active,
   collapsed,
   onClick,
+  locked = false,
 }: {
   id: Tab;
   label: string;
@@ -323,17 +342,18 @@ function SidebarItem({
   active: boolean;
   collapsed: boolean;
   onClick: () => void;
+  locked?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      data-ws-tooltip={collapsed ? label : undefined}
+      data-ws-tooltip={collapsed ? (locked ? `${label} (Upgrade)` : label) : undefined}
       className={`group flex w-full items-center gap-3 rounded-ws-button px-3 py-2 text-sm font-medium transition-colors duration-150 ${
-        active
+        active && !locked
           ? 'bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)] text-[var(--ws-accent)]'
           : 'text-[var(--ws-text-tertiary)] hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-secondary)]'
-      } ${collapsed ? 'justify-center px-2' : ''}`}
-      aria-current={active ? 'page' : undefined}
+      } ${locked ? 'opacity-70 hover:opacity-100' : ''} ${collapsed ? 'relative justify-center px-2' : ''}`}
+      aria-current={active && !locked ? 'page' : undefined}
     >
       <Icon size={18} className="shrink-0" />
       <AnimatePresence mode="wait">
@@ -349,6 +369,18 @@ function SidebarItem({
           </motion.span>
         )}
       </AnimatePresence>
+      {locked && !collapsed && (
+        <Lock
+          size={12}
+          className="ml-auto shrink-0 text-[var(--ws-gold)]"
+        />
+      )}
+      {locked && collapsed && (
+        <Lock
+          size={8}
+          className="absolute right-1 top-1 shrink-0 text-[var(--ws-gold)]"
+        />
+      )}
     </button>
   );
 }
