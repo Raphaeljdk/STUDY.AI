@@ -1,56 +1,19 @@
 'use client';
 
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { EnsoCircle } from './EnsoCircle';
 import { SeigaihaPattern } from './SeigaihaPattern';
 import { WoodblockTexture } from './WoodblockTexture';
 import { FloatingElements } from './FloatingElements';
 import { ParticlesEffect } from './ParticlesEffect';
 import { ZenButton } from './ZenButton';
-import { ArrowRight, Users, Clock, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
-// Simulated active users counter
-function useActiveUsers() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const base = 87;
-    const tick = () => setCount(base + Math.floor(Math.random() * 30));
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, []);
-  return count;
-}
 
-// Countdown timer
-function CountdownTimer() {
-  const [timeLeft, setTimeLeft] = useState({ mins: 14, secs: 59 });
-
-  useEffect(() => {
-    const end = new Date().getTime() + 15 * 60 * 1000;
-    const id = setInterval(() => {
-      const diff = Math.max(0, end - new Date().getTime());
-      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const s = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ mins: m, secs: s });
-      if (diff <= 0) clearInterval(id);
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div className="inline-flex items-center gap-2 rounded-ws-button border border-[var(--ws-accent)]/20 bg-[var(--ws-accent)]/5 px-3 py-1.5 text-xs font-medium text-[var(--ws-accent)]">
-      <Clock size={12} className="animate-pulse" />
-      <span>Acesso completo por</span>
-      <span className="tabular-nums font-bold">{String(timeLeft.mins).padStart(2, '0')}:{String(timeLeft.secs).padStart(2, '0')}</span>
-    </div>
-  );
-}
 
 // Social proof bar
 function SocialProof() {
-  const activeUsers = useActiveUsers();
   return (
     <div className="flex items-center gap-3">
       <div className="flex -space-x-2">
@@ -65,8 +28,7 @@ function SocialProof() {
         ))}
       </div>
       <div className="text-xs">
-        <span className="font-semibold text-[var(--ws-text-secondary)]">{activeUsers} pessoas</span>{' '}
-        <span className="text-[var(--ws-text-tertiary)]">estudando agora</span>
+        <span className="text-[var(--ws-text-tertiary)]">Plataforma de estudos com IA</span>
         <span className="live-dot ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--ws-verdigris)]" />
       </div>
     </div>
@@ -91,7 +53,7 @@ export function HeroSection() {
   }, []);
   const handleMouseLeave = useCallback(() => setEnsoOffset({ x: 0, y: 0 }), []);
 
-  const activeUsers = useActiveUsers();
+
 
   return (
     <section
@@ -181,34 +143,27 @@ export function HeroSection() {
               </ZenButton>
             </motion.div>
 
-            {/* Countdown + Social proof */}
+            {/* Social proof */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.1 }}
-              className="mt-8 flex flex-wrap items-center gap-4"
+              className="mt-8"
             >
-              <CountdownTimer />
               <SocialProof />
             </motion.div>
 
-            {/* Trust indicators */}
+            {/* Trust indicator */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.2 }}
-              className="mt-8 flex flex-wrap items-center gap-6 text-sm text-[var(--ws-text-tertiary)]"
+              className="mt-6"
             >
-              {[[`${(activeUsers * 120).toLocaleString('pt-BR')}`, 'estudantes'], ['98%', 'satisfação'], ['40+', 'universidades']].map(
-                ([value, label], i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="h-1 w-10 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-accent) 25%, transparent)' }} />
-                    <span>
-                      <strong className="text-[var(--ws-text-secondary)]">{value}</strong> {label}
-                    </span>
-                  </div>
-                )
-              )}
+              <div className="inline-flex items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-2 text-xs text-[var(--ws-text-tertiary)]">
+                <Sparkles size={12} className="text-[var(--ws-accent)]" />
+                <span>Comece grátis — 7 dias de teste em todos os planos</span>
+              </div>
             </motion.div>
           </motion.div>
 

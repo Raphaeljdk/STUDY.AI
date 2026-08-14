@@ -1,26 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Users } from 'lucide-react';
 
 const footerLinks = {
-  Produto: ['Recursos', 'Roadmap', 'Integracoes'],
+  Produto: ['Recursos', 'Roadmap', 'Integrações'],
   Empresa: ['Sobre', 'Blog', 'Carreiras', 'Contato'],
-  Recursos: ['Documentacao', 'Comunidade', 'Tutoriais', 'FAQ'],
+  Recursos: ['Documentação', 'Comunidade', 'Tutoriais', 'FAQ'],
   Legal: ['Privacidade', 'Termos', 'Cookies'],
 };
 
 export function FooterZen() {
-  const [activeUsers, setActiveUsers] = useState(0);
-
-  useEffect(() => {
-    const base = 87;
-    const tick = () => setActiveUsers(base + Math.floor(Math.random() * 30));
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <footer className="border-t border-[var(--ws-glass-border)] bg-[var(--ws-bg-dark)]">
       <div className="mx-auto max-w-[1440px] px-6 py-16 lg:px-24">
@@ -40,12 +29,12 @@ export function FooterZen() {
               </span>
             </div>
             <p className="mb-6 max-w-xs text-sm leading-relaxed text-[var(--ws-text-tertiary)]">
-              A beleza do aprendizado na imperfeicao. Uma plataforma que respeita seu ritmo natural de conhecimento.
+              A beleza do aprendizado na imperfeição. Uma plataforma que respeita seu ritmo natural de conhecimento.
             </p>
             <div className="mb-4 flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
               <span className="live-dot inline-block h-2 w-2 rounded-full bg-[var(--ws-verdigris)]" />
               <Users size={12} />
-              <span>{activeUsers} pessoas estudando agora</span>
+              <span>Plataforma ativa</span>
             </div>
             <div className="font-serif-jp text-2xl text-[var(--ws-text-tertiary)] opacity-30">
               侘寂
@@ -78,7 +67,7 @@ export function FooterZen() {
             &copy; {new Date().getFullYear()} StudyAI. Todos os direitos reservados.
           </p>
           <p className="font-serif-jp text-xs text-[var(--ws-text-tertiary)] opacity-40">
-            一期一会 — Cada encontro e unico
+            一期一会 — Cada encontro é único
           </p>
         </div>
       </div>
