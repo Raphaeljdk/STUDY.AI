@@ -70,3 +70,33 @@ Stage Summary:
 - Missions API completely rewritten (POST + GET)
 - ESLint passes clean
 - Changes: `src/lib/db.ts`, `src/app/api/missions/route.ts`
+
+---
+Task ID: 1
+Agent: Main
+Task: Implement Stripe payment system with 2 plans (Samurai/Sensei), monthly/annual billing, 7-day trial
+
+Work Log:
+- Installed stripe SDK via bun
+- Added Stripe API keys to .env (test mode)
+- Updated plan-gating.ts with correct prices (Samurai R$19.90, Sensei R$34.90) and annual prices
+- Updated usage.ts isPremiumUser() to recognize SAMURAI/SENSEI plans (not just 'PREMIUM')
+- Rewrote /api/checkout/route.ts to support 2 plans + monthly/annual billing + 7-day trial
+- Created /api/stripe/webhook/route.ts for handling Stripe events (checkout.completed, subscription.updated, subscription.deleted, invoice.payment_failed)
+- Created /api/stripe/portal/route.ts for customer billing portal management
+- Created /api/subscription/route.ts for subscription status checking
+- Completely redesigned PremiumUpgrade.tsx with 2-plan pricing modal (Samurai + Sensei), billing toggle (monthly/annual), feature comparison table
+- Updated DashboardView.tsx to handle ?upgrade=success/?upgrade=cancelled URL params with toast notifications
+- Updated Sidebar.tsx with plan name display (🥋 Shojin/Samurai, 🧠 Sensei), "Gerenciar assinatura" for premium users, "Ver planos" for free users
+- Updated PricingSection.tsx (landing page) with correct prices and feature descriptions
+- Updated useUsage.ts initial state to match new free limits (20 messages, 10 flashcards)
+- Removed old /api/stripe-webhook route (had 'PREMIUM' instead of proper tier names)
+- Build passes, lint clean
+
+Stage Summary:
+- Complete Stripe payment integration with 2-tier pricing
+- Plans: Shojin (Free), Samurai (R$19.90/mo or R$199/yr), Sensei (R$34.90/mo or R$349/yr)
+- 7-day free trial on both paid plans
+- Customer portal for subscription management
+- Webhook handling for subscription lifecycle
+- Beautiful pricing UI with toggle and comparison table

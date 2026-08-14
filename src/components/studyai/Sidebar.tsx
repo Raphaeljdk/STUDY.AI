@@ -144,7 +144,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
             >
               <p className="truncate text-sm font-medium text-[var(--ws-text-primary)]">{user?.name || 'Usuário'}</p>
               <p className="text-xs text-[var(--ws-accent)]">
-                {usage.isPremium ? 'Premium' : isAdmin ? 'Admin · Ilimitado' : 'Gratuito'}
+                {plan === 'SENSEI' ? '🧠 Sensei' : plan === 'SAMURAI' ? '🥋 Samurai' : isAdmin ? 'Admin · Ilimitado' : '🥋 Shojin'}
               </p>
             </motion.div>
           )}
@@ -184,24 +184,39 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
         </div>
       </nav>
 
-      {/* Usage bars for free users */}
-      {!usage.isPremium && !usage.loading && !collapsed && (
+      {/* Usage bars / manage subscription */}
+      {!collapsed && (
         <motion.div
           className="shrink-0 border-t border-[var(--ws-glass-border)] px-3 py-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
-          <div className="flex flex-col gap-2">
-            <UsageBar type="chatMessages" used={usage.usage.chatMessages} limit={usage.limits.chatMessages} />
-            <UsageBar type="flashcards" used={usage.usage.flashcards} limit={usage.limits.flashcards} />
+          {usage.isPremium ? (
             <button
-              onClick={onUpgrade}
+              onClick={async () => {
+                try {
+                  const data = await (await import('@/lib/api')).apiFetch('/api/stripe/portal', { method: 'POST' });
+                  if (data.url) window.location.href = data.url;
+                } catch {}
+              }}
               className="flex w-full items-center justify-center gap-1.5 rounded-ws-button bg-[color-mix(in_srgb,var(--ws-accent)_8%,transparent)] px-3 py-2 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_15%,transparent)]"
             >
               <Crown size={12} />
-              <span>Upgrade Premium</span>
+              <span>Gerenciar assinatura</span>
             </button>
-          </div>
+          ) : !usage.loading ? (
+            <div className="flex flex-col gap-2">
+              <UsageBar type="chatMessages" used={usage.usage.chatMessages} limit={usage.limits.chatMessages} />
+              <UsageBar type="flashcards" used={usage.usage.flashcards} limit={usage.limits.flashcards} />
+              <button
+                onClick={onUpgrade}
+                className="flex w-full items-center justify-center gap-1.5 rounded-ws-button bg-[color-mix(in_srgb,var(--ws-accent)_8%,transparent)] px-3 py-2 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_15%,transparent)]"
+              >
+                <Crown size={12} />
+                <span>Ver planos</span>
+              </button>
+            </div>
+          ) : null}
         </motion.div>
       )}
 

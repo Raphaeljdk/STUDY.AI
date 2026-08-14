@@ -14,9 +14,9 @@ interface UsageState {
 const initialState: UsageState = {
   plan: 'FREE',
   isPremium: false,
-  limits: { chatMessages: 5, flashcards: 3 },
+  limits: { chatMessages: 20, flashcards: 10 },
   usage: { chatMessages: 0, flashcards: 0 },
-  remaining: { chatMessages: 5, flashcards: 3 },
+  remaining: { chatMessages: 20, flashcards: 10 },
   loading: true,
 };
 

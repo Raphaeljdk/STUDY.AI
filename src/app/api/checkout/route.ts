@@ -1,26 +1,57 @@
-import { NextResponse } from 'next/server';
-import { getSessionUser, isPremiumUser } from '@/lib/usage';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionUser } from '@/lib/usage';
 import { db, nowISO } from '@/lib/db';
 
-export async function POST(request: Request) {
+// ── Stripe Plan Config ──
+type PlanTier = 'SAMURAI' | 'SENSEI';
+type BillingCycle = 'monthly' | 'annual';
+
+interface PlanConfig {
+  name: string;
+  monthly: number;   // cents
+  annual: number;    // cents
+  trialDays: number;
+}
+
+const PLANS: Record<PlanTier, PlanConfig> = {
+  SAMURAI: {
+    name: 'Samurai — Pro',
+    monthly: 1990,   // R$ 19,90
+    annual: 19900,   // R$ 199,00
+    trialDays: 7,
+  },
+  SENSEI: {
+    name: 'Sensei — Premium',
+    monthly: 3490,   // R$ 34,90
+    annual: 34900,   // R$ 349,00
+    trialDays: 7,
+  },
+};
+
+export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser();
-    if (!user) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
-    if (isPremiumUser(user)) {
-      return NextResponse.json({ error: 'Voce ja e Premium' }, { status: 400 });
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+    const body = await request.json();
+    const planTier = (body.plan || 'SAMURAI') as PlanTier;
+    const billingCycle = (body.billing || 'monthly') as BillingCycle;
+
+    if (!PLANS[planTier]) {
+      return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
     }
 
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const priceId = process.env.STRIPE_PREMIUM_PRICE_ID;
+    const planConfig = PLANS[planTier];
+    const amount = billingCycle === 'monthly' ? planConfig.monthly : planConfig.annual;
 
-    if (!stripeSecretKey || !priceId) {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
       return NextResponse.json({
-        error: 'Pagamento nao disponivel no momento',
+        error: 'Pagamento indisponível no momento',
         code: 'STRIPE_NOT_CONFIGURED',
       }, { status: 503 });
     }
 
-    // Dynamic import of Stripe (server-only)
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
 
@@ -33,27 +64,53 @@ export async function POST(request: Request) {
         metadata: { userId: user.id },
       });
       customerId = customer.id;
-      await db.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId, updatedAt: nowISO() } });
+      await db.user.update({
+        where: { id: user.id },
+        data: { stripeCustomerId: customerId, updatedAt: nowISO() },
+      });
     }
 
     const origin = request.headers.get('origin') || 'https://study-ai-nine-xi.vercel.app';
 
+    // Build recurring interval
+    const recurringInterval = billingCycle === 'monthly' ? 'month' : 'year';
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/?upgrade=success`,
+      line_items: [
+        {
+          price_data: {
+            currency: 'brl',
+            unit_amount: amount,
+            recurring: { interval: recurringInterval },
+            product_data: {
+              name: planConfig.name,
+              description: billingCycle === 'monthly'
+                ? `Plano ${planTier === 'SAMURAI' ? 'Samurai Pro' : 'Sensei Premium'} — Mensal`
+                : `Plano ${planTier === 'SAMURAI' ? 'Samurai Pro' : 'Sensei Premium'} — Anual`,
+              metadata: { planTier, billingCycle },
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${origin}/?upgrade=success&plan=${planTier.toLowerCase()}`,
       cancel_url: `${origin}/?upgrade=cancelled`,
-      metadata: { userId: user.id },
+      metadata: { userId: user.id, planTier, billingCycle },
       subscription_data: {
-        trial_period_days: 7,
-        metadata: { userId: user.id },
+        trial_period_days: planConfig.trialDays,
+        metadata: { userId: user.id, planTier, billingCycle },
       },
+      allow_promotion_codes: true,
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Checkout error:', error);
-    return NextResponse.json({ error: 'Erro ao criar sessao de pagamento' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erro ao criar sessão de pagamento', details: error.message },
+      { status: 500 }
+    );
   }
 }

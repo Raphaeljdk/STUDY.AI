@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -230,8 +231,35 @@ export function DashboardView() {
   const [editNotebookId, setEditNotebookId] = useState<string | null>(null);
   const activeUsers = useActiveUsers();
   const usage = useUsage();
+  const searchParams = useSearchParams();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeTrigger, setUpgradeTrigger] = useState<'chat' | 'flashcards' | 'nav'>('nav');
+
+  // Handle ?upgrade=success / ?upgrade=cancelled URL params
+  useEffect(() => {
+    const upgradeParam = searchParams.get('upgrade');
+    if (upgradeParam === 'success') {
+      toast({
+        title: '🎉 Bem-vindo ao StudyAI Pro!',
+        description: 'Seu plano está ativo com 7 dias grátis. Aproveite!',
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    } else if (upgradeParam === 'cancelled') {
+      toast({
+        title: 'Pagamento cancelado',
+        description: 'Você pode tentar novamente quando quiser.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', '/');
+    } else if (upgradeParam === 'manage') {
+      toast({
+        title: 'Gerenciamento de assinatura',
+        description: 'Suas alterações foram salvas.',
+      });
+      window.history.replaceState({}, '', '/');
+    }
+  }, [searchParams]);
 
   const openUpgrade = (type: 'chat' | 'flashcards' | 'nav' = 'nav') => {
     setUpgradeTrigger(type);

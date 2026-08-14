@@ -120,6 +120,32 @@ export const PLAN_LABELS: Record<Plan, string> = {
 
 export const PLAN_PRICES: Record<Plan, string> = {
   FREE: 'Grátis',
-  SAMURAI: 'R$ 29',
-  SENSEI: 'R$ 59',
+  SAMURAI: 'R$ 19,90',
+  SENSEI: 'R$ 34,90',
+};
+
+export const PLAN_PRICES_ANNUAL: Record<Exclude<Plan, 'FREE'>, string> = {
+  SAMURAI: 'R$ 199,00',
+  SENSEI: 'R$ 349,00',
+};
+
+export const PLAN_MONTHLY_EQUIVALENT: Record<Exclude<Plan, 'FREE'>, string> = {
+  SAMURAI: 'R$ 16,58',
+  SENSEI: 'R$ 29,08',
+};
+
+export const PLAN_DISPLAY_NAMES: Record<Plan, string> = {
+  FREE: 'Shojin',
+  SAMURAI: 'Samurai',
+  SENSEI: 'Sensei',
+};
+
+export const PLAN_DESCRIPTIONS: Record<Exclude<Plan, 'FREE'>, string> = {
+  SAMURAI: 'Para quem quer evoluir nos estudos.',
+  SENSEI: 'Para quem quer levar os estudos ao próximo nível.',
+};
+
+export const PLAN_BADGES: Record<Exclude<Plan, 'FREE'>, string> = {
+  SAMURAI: 'Mais popular',
+  SENSEI: 'Experiência completa',
 };

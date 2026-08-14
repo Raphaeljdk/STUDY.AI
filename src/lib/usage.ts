@@ -1,10 +1,11 @@
 import { db, genId } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import type { Plan } from './plan-gating';
 
 export const FREE_LIMITS = {
-  chatMessages: 5,
-  flashcards: 3,
+  chatMessages: 20,
+  flashcards: 10,
 } as const;
 
 export type UsageType = 'chatMessages' | 'flashcards';
@@ -16,7 +17,6 @@ function getTodayStart(): Date {
 
 export async function getUsage(userId: string) {
   const today = getTodayStart().toISOString();
-  // findUnique with compound key → use findFirst (unique index on userId+date)
   const usage = await db.dailyUsage.findFirst({
     where: { userId, date: today },
   });
@@ -30,8 +30,8 @@ export async function canUse(userId: string, type: UsageType): Promise<{ allowed
   const user = await db.user.findUnique({ where: { id: userId }, select: ['plan', 'role'] });
   if (!user) return { allowed: false, used: 0, limit: 0 };
 
-  // Admin and premium bypass limits
-  if (user.role === 'ADMIN' || user.plan === 'PREMIUM') {
+  // Admin and any paid plan bypass limits
+  if (user.role === 'ADMIN' || user.plan === 'SAMURAI' || user.plan === 'SENSEI') {
     return { allowed: true, used: 0, limit: Infinity };
   }
 
@@ -46,10 +46,8 @@ export async function incrementUsage(userId: string, type: UsageType): Promise<v
   const today = getTodayStart().toISOString();
   const field = type === 'chatMessages' ? 'chatMessages' : 'flashcards';
 
-  // Replace Prisma upsert with findFirst + create/update
   const existing = await db.dailyUsage.findFirst({ where: { userId, date: today } });
   if (existing) {
-    // Atomic increment via raw SQL
     await db.dailyUsage.exec(
       `UPDATE "DailyUsage" SET "${field}" = "${field}" + 1 WHERE "userId" = ? AND "date" = ?`,
       userId, today
@@ -70,5 +68,11 @@ export async function getSessionUser() {
 
 export function isPremiumUser(user: { plan?: string; role?: string } | null): boolean {
   if (!user) return false;
-  return user.role === 'ADMIN' || user.plan === 'PREMIUM';
+  return user.role === 'ADMIN' || user.plan === 'SAMURAI' || user.plan === 'SENSEI';
+}
+
+export function getUserPlan(user: { plan?: string; role?: string } | null): Plan {
+  if (!user) return 'FREE';
+  if (user.role === 'ADMIN') return 'SENSEI'; // Admin gets full access
+  return (user.plan as Plan) || 'FREE';
 }
