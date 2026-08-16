@@ -88,7 +88,7 @@ function ProgressRing({
         strokeLinecap="round"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
-        className="transition-all duration-700 ease-out"
+        className="transition-all duration-300 ease-out"
       />
     </svg>
   );
@@ -279,7 +279,7 @@ function MissionDetail({
       {/* Back */}
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-sm font-medium transition-ws"
+        className="flex items-center gap-1.5 text-sm font-medium transition-ws min-h-[44px] px-1"
         style={{ color: 'var(--ws-text-tertiary)' }}
       >
         <ArrowLeft className="w-4 h-4" />
@@ -389,7 +389,7 @@ function MissionDetail({
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={"flex items-center gap-3 p-3.5 transition-ws"}
+                className={"flex items-center gap-3 p-3.5 transition-ws min-h-[44px]"}
                 style={{
                   borderRadius: 'var(--ws-radius-button)',
                   background: isStepDone
@@ -405,7 +405,7 @@ function MissionDetail({
                     whileTap={{ scale: 0.9 }}
                     onClick={() => handleCompleteStep(step.id)}
                     disabled={completingStep === step.id}
-                    className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-ws"
+                    className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center min-h-[44px] min-w-[44px] transition-ws"
                     style={{
                       border: '2px solid var(--ws-glass-border)',
                       background: 'transparent',
@@ -613,7 +613,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
   // ===== DETAIL VIEW =====
   if (selectedMission) {
     return (
-      <div className="relative min-h-full pb-24">
+      <div className="relative min-h-dvh pb-24">
         <MissionDetail
           mission={selectedMission}
           onBack={handleBackFromDetail}
@@ -625,7 +625,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
 
   // ===== MAIN LIST VIEW =====
   return (
-    <div className="relative min-h-full pb-24">
+    <div className="relative min-h-dvh pb-24">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -639,7 +639,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreateDialog(true)}
-          className="flex items-center justify-center w-10 h-10 rounded-full transition-ws flex-shrink-0"
+          className="flex items-center justify-center w-10 h-10 rounded-full transition-ws flex-shrink-0 min-h-[44px] min-w-[44px]"
           style={{
             background: 'var(--ws-accent)',
             color: 'var(--ws-text-on-dark)',
@@ -707,7 +707,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
             <div>
               <button
                 onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center gap-2 mb-3 w-full text-left"
+                className="flex items-center gap-2 mb-3 w-full text-left min-h-[44px]"
               >
                 <Trophy className="w-4 h-4" style={{ color: '#D97706' }} />
                 <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--ws-text-tertiary)' }}>
@@ -805,7 +805,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
                     <button
                       key={opt.value}
                       onClick={() => setFormTime(opt.value)}
-                      className="py-2.5 text-xs font-medium rounded-ws-button transition-ws"
+                      className="py-2.5 text-xs font-medium rounded-ws-button transition-ws min-h-[44px]"
                       style={{
                         background: isActive
                           ? 'color-mix(in srgb, var(--ws-accent) 10%, transparent)'

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo, Component, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -161,17 +161,11 @@ interface StatsData {
 }
 interface ChatMsg { id: string; role: string; content: string; createdAt: string; }
 
-// ========== ACTIVE USERS HOOK ==========
+// ========== ACTIVE USERS (static, no re-renders) ==========
+// Removed fake random counter that caused re-renders every 5s
 function useActiveUsers() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const base = 87;
-    const tick = () => setCount(base + Math.floor(Math.random() * 30));
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, []);
-  return count;
+  // Return a stable reference — no state, no interval, no re-renders
+  return useMemo(() => Math.floor(Math.random() * 20) + 80, []);
 }
 
 // ========== SWIPE HOOK ==========
@@ -308,7 +302,7 @@ export function DashboardView() {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--ws-bg)]" {...swipeHandlers}>
+    <div className="flex min-h-dvh flex-col bg-[var(--ws-bg)] lg:min-h-screen" {...swipeHandlers}>
       {/* Desktop Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -320,8 +314,8 @@ export function DashboardView() {
       />
 
       {/* Mobile Top Header Bar */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/90 px-4 py-2.5 backdrop-blur-xl lg:hidden">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] font-serif-jp text-xs font-bold text-[var(--ws-accent)]">
+      <header className="no-select sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/95 px-4 py-2.5 backdrop-blur-xl safe-top lg:hidden">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] font-serif-jp text-xs font-bold text-[var(--ws-accent)]">
           {user.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
         <div className="min-w-0 flex-1">
@@ -337,7 +331,7 @@ export function DashboardView() {
       </header>
 
       {/* Main content area */}
-      <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 sm:pb-24 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8">
+      <main className="dashboard-scroll flex-1 mx-auto w-full max-w-[1440px] px-3 pb-20 pt-3 sm:px-4 sm:pb-20 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8" role="main">
         {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
         {!usage.isPremium && !usage.loading && (
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
@@ -1495,9 +1489,9 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
         )}
       </div>
 
-      <div className="mx-auto max-w-3xl overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl">
+      <div className="mx-auto flex max-w-3xl flex-col overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] shadow-[var(--ws-shadow-medium)] backdrop-blur-xl h-[calc(100dvh-120px)] lg:h-[calc(100vh-120px)]">
         {/* Header */}
-        <div className="flex items-center gap-4 border-b border-[var(--ws-glass-border)] px-6 py-4">
+        <div className="flex shrink-0 items-center gap-3 border-b border-[var(--ws-glass-border)] px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-lg">
             {wisdom?.emoji || '🌱'}
             {isLoading && <div className="absolute -top-0.5 -right-0.5 h-3 w-3"><div className="h-full w-full animate-ping rounded-full bg-green-400" /></div>}
@@ -1524,7 +1518,7 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="h-[calc(100dvh-300px)] min-h-[300px] max-h-[600px] overflow-y-auto p-4 sm:p-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="space-y-6">
             {messages.map((msg) => (
                 <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -1617,7 +1611,7 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
         </div>
 
         {/* Input - textarea for multi-line */}
-        <div className="border-t border-[var(--ws-glass-border)] p-4">
+        <div className="shrink-0 border-t border-[var(--ws-glass-border)] p-3 sm:p-4">
           <div className="flex items-end gap-3 rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-3">
             <textarea
               ref={textareaRef}

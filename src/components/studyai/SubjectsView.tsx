@@ -798,7 +798,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
         <div>
           <button
             onClick={() => setSelectedSubjectId(null)}
-            className="mb-4 flex items-center gap-1.5 text-sm text-[var(--ws-text-tertiary)] transition-colors hover:text-[var(--ws-accent)]"
+            className="mb-4 flex items-center gap-1.5 text-sm text-[var(--ws-text-tertiary)] transition-colors hover:text-[var(--ws-accent)] min-h-[44px]"
           >
             <ArrowLeft size={16} />
             <span>Voltar as materias</span>
@@ -825,7 +825,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                 variant="ghost"
                 size="icon"
                 onClick={openEditDialog}
-                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 min-h-[44px] min-w-[44px]"
                 aria-label="Editar materia"
               >
                 <Pencil size={16} />
@@ -837,7 +837,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                   setDeleteTarget(subjectDetail.id);
                   setShowDeleteDialog(true);
                 }}
-                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-red-500 hover:bg-red-500/10"
+                className="h-9 w-9 text-[var(--ws-text-tertiary)] hover:text-red-500 hover:bg-red-500/10 min-h-[44px] min-w-[44px]"
                 aria-label="Excluir materia"
               >
                 <Trash2 size={16} />
@@ -915,7 +915,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
               variant="ghost"
               size="sm"
               onClick={() => setShowAddTopic(!showAddTopic)}
-              className="h-7 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 hover:text-[var(--ws-accent)]"
+              className="h-7 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 hover:text-[var(--ws-accent)] min-h-[44px]"
             >
               {showAddTopic ? <X size={14} /> : <Plus size={14} />}
               {showAddTopic ? 'Cancelar' : 'Adicionar topico'}
@@ -990,14 +990,14 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAddTopic(true)}
-                className="mt-3 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+                className="mt-3 gap-1.5 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 min-h-[44px]"
               >
                 <Plus size={14} />
                 Adicionar primeiro topico
               </Button>
             </div>
           ) : (
-            <div className="max-h-80 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1 custom-scrollbar scroll-touch">
               <AnimatePresence>
                 {detailTopics.map((topic, idx) => {
                   const mc = getMasteryColor(topic.mastery);
@@ -1074,7 +1074,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => onNavigate('tasks')}
-                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 min-h-[44px]"
               >
                 Ver tarefas
               </Button>
@@ -1102,7 +1102,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => onNavigate('sessions')}
-                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10"
+                className="ml-auto shrink-0 text-xs text-[var(--ws-accent)] hover:bg-[var(--ws-accent)]/10 min-h-[44px]"
               >
                 Ver sessoes
               </Button>
@@ -1130,7 +1130,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.3 }}
           className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--ws-glass-border)] py-16 text-center"
         >
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ws-accent)]/10">
@@ -1179,7 +1179,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
         {!selectedSubjectId && (
           <Button
             onClick={openAddDialog}
-            className="gap-2 bg-[var(--ws-accent)] text-white hover:bg-[var(--ws-accent)]/90"
+            className="gap-2 bg-[var(--ws-accent)] text-white hover:bg-[var(--ws-accent)]/90 min-h-[44px]"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Nova materia</span>

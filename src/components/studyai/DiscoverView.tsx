@@ -135,7 +135,7 @@ function OnboardingSection({ onQuickTopic }: { onQuickTopic: (topic: string) => 
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       className="mb-6"
     >
       {/* Main onboarding card */}
@@ -195,10 +195,9 @@ function OnboardingSection({ onQuickTopic }: { onQuickTopic: (topic: string) => 
           {QUICK_TOPICS.map((topic) => (
             <motion.button
               key={topic}
-              whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               onClick={() => onQuickTopic(topic)}
-              className="rounded-ws-button px-3.5 py-1.5 text-xs font-medium transition-ws"
+              className="rounded-ws-button px-3.5 py-1.5 text-xs font-medium transition-ws min-h-[44px]"
               style={{
                 background: 'var(--ws-glass)',
                 color: 'var(--ws-text-secondary)',
@@ -460,7 +459,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
   const hasActiveFilter = activeFilter !== 'todos' || !!searchQuery.trim();
 
   return (
-    <div className="relative min-h-full pb-24">
+    <div className="relative min-h-dvh pb-24">
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-serif-jp text-2xl font-bold mb-1" style={{ color: 'var(--ws-text-primary)' }}>
@@ -505,7 +504,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
               <button
                 key={opt.key}
                 onClick={() => { setActiveFilter(opt.key); setPage(1); }}
-                className="flex items-center gap-1.5 whitespace-nowrap rounded-ws-button px-3.5 py-2 text-xs font-medium transition-ws"
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-ws-button px-3.5 py-2 text-xs font-medium transition-ws min-h-[44px]"
                 style={{
                   background: isActive
                     ? typeConf ? typeConf.accentBg : 'color-mix(in srgb, var(--ws-accent) 10%, transparent)'
@@ -571,7 +570,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
           <button
             onClick={retryFetch}
             disabled={loading}
-            className="flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws"
+            className="flex items-center gap-2 rounded-ws-button px-5 py-2.5 text-sm font-medium text-white transition-ws min-h-[44px]"
             style={{
               background: 'var(--ws-accent)',
               boxShadow: 'var(--ws-shadow-soft)',
@@ -652,7 +651,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                       </div>
                       <button
                         onClick={(e) => handleSave(e, item.id)}
-                        className="flex-shrink-0 rounded-full p-1.5 transition-ws hover:scale-110"
+                        className="flex-shrink-0 rounded-full p-1.5 transition-ws hover:scale-110 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         style={{ color: item.isSaved ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)' }}
                         disabled={savingId === item.id}
                         aria-label={item.isSaved ? 'Remover dos salvos' : 'Salvar conteudo'}
@@ -695,7 +694,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                           <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--ws-glass-border)' }}>
                             <button
                               onClick={(e) => openSubjectSelector(e, item.id)}
-                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws min-h-[44px]"
                               style={{ background: typeConf.accentBg, color: typeConf.accent, border: `1px solid ${typeConf.accentBorder}` }}
                             >
                               <BookPlus className="h-3 w-3" />
@@ -703,7 +702,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                             </button>
                             <button
                               onClick={handleGenerateFlashcards}
-                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws min-h-[44px]"
                               style={{ background: 'var(--ws-glass)', color: 'var(--ws-text-secondary)', border: '1px solid var(--ws-glass-border)' }}
                             >
                               <Brain className="h-3 w-3" />
@@ -711,7 +710,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                             </button>
                             <button
                               onClick={handleGenerateQuestions}
-                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws"
+                              className="inline-flex items-center gap-1.5 rounded-ws-button px-3 py-1.5 text-xs font-medium transition-ws min-h-[44px]"
                               style={{ background: 'var(--ws-glass)', color: 'var(--ws-text-secondary)', border: '1px solid var(--ws-glass-border)' }}
                             >
                               <FileQuestion className="h-3 w-3" />
@@ -840,7 +839,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                   <button
                     key={sub}
                     onClick={() => setAiSubject(sub)}
-                    className="rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-ws"
+                    className="rounded-full px-2.5 py-1.5 text-[10px] font-medium transition-ws min-h-[44px]"
                     style={{
                       background: aiSubject === sub ? 'color-mix(in srgb, var(--ws-accent) 10%, transparent)' : 'var(--ws-glass)',
                       color: aiSubject === sub ? 'var(--ws-accent)' : 'var(--ws-text-tertiary)',
@@ -866,7 +865,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                     <button
                       key={d.key}
                       onClick={() => setAiDifficulty(d.key)}
-                      className="flex-1 rounded-ws-button py-2 text-xs font-medium transition-ws"
+                      className="flex-1 rounded-ws-button py-2 text-xs font-medium transition-ws min-h-[44px]"
                       style={{
                         background: isAct ? dc.bg : 'var(--ws-glass)',
                         color: isAct ? dc.color : 'var(--ws-text-secondary)',
@@ -931,12 +930,12 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
             </div>
           ) : (
             <>
-              <div className="max-h-64 overflow-y-auto space-y-2 mt-2">
+              <div className="max-h-64 overflow-y-auto space-y-2 mt-2 scroll-touch">
                 {subjects.map(sub => (
                   <button
                     key={sub.id}
                     onClick={() => setSelectedSubjectId(sub.id)}
-                    className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-ws"
+                    className="flex w-full items-center gap-3 rounded-ws-button p-3 text-left transition-ws min-h-[44px]"
                     style={{
                       background: selectedSubjectId === sub.id
                         ? 'color-mix(in srgb, var(--ws-accent) 8%, transparent)'

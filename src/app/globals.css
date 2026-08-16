@@ -146,12 +146,27 @@
     outline-color: var(--ring, rgba(0,0,0,0.3));
     outline-offset: 2px;
   }
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     background-color: var(--ws-bg);
     color: var(--ws-text-primary);
     font-family: var(--font-inter), 'Inter', sans-serif;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
   }
+  /* Touch optimization for interactive elements */
+  button, a, [role="button"], input, textarea, select {
+    touch-action: manipulation;
+  }
+  /* Prevent layout shifts from scrollbar on mobile */
+  scrollbar-gutter: stable;
 }
 
 /* ===== KEYBOARD NAVIGATION (Accessibility) ===== */
@@ -431,9 +446,61 @@
   color: var(--ws-text-on-dark);
 }
 
-/* ===== SMOOTH SCROLL ===== */
-html {
-  scroll-behavior: smooth;
+/* ===== MOBILE PERFORMANCE OPTIMIZATIONS ===== */
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dashboard scroll container - proper iOS handling */
+.dashboard-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  /* Fix for iOS 100vh bug */
+  height: 100dvh;
+}
+
+/* Prevent pull-to-refresh on the app */
+body.app-loaded {
+  overscroll-behavior: none;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Smooth momentum scrolling on iOS */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Prevent text selection on UI elements (not on content) */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Fix 100vh on mobile browsers */
+.h-dvh {
+  height: 100dvh;
+}
+.min-h-dvh {
+  min-height: 100dvh;
 }
 
 /* ===== TIPAP EDITOR STYLES ===== */

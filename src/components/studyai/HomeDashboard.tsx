@@ -573,26 +573,24 @@ export function HomeDashboard({
       <motion.section
         className="mb-6"
         {...fadeInUp}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.3, delay: 0.3 }}
         aria-label="Acoes rapidas"
       >
-        <div className="flex flex-wrap gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
           {[
             { icon: BookPlus, label: 'Adicionar materia', action: () => onNavigate('notebooks') },
             { icon: ClipboardList, label: 'Nova tarefa', action: () => onNavigate('tasks') },
             { icon: Play, label: 'Iniciar sessao', action: () => onNavigate('timer') },
-            { icon: RotateCcw, label: 'Revisar flashcards', action: () => onNavigate('flashcards') },
+            { icon: RotateCcw, label: 'Revisar cards', action: () => onNavigate('flashcards') },
           ].map((btn) => (
             <motion.button
               key={btn.label}
-              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.97 }}
               onClick={btn.action}
-              className="flex items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-2.5 text-sm font-medium text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/20 hover:text-[var(--ws-accent)]"
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-3 py-2.5 text-xs font-medium text-[var(--ws-text-secondary)] transition-colors hover:border-[var(--ws-accent)]/20 hover:text-[var(--ws-accent)] sm:px-4 sm:text-sm"
             >
               <btn.icon size={15} strokeWidth={1.5} />
-              <span className="hidden sm:inline">{btn.label}</span>
-              <span className="sm:hidden text-xs">{btn.label}</span>
+              <span>{btn.label}</span>
             </motion.button>
           ))}
         </div>

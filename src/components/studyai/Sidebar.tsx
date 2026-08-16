@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, BookOpen, ListTodo, Target, CalendarDays,
   Timer, MessageCircle,
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
-  ChevronLeft, ChevronRight, LogOut, Crown, Shield, Users, ChevronDown,
+  ChevronLeft, ChevronRight, LogOut, Crown, Shield, ChevronDown,
   BookText, Layers, ScrollText, Lock,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { UsageBar } from './PremiumUpgrade';
 import { PWAInstallButton } from '@/components/PWAInstallPrompt';
 import type { Tab } from './DashboardView';
-import { canAccess, TAB_FEATURE_MAP, FEATURE_MIN_PLAN, type Plan } from '@/lib/plan-gating';
+import { canAccess, type Plan } from '@/lib/plan-gating';
 
 type LucideIcon = typeof Home;
 
@@ -221,32 +221,16 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
       )}
 
       {/* Footer */}
-      <div className="shrink-0 border-t border-[var(--ws-glass-border)] px-2 py-3">
+      <div className="shrink-0 border-t border-[var(--ws-glass-border)] px-2 py-2.5">
         {/* PWA Install Button */}
         <div className="mb-2">
           <PWAInstallButton collapsed={collapsed} />
         </div>
 
-        {/* Active users */}
-        <AnimatePresence mode="wait">
-          {!collapsed && (
-            <motion.div
-              className="mb-2 flex items-center gap-1.5 px-2 text-xs text-[var(--ws-text-tertiary)]"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[var(--ws-verdigris)]" />
-              <Users size={10} />
-              <span>{activeUsers} online</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="flex items-center gap-1">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-ws-button px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-secondary)]"
+            className="flex min-h-[36px] flex-1 items-center justify-center gap-2 rounded-ws-button px-3 py-2 text-xs text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-text-secondary)]"
             aria-label={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
           >
             {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Recolher</span></>}
@@ -254,7 +238,7 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
           <button
             onClick={() => signOut({ callbackUrl: '/' })}
             data-ws-tooltip="Sair"
-            className="flex items-center justify-center rounded-ws-button px-2 py-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-accent)]"
+            className="flex min-h-[36px] items-center justify-center rounded-ws-button px-2.5 py-2 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)] hover:text-[var(--ws-accent)]"
             aria-label="Sair"
           >
             <LogOut size={16} />

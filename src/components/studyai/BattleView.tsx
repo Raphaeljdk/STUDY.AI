@@ -213,7 +213,7 @@ function SubjectSelection({ onStart }: { onStart: (subject: string) => Promise<v
                   setSelectedSubject(isSelected ? null : subj.name);
                   setCustomSubject('');
                 }}
-                className="flex items-center gap-2.5 p-3.5 text-left transition-ws"
+                className="flex items-center gap-2.5 p-3.5 text-left transition-ws min-h-[44px]"
                 style={{
                   borderRadius: 'var(--ws-radius-card)',
                   background: isSelected
@@ -494,7 +494,7 @@ function BattleScreen({
                   whileTap={!isAnswered ? { scale: 0.98 } : undefined}
                   onClick={() => handleSelectOption(idx)}
                   disabled={isAnswered || showConfidence}
-                  className="w-full flex items-center gap-3 p-4 text-left transition-ws"
+                  className="w-full flex items-center gap-3 p-4 text-left transition-ws min-h-[44px]"
                   style={{
                     borderRadius: 'var(--ws-radius-button)',
                     background: optionBg,
@@ -549,7 +549,7 @@ function BattleScreen({
                   key={level.value}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleConfidence(level.value)}
-                  className="flex flex-col items-center gap-1.5 p-3 transition-ws hover-lift"
+                  className="flex flex-col items-center gap-1.5 p-3 transition-ws hover-lift min-h-[44px]"
                   style={{
                     borderRadius: 'var(--ws-radius-button)',
                     background: 'var(--ws-glass)',
@@ -714,7 +714,7 @@ function ResultsScreen({
         <div className="pt-2">
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center gap-2 mx-auto text-sm font-medium transition-ws"
+            className="flex items-center gap-2 mx-auto text-sm font-medium transition-ws min-h-[44px] px-2"
             style={{ color: 'var(--ws-text-tertiary)' }}
           >
             <History className="w-4 h-4" />
@@ -732,7 +732,7 @@ function ResultsScreen({
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="space-y-2 pt-3 max-h-64 overflow-y-auto">
+                <div className="space-y-2 pt-3 max-h-64 overflow-y-auto scroll-touch">
                   {history.map((item, i) => (
                     <div
                       key={item.id}
@@ -881,7 +881,7 @@ export function BattleView() {
   };
 
   return (
-    <div className="relative min-h-full pb-24">
+    <div className="relative min-h-dvh pb-24">
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-serif-jp text-2xl font-bold mb-1" style={{ color: 'var(--ws-text-primary)' }}>

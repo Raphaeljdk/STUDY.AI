@@ -110,12 +110,12 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
     <>
       {/* Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl lg:hidden"
+        className="no-select fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--ws-glass-border)] bg-[var(--ws-glass)] backdrop-blur-xl lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         role="navigation"
         aria-label="Navegação mobile"
       >
-        <div className="flex h-[58px] items-center justify-around px-1">
+        <div className="flex h-[60px] items-center justify-around px-1">
           {BOTTOM_BAR_IDS.map(id => {
             const item = ALL_ITEMS.find(i => i.id === id);
             if (!item) return null;
@@ -125,7 +125,7 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
               <button
                 key={id}
                 onClick={() => onTabChange(id)}
-                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
+                className={`relative flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
                   active
                     ? 'text-[var(--ws-accent)]'
                     : 'text-[var(--ws-text-tertiary)] active:text-[var(--ws-text-secondary)]'
@@ -150,7 +150,7 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
           {/* More Button */}
           <button
             onClick={() => setMoreOpen(true)}
-            className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
+            className={`relative flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
               isMoreActive
                 ? 'text-[var(--ws-accent)]'
                 : 'text-[var(--ws-text-tertiary)] active:text-[var(--ws-text-secondary)]'
@@ -212,7 +212,7 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
                   <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ws-text-tertiary)]">
                     {groupName}
                   </p>
-                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                     {groupItems.map(item => {
                       const active = isActive(item.id);
                       const locked = item.featureGate ? !canAccess(plan, item.featureGate) : false;
@@ -221,7 +221,7 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
                         <button
                           key={item.id}
                           onClick={() => locked ? (onUpgrade?.() || handleSelect(item.id)) : handleSelect(item.id)}
-                          className={`relative flex flex-col items-center gap-1.5 rounded-ws-card px-2 py-3 transition-colors ${
+                          className={`relative flex min-h-[56px] flex-col items-center gap-1.5 rounded-ws-card px-2 py-3 transition-colors ${
                             active && !locked
                               ? 'bg-[color-mix(in_srgb,var(--ws-accent)_12%,transparent)] text-[var(--ws-accent)]'
                               : locked
@@ -269,11 +269,11 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
               <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ws-text-tertiary)]">
                 Conta
               </p>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 {isPremium && (
                   <button
                     onClick={handleManageSubscription}
-                    className="flex items-center gap-3 rounded-ws-card px-3 py-3 text-sm text-[var(--ws-text-secondary)] transition-colors active:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)]"
+                    className="flex min-h-[44px] items-center gap-3 rounded-ws-card px-3 py-3 text-sm text-[var(--ws-text-secondary)] transition-colors active:bg-[color-mix(in_srgb,var(--ws-ink)_5%,transparent)]"
                   >
                     <Crown size={18} className="text-[var(--ws-gold)]" />
                     <span>Gerenciar assinatura</span>
@@ -282,7 +282,7 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
                 )}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-3 rounded-ws-card px-3 py-3 text-sm text-red-500 transition-colors active:bg-red-50 dark:active:bg-red-950/20"
+                  className="flex min-h-[44px] items-center gap-3 rounded-ws-card px-3 py-3 text-sm text-red-500 transition-colors active:bg-red-50 dark:active:bg-red-950/20"
                 >
                   <LogOut size={18} />
                   <span>Sair da conta</span>

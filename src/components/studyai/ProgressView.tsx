@@ -152,13 +152,13 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.04, delayChildren: 0.05 },
   },
 };
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] } },
 };
 
 // ===== ANIMATED COUNTER =====
@@ -505,7 +505,7 @@ export function ProgressView({ user }: ProgressViewProps) {
         <p className="text-sm text-[var(--ws-text-secondary)]">{message}</p>
         <button
           onClick={() => retrySection(section)}
-          className="flex items-center gap-1.5 rounded-ws-button px-4 py-2 text-xs font-medium text-white transition-ws"
+          className="flex items-center gap-1.5 rounded-ws-button px-4 py-2 text-xs font-medium text-white transition-ws min-h-[44px]"
           style={{ background: 'var(--ws-accent)' }}
         >
           <RotateCcw size={14} />
@@ -523,7 +523,7 @@ export function ProgressView({ user }: ProgressViewProps) {
         <button
           onClick={handleFullRetry}
           disabled={retrying}
-          className="flex items-center gap-2 rounded-lg bg-[var(--ws-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ws-accent-hover)]"
+          className="flex items-center gap-2 rounded-lg bg-[var(--ws-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ws-accent-hover)] min-h-[44px]"
         >
           {retrying ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
           Tentar novamente
@@ -677,7 +677,7 @@ export function ProgressView({ user }: ProgressViewProps) {
                       }}
                       initial={{ width: 0 }}
                       animate={{ width: `${progressPercent}%` }}
-                      transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+                      transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
                     />
                   </div>
                 </div>
@@ -932,6 +932,7 @@ export function ProgressView({ user }: ProgressViewProps) {
                   }`}
                   style={{ borderRadius: 'var(--ws-radius-card)' }}
                   whileHover={ach.unlocked ? { y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' } : undefined}
+                  whileTap={ach.unlocked ? { scale: 0.98 } : undefined}
                 >
                   {/* Lock overlay for locked achievements */}
                   {!ach.unlocked && (
@@ -1022,7 +1023,7 @@ export function ProgressView({ user }: ProgressViewProps) {
                               style={{ backgroundColor: subjectColor }}
                               initial={{ width: 0 }}
                               animate={{ width: `${Math.max(subject.taskPercent, 2)}%` }}
-                              transition={{ duration: 0.8, delay: i * 0.1, ease: [0.4, 0, 0.2, 1] }}
+                              transition={{ duration: 0.5, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
                             />
                           </div>
                         </motion.div>

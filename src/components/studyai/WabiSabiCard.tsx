@@ -24,8 +24,13 @@ export function WabiSabiCard({ children, className = '', hover = true, glass = f
           ? {
               y: -3,
               boxShadow: '0 16px 48px rgba(0,0,0,0.1)',
-              transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] },
+              transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
             }
+          : undefined
+      }
+      whileTap={
+        hover
+          ? { scale: 0.985 }
           : undefined
       }
     >
