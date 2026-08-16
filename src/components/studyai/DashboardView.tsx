@@ -198,6 +198,31 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 // ========== MAIN ==========
 const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
 
+// Tab labels for mobile header
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: 'Home',
+  discover: 'Discover',
+  battle: 'Batalha',
+  microlesson: 'MicroAula',
+  missions: 'Missões',
+  teach: 'Ensinar',
+  subjects: 'Matérias',
+  tasks: 'Tarefas',
+  goals: 'Metas',
+  calendar: 'Calendário',
+  notebooks: 'Notebook',
+  'notebook-edit': 'Notebook',
+  flashcards: 'Flashcards',
+  'flashcard-review': 'Flashcards',
+  timer: 'Timer',
+  chat: 'Sensei AI',
+  brain: 'Cérebro',
+  roadmap: 'Roadmap',
+  emergency: 'Emergência',
+  progress: 'Progresso',
+  admin: 'Admin',
+};
+
 export function DashboardView() {
   const { data: session } = useSession();
   const sessionUser = session?.user as any;
@@ -294,8 +319,25 @@ export function DashboardView() {
         activeUsers={activeUsers}
       />
 
+      {/* Mobile Top Header Bar */}
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--ws-glass-border)] bg-[var(--ws-glass)]/90 px-4 py-2.5 backdrop-blur-xl lg:hidden">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--ws-glass-border)] bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] font-serif-jp text-xs font-bold text-[var(--ws-accent)]">
+          {user.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-[var(--ws-text-primary)]">
+            {activeTab === 'dashboard' ? `Olá, ${user.name?.split(' ')[0] || 'Estudante'}`
+              : TAB_LABELS[activeTab] || activeTab}
+          </p>
+          <p className="text-[10px] text-[var(--ws-text-tertiary)]">
+            {user.plan === 'SENSEI' ? '🧠 Sensei' : user.plan === 'SAMURAI' ? '🥋 Samurai' : isAdmin ? 'Admin · Ilimitado' : '🥋 Shojin'}
+          </p>
+        </div>
+        <img src="/studyai-logo.png" alt="StudyAI" width={28} height={28} className="shrink-0 rounded-full opacity-80" />
+      </header>
+
       {/* Main content area */}
-      <main className="mx-auto max-w-[1440px] px-3 py-4 pb-24 sm:px-4 sm:py-6 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8">
+      <main className="mx-auto max-w-[1440px] px-3 pb-24 pt-3 sm:px-4 sm:pb-24 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8">
         {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
         {!usage.isPremium && !usage.loading && (
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
@@ -404,6 +446,8 @@ export function DashboardView() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         isAdmin={isAdmin}
+        isPremium={usage.isPremium}
+        onUpgrade={() => openUpgrade('nav')}
       />
     </div>
   );
@@ -1480,7 +1524,7 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6">
+        <div ref={scrollRef} className="h-[calc(100dvh-300px)] min-h-[300px] max-h-[600px] overflow-y-auto p-4 sm:p-6">
           <div className="space-y-6">
             {messages.map((msg) => (
                 <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>

@@ -357,7 +357,7 @@ function GoalFormDialog({
           </div>
 
           {/* Tipo e Valor Alvo */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label style={{ color: 'var(--ws-text-secondary)' }}>Tipo</Label>
               <Select value={type} onValueChange={setType}>
@@ -655,7 +655,7 @@ function GoalCard({
         </div>
 
         {/* Action buttons */}
-        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onEdit(goal)}
             disabled={isCompleted}
@@ -767,7 +767,7 @@ function StatsBar({ goals }: { goals: Goal[] }) {
   const total = goals.length;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
       {[
         { label: 'Em andamento', value: inProgress, color: 'var(--ws-gold)', icon: <Flame className="h-4 w-4" /> },
         { label: 'Concluídas', value: completed, color: 'var(--ws-verdigris)', icon: <CheckCircle2 className="h-4 w-4" /> },
@@ -775,20 +775,20 @@ function StatsBar({ goals }: { goals: Goal[] }) {
       ].map((stat) => (
         <div
           key={stat.label}
-          className="flex items-center gap-2 rounded-xl p-3 border"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl p-2 sm:p-3 border"
           style={{
             borderColor: 'var(--ws-glass-border)',
             background: 'var(--ws-glass)',
           }}
         >
-          <div className="flex items-center justify-center h-8 w-8 rounded-lg" style={{ color: stat.color }}>
+          <div className="flex items-center justify-center h-7 w-7 shrink-0 rounded-lg sm:h-8 sm:w-8" style={{ color: stat.color }}>
             {stat.icon}
           </div>
-          <div>
-            <p className="text-lg font-bold" style={{ color: stat.color }}>
+          <div className="min-w-0">
+            <p className="text-base font-bold sm:text-lg" style={{ color: stat.color }}>
               {stat.value}
             </p>
-            <p className="text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>
+            <p className="text-[9px] sm:text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>
               {stat.label}
             </p>
           </div>

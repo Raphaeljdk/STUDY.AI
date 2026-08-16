@@ -578,7 +578,7 @@ export function SubjectsView({ onNavigate }: SubjectsViewProps) {
           {/* Icon picker */}
           <div className="space-y-2">
             <Label className="text-[var(--ws-text-secondary)]">Icone</Label>
-            <div className="grid grid-cols-6 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
               {ICON_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const isSelected = formIcon === opt.value;

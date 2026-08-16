@@ -212,12 +212,12 @@ export function HomeDashboard({
   if (loading) {
     return (
       <div>
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="skeleton mb-2 h-8 w-64" />
           <div className="skeleton h-4 w-80" />
         </div>
         <div className="skeleton-card mb-6 h-48" />
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="skeleton-card h-28" />
           ))}
@@ -240,15 +240,15 @@ export function HomeDashboard({
     >
       {/* ===== 1. GREETING SECTION ===== */}
       <motion.section
-        className="mb-8"
+        className="mb-6"
         {...fadeInUp}
         transition={{ duration: 0.5 }}
         aria-label="Saudacao"
       >
-        <div className="flex items-start gap-4">
-          {/* Avatar */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          {/* Avatar - hidden on mobile (shown in mobile header) */}
           <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full font-serif-jp text-lg font-bold text-[var(--ws-text-on-dark)]"
+            className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-full font-serif-jp text-lg font-bold text-[var(--ws-text-on-dark)] sm:flex"
             style={{
               background: `linear-gradient(135deg, var(--ws-accent), color-mix(in srgb, var(--ws-accent) 70%, var(--ws-gold)))`,
             }}
@@ -257,9 +257,9 @@ export function HomeDashboard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] lg:text-3xl">
-                {getGreeting()}, {firstName}!
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)] sm:text-2xl lg:text-3xl">
+                {getGreeting()}!
               </h1>
               <Badge
                 className="gap-1 rounded-ws-button border-0 px-2.5 py-0.5 text-xs font-semibold"
@@ -301,7 +301,7 @@ export function HomeDashboard({
 
       {/* ===== 2. STUDY PLAN CARD ===== */}
       <motion.section
-        className="mb-8"
+        className="mb-6"
         {...fadeInUp}
         transition={{ duration: 0.5, delay: 0.08 }}
         aria-label="Plano de estudo"
@@ -388,7 +388,7 @@ export function HomeDashboard({
 
       {/* ===== 3. STATS GRID ===== */}
       <motion.section
-        className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2"
+        className="mb-6 grid grid-cols-2 gap-3 sm:gap-4"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
@@ -409,13 +409,13 @@ export function HomeDashboard({
                 </span>
               )}
             </div>
-            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+            <p className="mt-3 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] sm:mt-4 sm:text-3xl">
               {user.currentStreak}
             </p>
-            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+            <p className="mt-0.5 text-xs font-medium text-[var(--ws-text-secondary)] sm:text-sm">
               Sequencia
             </p>
-            <p className="text-xs text-[var(--ws-text-tertiary)]">dias seguidos</p>
+            <p className="text-[10px] text-[var(--ws-text-tertiary)] sm:text-xs">dias seguidos</p>
           </WabiSabiCard>
         </motion.div>
 
@@ -427,13 +427,13 @@ export function HomeDashboard({
             >
               <Clock size={20} className="text-[var(--ws-gold)]" strokeWidth={1.5} />
             </div>
-            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+            <p className="mt-3 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] sm:mt-4 sm:text-3xl">
               {stats?.minutesToday ?? 0}
             </p>
-            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+            <p className="mt-0.5 text-xs font-medium text-[var(--ws-text-secondary)] sm:text-sm">
               Hoje
             </p>
-            <p className="text-xs text-[var(--ws-text-tertiary)]">minutos de estudo</p>
+            <p className="text-[10px] text-[var(--ws-text-tertiary)] sm:text-xs">minutos de estudo</p>
           </WabiSabiCard>
         </motion.div>
 
@@ -445,16 +445,16 @@ export function HomeDashboard({
             >
               <ClipboardList size={20} className="text-[var(--ws-verdigris)]" strokeWidth={1.5} />
             </div>
-            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+            <p className="mt-3 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] sm:mt-4 sm:text-3xl">
               {stats?.completedToday ?? 0}
-              <span className="ml-1 text-lg font-normal text-[var(--ws-text-tertiary)]">
+              <span className="ml-1 text-base font-normal text-[var(--ws-text-tertiary)] sm:text-lg">
                 /{stats?.pendingTasks ?? 0}
               </span>
             </p>
-            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+            <p className="mt-0.5 text-xs font-medium text-[var(--ws-text-secondary)] sm:text-sm">
               Tarefas
             </p>
-            <p className="text-xs text-[var(--ws-text-tertiary)]">concluidas hoje</p>
+            <p className="text-[10px] text-[var(--ws-text-tertiary)] sm:text-xs">concluidas hoje</p>
           </WabiSabiCard>
         </motion.div>
 
@@ -466,13 +466,13 @@ export function HomeDashboard({
             >
               <Brain size={20} className="text-[var(--ws-accent)]" strokeWidth={1.5} />
             </div>
-            <p className="mt-4 font-serif-jp text-3xl font-bold text-[var(--ws-text-primary)]">
+            <p className="mt-3 font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] sm:mt-4 sm:text-3xl">
               {stats?.dueFlashcards ?? 0}
             </p>
-            <p className="mt-0.5 text-sm font-medium text-[var(--ws-text-secondary)]">
+            <p className="mt-0.5 text-xs font-medium text-[var(--ws-text-secondary)] sm:text-sm">
               Flashcards
             </p>
-            <p className="text-xs text-[var(--ws-text-tertiary)]">para revisar agora</p>
+            <p className="text-[10px] text-[var(--ws-text-tertiary)] sm:text-xs">para revisar</p>
             {(stats?.dueFlashcards ?? 0) > 0 && (
               <button
                 onClick={() => onNavigate('flashcards')}
@@ -487,7 +487,7 @@ export function HomeDashboard({
 
       {/* ===== 4. XP & LEVEL CARD ===== */}
       <motion.section
-        className="mb-8"
+        className="mb-6"
         {...fadeInUp}
         transition={{ duration: 0.5, delay: 0.25 }}
         aria-label="Nivel e XP"
@@ -571,7 +571,7 @@ export function HomeDashboard({
 
       {/* ===== 5. QUICK ACTIONS ===== */}
       <motion.section
-        className="mb-8"
+        className="mb-6"
         {...fadeInUp}
         transition={{ duration: 0.5, delay: 0.3 }}
         aria-label="Acoes rapidas"
@@ -599,7 +599,7 @@ export function HomeDashboard({
       </motion.section>
 
       {/* ===== 6 + 7: EVENTS & TASKS (side by side on desktop) ===== */}
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
         {/* 6. PROXIMOS EVENTOS */}
         <motion.section
           {...fadeInUp}
@@ -737,7 +737,7 @@ export function HomeDashboard({
       {/* ===== 8. METAS DO DIA ===== */}
       {safeGoals.length > 0 && (
         <motion.section
-          className="mb-8"
+          className="mb-6"
           {...fadeInUp}
           transition={{ duration: 0.5, delay: 0.45 }}
           aria-label="Metas do dia"

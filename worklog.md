@@ -100,3 +100,60 @@ Stage Summary:
 - Customer portal for subscription management
 - Webhook handling for subscription lifecycle
 - Beautiful pricing UI with toggle and comparison table
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add logout option, make app responsive for PC and mobile, reference app navigation style
+
+Work Log:
+- Analyzed uploaded image (mobile study app with bottom nav: Home, Matérias, Tarefas, Timer, Mais)
+- Attempted to read TikTok video URL (redirect, no useful content extracted)
+- Explored full project structure: 148 src files, 50 API routes
+- Identified CRITICAL issue: logout was only in Sidebar.tsx (desktop-only, hidden on mobile)
+- MobileNavBar had no logout option — mobile users couldn't sign out
+
+Changes made:
+1. MobileNavBar.tsx — Complete rewrite:
+   - Added user profile section at top of "Mais" sheet (avatar, name, email, plan badge)
+   - Added logout button ("Sair da conta") with red styling
+   - Added AlertDialog confirmation dialog for logout
+   - Added "Gerenciar assinatura" button for premium users
+   - Changed nav grid from 3-col to 4-col for better mobile layout
+   - Active indicator changed from top-px line to floating dot above icon (matching reference app)
+   - Added sheet drag handle, improved safe-area handling
+   - Passed isPremium and onUpgrade props for feature gating
+
+2. DashboardView.tsx:
+   - Added sticky mobile header bar (user avatar + name/greeting + plan badge + logo)
+   - Added TAB_LABELS record for all 21 tabs (used in mobile header)
+   - Passed isPremium and onUpgrade to MobileNavBar
+   - Made chat messages container responsive (100dvh-300px, min 300px, max 600px)
+   - Adjusted main content padding (pt-3 mobile, lg:py-8 desktop)
+
+3. HomeDashboard.tsx — Mobile responsiveness:
+   - Changed stats grid from grid-cols-1 sm:grid-cols-2 to grid-cols-2 (always 2x2)
+   - Hidden avatar on mobile (shown in header instead)
+   - Compact greeting: smaller text sizes, removed first name on mobile
+   - Reduced margins from mb-8 to mb-6 throughout
+   - Smaller text sizes: text-2xl→text-xl on mobile, text-lg→text-base
+   - Updated loading skeleton to match new grid layout
+
+4. SubjectsView.tsx:
+   - Fixed inverted grid breakpoints: grid-cols-6 sm:grid-cols-4 → grid-cols-4 sm:grid-cols-6
+
+5. GoalsView.tsx:
+   - Made action buttons (edit/delete) visible on mobile: opacity-100 sm:opacity-0 sm:group-hover:opacity-100
+   - Compacted 3-column stats bar: smaller gaps, padding, fonts, icons on mobile
+   - Stacked form fields on mobile: grid-cols-1 sm:grid-cols-2
+
+6. Verified:
+   - ESLint passes with no errors
+   - Next.js production build succeeds
+   - Landing page renders correctly on mobile (390px viewport) via agent-browser
+
+Stage Summary:
+- Mobile users can now logout via Mais drawer → "Sair da conta" (with confirmation dialog)
+- Mobile users can manage subscriptions from the same drawer
+- New sticky header bar shows user info and current section on mobile
+- Bottom nav matches reference app style (Home, Matérias, Tarefas, Timer, Mais)
+- All dashboard views are now properly responsive for mobile screens
