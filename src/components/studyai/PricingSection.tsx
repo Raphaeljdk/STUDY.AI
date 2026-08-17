@@ -7,7 +7,7 @@ import { SectionHeading } from './SectionHeading';
 import { ZenButton } from './ZenButton';
 import {
   Check, Star, Sparkles, BookOpen, Swords, GraduationCap,
-  ChevronDown,
+  ChevronDown, X,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -258,7 +258,17 @@ export function PricingSection() {
                         variant={plan.ctaVariant}
                         size="md"
                         className="w-full"
-                        onClick={() => (window as any).__studyai_openAuth?.('register')}
+                        onClick={() => {
+                          if (plan.id === 'shojin') {
+                            (window as any).__studyai_openAuth?.('register');
+                          } else {
+                            (window as any).__studyai_openAuth?.({
+                              mode: 'register',
+                              plan: plan.id.toUpperCase() as 'SAMURAI' | 'SENSEI',
+                              billing,
+                            });
+                          }
+                        }}
                       >
                         {plan.cta}
                       </ZenButton>

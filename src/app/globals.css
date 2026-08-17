@@ -146,26 +146,29 @@
     outline-color: var(--ring, rgba(0,0,0,0.3));
     outline-offset: 2px;
   }
-  html {
-    scroll-behavior: smooth;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-  }
-  body {
-    background-color: var(--ws-bg);
-    color: var(--ws-text-primary);
-    font-family: var(--font-inter), 'Inter', sans-serif;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    -webkit-tap-highlight-color: transparent;
-    overscroll-behavior-y: contain;
-  }
-  /* Touch optimization for interactive elements */
-  button, a, [role="button"], input, textarea, select {
-    touch-action: manipulation;
-  }
-  /* Prevent layout shifts from scrollbar on mobile */
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  background-color: var(--ws-bg);
+  color: var(--ws-text-primary);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+/* Touch optimization for interactive elements */
+button, a, [role="button"], input, textarea, select {
+  touch-action: manipulation;
+}
+/* Prevent layout shifts from scrollbar on mobile */
+.scrollbar-stable {
   scrollbar-gutter: stable;
 }
 

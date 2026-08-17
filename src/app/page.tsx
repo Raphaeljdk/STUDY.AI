@@ -12,13 +12,33 @@ import { PricingSection } from '@/components/studyai/PricingSection';
 import { FooterZen } from '@/components/studyai/FooterZen';
 import { Loader2 } from 'lucide-react';
 
+export type OpenAuthOptions = {
+  mode?: 'login' | 'register';
+  plan?: 'SAMURAI' | 'SENSEI';
+  billing?: 'monthly' | 'annual';
+};
+
 export default function Home() {
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  const [modalKey, setModalKey] = useState(0);
 
-  const openAuth = useCallback((mode: 'login' | 'register' = 'register') => {
-    setAuthMode(mode);
+  const openAuth = useCallback((modeOrOpts: 'login' | 'register' | OpenAuthOptions = 'register') => {
+    if (typeof modeOrOpts === 'string') {
+      setAuthMode(modeOrOpts);
+      if (typeof window !== 'undefined') {
+        window.__studyai_pendingPlan = undefined;
+        window.__studyai_pendingBilling = 'monthly';
+      }
+    } else {
+      setAuthMode(modeOrOpts.mode || 'register');
+      if (typeof window !== 'undefined') {
+        window.__studyai_pendingPlan = modeOrOpts.plan;
+        window.__studyai_pendingBilling = modeOrOpts.billing || 'monthly';
+      }
+    }
+    setModalKey(k => k + 1);
     setAuthOpen(true);
   }, []);
 
@@ -51,6 +71,7 @@ export default function Home() {
       <PricingSection />
       <FooterZen />
       <AuthModal
+        key={modalKey}
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
         initialMode={authMode}

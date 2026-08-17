@@ -3,9 +3,35 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
-import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle, Swords, GraduationCap, Crown } from 'lucide-react';
 import { ZenButton } from './ZenButton';
 import { apiFetch } from '@/lib/api';
+
+/* ── Plan config for the modal ── */
+const MODAL_PLANS = {
+  SAMURAI: {
+    name: 'Samurai',
+    jp: '侍',
+    icon: Swords,
+    color: 'text-amber-500',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/30',
+    monthly: 'R$ 19,90/mês',
+    annual: 'R$ 199,00/ano',
+  },
+  SENSEI: {
+    name: 'Sensei',
+    jp: '先生',
+    icon: GraduationCap,
+    color: 'text-violet-500',
+    bg: 'bg-violet-500/10',
+    border: 'border-violet-500/30',
+    monthly: 'R$ 34,90/mês',
+    annual: 'R$ 349,00/ano',
+  },
+} as const;
+
+type SelectedPlan = 'SAMURAI' | 'SENSEI';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -15,13 +41,29 @@ interface AuthModalProps {
 
 type FormStatus = 'idle' | 'loading' | 'success' | 'error';
 
+// Global pending plan (set by pricing CTAs before opening modal)
+declare global {
+  interface Window {
+    __studyai_pendingPlan?: SelectedPlan;
+    __studyai_pendingBilling?: 'monthly' | 'annual';
+  }
+}
+
 export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+  // Read pending plan from global (set by pricing CTAs)
+  const pendingPlan = typeof window !== 'undefined' ? window.__studyai_pendingPlan : undefined;
+  const pendingBilling = typeof window !== 'undefined' ? window.__studyai_pendingBilling || 'monthly' : 'monthly';
+  
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<FormStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+
+  // Plan state for registration with plan
+  const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | undefined>(pendingPlan);
+  const [selectedBilling, setSelectedBilling] = useState<'monthly' | 'annual'>(pendingBilling);
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -38,6 +80,11 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setSuccessMsg('');
   };
 
+  const handleClose = () => {
+    window.__studyai_pendingPlan = undefined;
+    window.__studyai_pendingBilling = undefined;
+    onClose();
+  };
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
@@ -77,7 +124,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setSuccessMsg('');
 
     try {
-      // Step 1: Create account (with timeout to avoid hanging)
+      // Step 1: Create account
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -93,7 +140,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') {
           setStatus('error');
-          setErrorMsg('Servidor demorou demais. O banco de dados pode nao estar configurado. Tente novamente.');
+          setErrorMsg('Servidor demorou demais. Tente novamente.');
         } else {
           setStatus('error');
           setErrorMsg('Erro de conexao. Verifique sua internet e tente novamente.');
@@ -113,14 +160,12 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
       if (!res.ok) {
         setStatus('error');
-        // Map common error messages to friendlier ones
         const msg = data.error || 'Erro ao criar conta';
         if (res.status === 409) {
           setErrorMsg('Este email ja esta cadastrado. Tente fazer login.');
         } else if (res.status === 400) {
           setErrorMsg(msg);
         } else {
-          // Show real error details for 500 + add debugging info
           const details = data.details || '';
           console.error('[Register Error]', res.status, data);
           setErrorMsg(details ? `${msg} (${details})` : msg);
@@ -128,12 +173,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         return;
       }
 
-      // Debug: log successful register response
-      console.log('[Register Success]', data);
-
-      // Step 2: Auto-login after successful registration
-      setStatus('success');
-      setSuccessMsg('Conta criada com sucesso! Fazendo login...');
+      // Step 2: Auto-login
+      setSuccessMsg('Conta criada! Fazendo login...');
       try {
         const loginRes = await signIn('credentials', {
           email: form.email,
@@ -142,11 +183,49 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         });
 
         if (loginRes?.ok) {
-          setSuccessMsg('Bem-vindo(a)! Entrando...');
-          setTimeout(() => {
-            onClose();
-            window.location.reload();
-          }, 600);
+          // Step 3: If plan selected, redirect to checkout
+          if (selectedPlan) {
+            setSuccessMsg('Redirecionando para o pagamento...');
+            try {
+              const checkoutRes = await apiFetch('/api/checkout', {
+                method: 'POST',
+                body: JSON.stringify({
+                  plan: selectedPlan,
+                  billing: selectedBilling,
+                }),
+                raw: true,
+              });
+              const checkoutData = await checkoutRes.json();
+
+              if (checkoutRes.ok && checkoutData.url) {
+                // Redirect to Stripe
+                window.location.href = checkoutData.url;
+                return;
+              } else {
+                // Checkout failed but account created — go to dashboard
+                console.error('[Checkout after register]', checkoutData);
+                setSuccessMsg('Conta criada! Redirecionando...');
+                setTimeout(() => {
+                  onClose();
+                  window.location.reload();
+                }, 800);
+              }
+            } catch {
+              // Checkout failed but account created
+              setSuccessMsg('Conta criada! Redirecionando...');
+              setTimeout(() => {
+                onClose();
+                window.location.reload();
+              }, 800);
+            }
+          } else {
+            // No plan selected — go to dashboard
+            setSuccessMsg('Bem-vindo(a)! Entrando...');
+            setTimeout(() => {
+              onClose();
+              window.location.reload();
+            }, 600);
+          }
         } else {
           setSuccessMsg('Conta criada! Clique em Entrar para acessar.');
           setTimeout(() => switchMode('login'), 2000);
@@ -163,6 +242,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
   const isLoading = status === 'loading';
   const isSuccess = status === 'success';
+  const planInfo = selectedPlan ? MODAL_PLANS[selectedPlan] : null;
 
   return (
     <AnimatePresence>
@@ -173,17 +253,17 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!isLoading ? onClose : undefined} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!isLoading ? handleClose : undefined} />
 
           <motion.div
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] shadow-[var(--ws-shadow-medium)]"
+            className="relative z-10 w-full max-w-md overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] shadow-[var(--ws-shadow-medium)] max-h-[90vh] overflow-y-auto"
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
           >
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isLoading}
               className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_8%,transparent)] hover:text-[var(--ws-text-primary)] disabled:opacity-50"
               aria-label="Fechar"
@@ -192,11 +272,13 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             </button>
 
             <div className="p-8">
-              {/* Free badge */}
-              <div className="mb-6 flex items-center justify-center gap-2 rounded-ws-button px-3 py-1.5 mx-auto w-fit" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)' }}>
-                <Sparkles size={14} className="text-[var(--ws-verdigris)]" />
-                <span className="text-xs font-medium text-[var(--ws-verdigris)]">100% Gratuito e Ilimitado</span>
-              </div>
+              {/* Free badge (only when no plan selected) */}
+              {!planInfo && (
+                <div className="mb-6 flex items-center justify-center gap-2 rounded-ws-button px-3 py-1.5 mx-auto w-fit" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)' }}>
+                  <Sparkles size={14} className="text-[var(--ws-verdigris)]" />
+                  <span className="text-xs font-medium text-[var(--ws-verdigris)]">100% Gratuito e Ilimitado</span>
+                </div>
+              )}
 
               {/* Success State */}
               {isSuccess && (
@@ -290,7 +372,106 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               {mode === 'register' && !isSuccess && (
                 <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
                   <h2 className="mb-1 text-center font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)]">Criar Conta</h2>
-                  <p className="mb-6 text-center text-sm text-[var(--ws-text-tertiary)]">Comece sua jornada de aprendizado</p>
+                  <p className="mb-6 text-center text-sm text-[var(--ws-text-tertiary)]">
+                    {planInfo ? 'Escolha seu plano e comece sua jornada' : 'Comece sua jornada de aprendizado'}
+                  </p>
+
+                  {/* Selected plan banner */}
+                  <AnimatePresence>
+                    {planInfo && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                        animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className={`relative rounded-ws-button border ${planInfo.border} ${planInfo.bg} p-3.5`}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlan(undefined)}
+                            className="absolute right-2 top-2 rounded-full p-1 text-[var(--ws-text-tertiary)] transition-colors hover:bg-black/10 hover:text-[var(--ws-text-primary)]"
+                            aria-label="Remover plano"
+                          >
+                            <X size={14} />
+                          </button>
+                          <div className="flex items-center gap-3">
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10`}>
+                              <planInfo.icon size={18} className={planInfo.color} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-serif-jp text-sm font-bold text-[var(--ws-text-primary)]">Plano {planInfo.name}</span>
+                                <span className="font-serif-jp text-[10px] text-[var(--ws-text-tertiary)]">{planInfo.jp}</span>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-2">
+                                <span className={`text-xs font-medium ${planInfo.color}`}>
+                                  {selectedBilling === 'monthly' ? planInfo.monthly : planInfo.annual}
+                                </span>
+                                <span className="text-[10px] text-[var(--ws-text-tertiary)]">
+                                  7 dias grátis
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Billing toggle inside the plan banner */}
+                          <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2.5">
+                            <span className={`text-[11px] font-medium transition-colors ${selectedBilling === 'monthly' ? 'text-[var(--ws-text-primary)]' : 'text-[var(--ws-text-tertiary)]'}`}>
+                              Mensal
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBilling(b => b === 'monthly' ? 'annual' : 'monthly')}
+                              className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${selectedBilling === 'annual' ? 'bg-[var(--ws-verdigris)]' : 'bg-[var(--ws-glass-border)]'}`}
+                            >
+                              <motion.div
+                                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm"
+                                animate={{ left: selectedBilling === 'annual' ? '18px' : '2px' }}
+                                transition={{ duration: 0.15 }}
+                              />
+                            </button>
+                            <span className={`text-[11px] font-medium transition-colors ${selectedBilling === 'annual' ? 'text-[var(--ws-text-primary)]' : 'text-[var(--ws-text-tertiary)]'}`}>
+                              Anual
+                            </span>
+                            {selectedBilling === 'annual' && (
+                              <span className="text-[10px] font-medium text-green-500">
+                                -2 meses grátis
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Plan selector (when no plan pre-selected, show quick pick) */}
+                  {!planInfo && (
+                    <div className="mb-5">
+                      <p className="mb-2.5 text-center text-xs text-[var(--ws-text-tertiary)]">
+                        Quer começar com um plano premium?
+                      </p>
+                      <div className="flex gap-2">
+                        {(['SAMURAI', 'SENSEI'] as const).map((p) => {
+                          const pi = MODAL_PLANS[p];
+                          const PIcon = pi.icon;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setSelectedPlan(p)}
+                              className={`flex flex-1 items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-3 py-2.5 text-left transition-all hover:border-[var(--ws-accent)]/30 hover:bg-[var(--ws-accent)]/5`}
+                            >
+                              <PIcon size={16} className={pi.color} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-[var(--ws-text-primary)]">{pi.name}</p>
+                                <p className="text-[10px] text-[var(--ws-text-tertiary)]">{pi.monthly}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div>
@@ -369,9 +550,24 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                         className="flex-1"
                         disabled={isLoading}
                       >
-                        {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Criar Conta Gratis'}
+                        {isLoading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : planInfo ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Crown size={14} />
+                            Criar e Assinar {planInfo.name}
+                          </span>
+                        ) : (
+                          'Criar Conta Gratis'
+                        )}
                       </ZenButton>
                     </div>
+
+                    {planInfo && (
+                      <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
+                        7 dias grátis · Cancele quando quiser · Pagamento seguro via Stripe
+                      </p>
+                    )}
                   </form>
 
                   <p className="mt-6 text-center text-sm text-[var(--ws-text-tertiary)]">
