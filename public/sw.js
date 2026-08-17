@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'studyai-v2';
+const CACHE_NAME = 'studyai-v3';
 const OFFLINE_URL = '/';
 
 // Assets to pre-cache on install (graceful — won't fail if any is missing)
@@ -22,7 +22,14 @@ self.addEventListener('install', (event) => {
       );
     })
   );
-  self.skipWaiting();
+  // Don't auto-skip waiting — wait for client to confirm
+});
+
+// Listen for skip waiting message from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activate: clean up old caches

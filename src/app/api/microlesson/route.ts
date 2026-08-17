@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
+import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
 import { aiChat } from '@/lib/zai';
 
 export async function POST(request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
+    const userPlan = (user.plan || 'FREE') as any;
+    if (!canAccess(userPlan, 'microLesson')) {
+      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['microLesson'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
+    }
 
     let body: any;
     try {

@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
+import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
 import { db, genId, nowISO } from '@/lib/db';
 
 export async function GET(_request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
+    const userPlan = (user.plan || 'FREE') as any;
+    if (!canAccess(userPlan, 'roadmapAI')) {
+      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['roadmapAI'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
+    }
     const userId = user.id;
 
     const roadmaps = await db.roadmap.findMany({
@@ -25,6 +30,10 @@ export async function POST(request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
+    const userPlan = (user.plan || 'FREE') as any;
+    if (!canAccess(userPlan, 'roadmapAI')) {
+      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['roadmapAI'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
+    }
     const userId = user.id;
 
     let body: any;

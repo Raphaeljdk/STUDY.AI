@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
+import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
 import { db, genId, nowISO } from '@/lib/db';
 
 async function awardXP(userId: string, amount: number, source: any, description: string) {
@@ -28,6 +29,10 @@ export async function POST(
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
+    const userPlan = (user.plan || 'FREE') as any;
+    if (!canAccess(userPlan, 'missions')) {
+      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['missions'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
+    }
     const userId = user.id;
 
     const { id } = await params;

@@ -9,6 +9,7 @@ import {
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   Shield, Lock, LogOut, Crown,
   BookText, Layers, ScrollText, MessageCircle, ChevronRight, Settings,
+  PenTool, Palette,
 } from 'lucide-react';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
@@ -39,6 +40,8 @@ const ALL_ITEMS: NavItem[] = [
   { id: 'flashcards', label: 'Flashcards', icon: Layers, group: 'Estudo' },
   { id: 'timer', label: 'Timer', icon: Timer, group: 'Estudo' },
   { id: 'chat', label: 'Sensei AI', icon: MessageCircle, group: 'Estudo' },
+  { id: 'drawing', label: 'Desenhos', icon: PenTool, group: 'Estudo' },
+  { id: 'covers', label: 'Capas', icon: Palette, group: 'Estudo' },
   { id: 'battle', label: 'Batalha', icon: Swords, group: 'Explorar', featureGate: 'battle' },
   { id: 'microlesson', label: 'MicroAula', icon: GraduationCap, group: 'Explorar', featureGate: 'microLesson' },
   { id: 'missions', label: 'Missões', icon: Rocket, group: 'Explorar', featureGate: 'missions' },

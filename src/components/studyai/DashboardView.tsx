@@ -22,7 +22,11 @@ import { useUsage } from '@/hooks/useUsage';
 import { PremiumUpgrade } from './PremiumUpgrade';
 import { Sidebar } from './Sidebar';
 import { MobileNavBar } from './MobileNavBar';
+import { PlanGate } from '@/components/PlanGate';
 import dynamic from 'next/dynamic';
+
+const StreakWidget = dynamic(() => import('./StreakWidget').then(m => ({ default: m.StreakWidget })), { ssr: false });
+const ReminderCheck = dynamic(() => import('./ReminderCheck').then(m => ({ default: m.ReminderCheck })), { ssr: false });
 
 const CanvasNotebookView = dynamic(
   () => import('@/components/notebook/CanvasNotebookView'),
@@ -50,6 +54,8 @@ const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
 const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
 const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
 const TeachView = dynamic(() => import('./TeachView'), { ssr: false });
+const DrawingView = dynamic(() => import('./DrawingView'), { ssr: false });
+const CoversView = dynamic(() => import('./CoversView').then(m => ({ default: m.CoversView })), { ssr: false });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -142,7 +148,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin';
+export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin' | 'drawing' | 'covers';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -190,7 +196,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'drawing', 'covers', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
 
 // Tab labels for mobile header
 const TAB_LABELS: Record<Tab, string> = {
@@ -214,6 +220,8 @@ const TAB_LABELS: Record<Tab, string> = {
   roadmap: 'Roadmap',
   emergency: 'Emergência',
   progress: 'Progresso',
+  drawing: 'Desenhos',
+  covers: 'Capas de Caderno',
   admin: 'Admin',
 };
 
@@ -327,11 +335,14 @@ export function DashboardView() {
             {user.plan === 'SENSEI' ? '🧠 Sensei' : user.plan === 'SAMURAI' ? '🥋 Samurai' : isAdmin ? 'Admin · Ilimitado' : '🥋 Shojin'}
           </p>
         </div>
+        <StreakWidget />
         <img src="/studyai-logo.png" alt="StudyAI" width={28} height={28} className="shrink-0 rounded-full opacity-80" />
       </header>
 
       {/* Main content area */}
       <main className="dashboard-scroll flex-1 mx-auto w-full max-w-[1440px] px-3 pb-20 pt-3 sm:px-4 sm:pb-20 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8" role="main">
+        {/* Calendar reminder notifications (invisible — fires toasts) */}
+        <ReminderCheck />
         {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
         {!usage.isPremium && !usage.loading && (
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
@@ -355,29 +366,39 @@ export function DashboardView() {
           </SectionErrorBoundary>
         )}
         {activeTab === 'discover' && (
-          <SectionErrorBoundary name="DiscoverView">
-            <DiscoverView onNavigate={navigateTo} />
-          </SectionErrorBoundary>
+          <PlanGate feature='discover'>
+            <SectionErrorBoundary name="DiscoverView">
+              <DiscoverView onNavigate={navigateTo} />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'battle' && (
-          <SectionErrorBoundary name="BattleView">
-            <BattleView />
-          </SectionErrorBoundary>
+          <PlanGate feature='battle'>
+            <SectionErrorBoundary name="BattleView">
+              <BattleView />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'microlesson' && (
-          <SectionErrorBoundary name="MicroLessonView">
-            <MicroLessonView />
-          </SectionErrorBoundary>
+          <PlanGate feature='microLesson'>
+            <SectionErrorBoundary name="MicroLessonView">
+              <MicroLessonView />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'missions' && (
-          <SectionErrorBoundary name="MissionsView">
-            <MissionsView onNavigate={navigateTo} />
-          </SectionErrorBoundary>
+          <PlanGate feature='missions'>
+            <SectionErrorBoundary name="MissionsView">
+              <MissionsView onNavigate={navigateTo} />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'teach' && (
-          <SectionErrorBoundary name="TeachView">
-            <TeachView onNavigate={navigateTo} />
-          </SectionErrorBoundary>
+          <PlanGate feature='teach'>
+            <SectionErrorBoundary name="TeachView">
+              <TeachView onNavigate={navigateTo} />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'subjects' && (
           <SectionErrorBoundary name="SubjectsView">
@@ -410,14 +431,18 @@ export function DashboardView() {
         {activeTab === 'timer' && <PomodoroTimer key="pom" />}
         {activeTab === 'chat' && <SenseiChat key="chat" />}
         {activeTab === 'brain' && (
-          <SectionErrorBoundary name="BrainView">
-            <BrainView onNavigate={navigateTo} />
-          </SectionErrorBoundary>
+          <PlanGate feature='brain'>
+            <SectionErrorBoundary name="BrainView">
+              <BrainView onNavigate={navigateTo} />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'roadmap' && (
-          <SectionErrorBoundary name="RoadmapView">
-            <RoadmapView />
-          </SectionErrorBoundary>
+          <PlanGate feature='roadmapAI'>
+            <SectionErrorBoundary name="RoadmapView">
+              <RoadmapView />
+            </SectionErrorBoundary>
+          </PlanGate>
         )}
         {activeTab === 'emergency' && (
           <SectionErrorBoundary name="EmergencyView">
@@ -425,8 +450,20 @@ export function DashboardView() {
           </SectionErrorBoundary>
         )}
         {activeTab === 'progress' && (
-          <SectionErrorBoundary name="ProgressView">
-            <ProgressView user={user} />
+          <PlanGate feature='dashboardFull'>
+            <SectionErrorBoundary name="ProgressView">
+              <ProgressView user={user} />
+            </SectionErrorBoundary>
+          </PlanGate>
+        )}
+        {activeTab === 'drawing' && (
+          <SectionErrorBoundary name='DrawingView'>
+            <DrawingView />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'covers' && (
+          <SectionErrorBoundary name='CoversView'>
+            <CoversView />
           </SectionErrorBoundary>
         )}
         {activeTab === 'admin' && isAdmin && <AdminPanel key="adm" />}

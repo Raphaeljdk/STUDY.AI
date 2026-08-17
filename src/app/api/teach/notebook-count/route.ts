@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
+import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
 import { db } from '@/lib/db';
 
 // GET /api/teach/notebook-count - count notebook pages for a subject/topic
@@ -7,6 +8,10 @@ export async function GET(request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
+    const userPlan = (user.plan || 'FREE') as any;
+    if (!canAccess(userPlan, 'teach')) {
+      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['teach'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
+    }
     const userId = user.id;
 
     const { searchParams } = new URL(request.url);

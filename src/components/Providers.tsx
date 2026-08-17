@@ -5,13 +5,19 @@ import { ThemeProvider } from 'next-themes';
 import { ReactNode, useEffect, useCallback } from 'react';
 import { useServiceWorker } from '@/hooks/useServiceWorker';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
+import { PWAUpdateBanner } from '@/components/PWAUpdateBanner';
 
 function PWAProvider({ children }: { children: ReactNode }) {
-  useServiceWorker();
+  const { updateAvailable, applyUpdate, dismissUpdate } = useServiceWorker();
   return (
     <>
       {children}
       <PWAInstallPrompt />
+      <PWAUpdateBanner
+        updateAvailable={updateAvailable}
+        onApply={applyUpdate}
+        onDismiss={dismissUpdate}
+      />
     </>
   );
 }

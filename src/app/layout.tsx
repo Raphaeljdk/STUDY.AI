@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Serif, Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -124,6 +125,7 @@ export default function RootLayout({
           Pular para conteudo principal
         </a>
         <Providers>
+          <LoadingScreen />
           <div id="scroll-progress-bar" style={{ width: 0 }} />
           <main id="main-content">
             {children}
