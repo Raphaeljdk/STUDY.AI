@@ -4,9 +4,16 @@ import { useSession } from 'next-auth/react';
 import { canAccess, PLAN_LIMITS, getRequiredPlan, type Plan, type PlanFeature } from '@/lib/plan-gating';
 import { useMemo } from 'react';
 
+/** Resolve the effective plan for a user (admin gets SENSEI access) */
+function resolvePlan(role?: string, plan?: string): Plan {
+  if (role === 'ADMIN') return 'SENSEI';
+  return (plan as Plan) || 'FREE';
+}
+
 export function usePlanGate(feature: string) {
   const { data: session } = useSession();
-  const plan = ((session?.user as any)?.plan || 'FREE') as Plan;
+  const user = session?.user as any;
+  const plan = resolvePlan(user?.role, user?.plan);
   const accessible = canAccess(plan, feature);
   const limits = PLAN_LIMITS[plan];
   const requiredPlan = getRequiredPlan(feature);
@@ -23,7 +30,8 @@ export function usePlanGate(feature: string) {
 /** Batch check multiple features at once */
 export function usePlanFeatures(features: string[]) {
   const { data: session } = useSession();
-  const plan = ((session?.user as any)?.plan || 'FREE') as Plan;
+  const user = session?.user as any;
+  const plan = resolvePlan(user?.role, user?.plan);
   const featuresKey = features.join(',');
 
   return useMemo(() => {

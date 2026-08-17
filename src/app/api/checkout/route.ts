@@ -70,6 +70,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // If user has an existing subscription, cancel it to prevent double-billing
+    if (user.stripeSubscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+        console.log(`[checkout] Cancelled previous subscription ${user.stripeSubscriptionId} for user ${user.id}`);
+      } catch (cancelErr: any) {
+        // Subscription may already be cancelled — log but continue
+        console.warn(`[checkout] Could not cancel previous subscription: ${cancelErr.message}`);
+      }
+      // Clear old subscription reference so the webhook sets the new one cleanly
+      await db.user.update({
+        where: { id: user.id },
+        data: { stripeSubscriptionId: '', updatedAt: nowISO() },
+      });
+    }
+
     const origin = request.headers.get('origin') || 'https://study-ai-nine-xi.vercel.app';
 
     // Build recurring interval

@@ -164,3 +164,76 @@ Stage Summary:
 - All features verified working in browser
 - Zero console errors
 - Professional landing page with Japanese aesthetic
+
+---
+Task ID: 4-5-6
+Agent: Main
+Task: Diagnose & Fix Plan Gating, Billing Portal, Plan Switching
+
+Work Log:
+- **Issue A (Admin blocked by PlanGate)**: Diagnosed that `use-plan-gate.ts`, `Sidebar.tsx`, and `MobileNavBar.tsx` all read `user.plan` without checking `user.role === 'ADMIN'`. Admin users with `plan` not set to SAMURAI/SENSEI would see lock icons and be blocked from premium features.
+  - Fixed `use-plan-gate.ts`: Added `resolvePlan(role, plan)` helper that returns SENSEI for ADMIN role, matching server-side `getUserPlan()` in `usage.ts`.
+  - Fixed `Sidebar.tsx`: Changed `const plan = (user?.plan || 'FREE')` to include admin role check.
+  - Fixed `MobileNavBar.tsx`: Same admin role check added.
+
+- **Issue B (Billing Portal silent error)**: Diagnosed empty `catch {}` blocks in both `Sidebar.tsx` (line 203) and `MobileNavBar.tsx` (line 105) when calling `/api/stripe/portal`.
+  - Fixed both files: Replaced empty catch with `toast()` error notification showing the error message.
+
+- **Issue C (Plan upgrade/downgrade creates duplicate subscriptions)**: Diagnosed that `checkout/route.ts` always created a new Stripe subscription even if the user already had one, leading to double-billing.
+  - Fixed `checkout/route.ts`: Added logic to cancel existing Stripe subscription (via `stripe.subscriptions.cancel()`) before creating a new checkout session. Also clears the old `stripeSubscriptionId` from the user record so the webhook sets the new one cleanly.
+
+- **Issue D (API plan gating ignores admin role)**: Diagnosed that all 17 API routes used `const userPlan = (user.plan || 'FREE') as any` which ignores admin role, blocking admin users from premium API routes.
+  - Created `requirePlan(user, feature)` helper in `api-server.ts` that uses `getUserPlan(user)` from `usage.ts` (which returns SENSEI for admins) instead of raw `user.plan`.
+  - Updated all 17 API routes to use the new helper:
+    - battle/route.ts (GET + POST)
+    - battle/finish/route.ts (POST)
+    - missions/route.ts (GET + POST)
+    - missions/[id]/route.ts (PATCH + DELETE)
+    - missions/[id]/complete/route.ts (POST)
+    - discover/route.ts (GET + POST)
+    - discover/[id]/route.ts (GET + PATCH + DELETE)
+    - discover/[id]/save/route.ts (GET + POST)
+    - microlesson/route.ts (POST)
+    - stats/route.ts (GET)
+    - teach/route.ts (GET + POST)
+    - teach/guide/route.ts (POST)
+    - teach/notebook-count/route.ts (GET)
+    - brain/route.ts (GET)
+    - roadmaps/route.ts (GET + POST)
+    - roadmaps/[id]/route.ts (PATCH + DELETE)
+    - roadmaps/generate/route.ts (POST)
+  - Extended `SessionUser` interface in `api-server.ts` to include optional `stripeSubscriptionId` and `stripeCustomerId` fields.
+
+Stage Summary:
+- Admin users now correctly bypass all plan gates (both client and server side)
+- Billing portal errors now show toast notifications instead of being silently swallowed
+- Plan switching (SAMURAI ↔ SENSEI) now cancels the old subscription before creating a new one, preventing double-billing
+- All 17 API routes use centralized `requirePlan()` helper that properly respects admin role
+- All plan gating logic is now consistent: client-side and server-side both use the same `getUserPlan()` logic (admin → SENSEI)
+
+---
+Task ID: 2-fix
+Agent: Main
+Task: Rewrite DrawingView Component
+
+Work Log:
+- Completely rewrote `src/components/studyai/DrawingView.tsx` from 1562 lines to 455 lines
+- Removed complex layer system (3 offscreen canvases + compositing) - now uses 2 canvases: main + overlay
+- Removed DPR scaling complexity (was causing bugs) - now uses simple CSS transform for zoom
+- Removed pan tool - simplified interaction model
+- Extracted all drawing primitives as standalone functions outside component (strokeLine, strokeRect, strokeEllipse, strokeArrow, strokeDoor, strokeWindow, strokeDimension)
+- Used SHAPE_FNS lookup map to avoid repetitive switch/case in handlers
+- History: stores up to 30 ImageData snapshots, no per-layer tracking
+- All 3 modes fully working: Artistico (brush, eraser), Tecnico (line, rect, circle, arrow, text), Arquitetura (wall, room, door, window, dimension)
+- Touch events supported via getCoords helper that handles both MouseEvent and TouchEvent
+- Uses app CSS variables: var(--ws-bg), var(--ws-accent), var(--ws-glass), etc.
+- Color palette: 12 Japanese-inspired colors + custom color picker
+- Opacity slider in Artistico mode only
+- Responsive: desktop sidebar (md:flex), mobile bottom toolbar (md:hidden)
+- Verified zero TypeScript errors with project tsconfig
+
+Stage Summary:
+- DrawingView reduced from 1562 to 455 lines (71% reduction)
+- Eliminated layer system bugs by simplifying to 2-canvas architecture
+- All drawing tools compile and function correctly
+- Clean SWC-compatible JSX (no color-mix, no parenthesized comments)

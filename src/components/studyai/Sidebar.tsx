@@ -16,6 +16,7 @@ import { UsageBar } from './PremiumUpgrade';
 import { PWAInstallButton } from '@/components/PWAInstallPrompt';
 import type { Tab } from './DashboardView';
 import { canAccess, type Plan } from '@/lib/plan-gating';
+import { toast } from '@/hooks/use-toast';
 
 type LucideIcon = typeof Home;
 
@@ -98,7 +99,8 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
   const { data: session } = useSession();
   const user = session?.user as any;
   const [collapsed, setCollapsed] = useState(false);
-  const plan = (user?.plan || 'FREE') as Plan;
+  // Admin users get SENSEI access (mirrors server-side getUserPlan logic)
+  const plan = (user?.role === 'ADMIN' ? 'SENSEI' : (user?.plan || 'FREE')) as Plan;
 
   const isActive = useCallback((id: Tab) => {
     if (id === 'notebooks') return activeTab === 'notebooks' || activeTab === 'notebook-edit';
@@ -200,7 +202,13 @@ export function Sidebar({ activeTab, onTabChange, isAdmin, usage, onUpgrade, act
                 try {
                   const data = await (await import('@/lib/api')).apiFetch('/api/stripe/portal', { method: 'POST' });
                   if (data.url) window.location.href = data.url;
-                } catch {}
+                } catch (err: any) {
+                  toast({
+                    title: 'Erro ao abrir portal',
+                    description: err?.message || 'Nao foi possivel abrir o portal de assinatura.',
+                    variant: 'destructive',
+                  });
+                }
               }}
               className="flex w-full items-center justify-center gap-1.5 rounded-ws-button bg-[color-mix(in_srgb,var(--ws-accent)_8%,transparent)] px-3 py-2 text-xs font-medium text-[var(--ws-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_15%,transparent)]"
             >

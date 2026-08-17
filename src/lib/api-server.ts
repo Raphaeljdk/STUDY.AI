@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { getUserPlan, type Plan } from './usage';
+import { canAccess, FEATURE_MIN_PLAN } from './plan-gating';
 
 export interface SessionUser {
   id: string;
@@ -9,6 +11,8 @@ export interface SessionUser {
   name: string;
   role: string;
   plan: string;
+  stripeSubscriptionId?: string;
+  stripeCustomerId?: string;
 }
 
 /**
@@ -62,4 +66,26 @@ export async function requireUserAsync(): Promise<NextResponse | SessionUser> {
  */
 export function isErrorResponse(result: any): result is NextResponse {
   return result instanceof NextResponse;
+}
+
+/**
+ * Check if a user can access a premium feature.
+ * Respects ADMIN role (admins get SENSEI access).
+ * Returns a 403 NextResponse if access is denied, or null if allowed.
+ *
+ * Usage:
+ *   const user = await requireUserAsync();
+ *   if (user instanceof NextResponse) return user;
+ *   const denied = requirePlan(user, 'battle');
+ *   if (denied) return denied;
+ */
+export function requirePlan(user: SessionUser, feature: string): NextResponse | null {
+  const plan = getUserPlan(user);
+  if (!canAccess(plan, feature)) {
+    return NextResponse.json(
+      { error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN[feature], message: `Esta funcionalidade requer o plano ${FEATURE_MIN_PLAN[feature] === 'SENSEI' ? 'Sensei' : 'Samurai'} ou superior.` },
+      { status: 403 },
+    );
+  }
+  return null;
 }

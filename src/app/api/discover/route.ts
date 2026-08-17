@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUserAsync } from '@/lib/api-server';
-import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
+import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
 import { aiChat } from '@/lib/zai';
 
@@ -10,10 +9,8 @@ export async function GET(request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
-    const userPlan = (user.plan || 'FREE') as any;
-    if (!canAccess(userPlan, 'discover')) {
-      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['discover'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
-    }
+    const denied = requirePlan(user, 'discover');
+    if (denied) return denied;
     const userId = user.id;
 
     const { searchParams } = new URL(request.url);
@@ -78,10 +75,8 @@ export async function POST(request: Request) {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
-    const userPlan = (user.plan || 'FREE') as any;
-    if (!canAccess(userPlan, 'discover')) {
-      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['discover'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
-    }
+    const denied = requirePlan(user, 'discover');
+    if (denied) return denied;
     const userId = user.id;
 
     let body: any;

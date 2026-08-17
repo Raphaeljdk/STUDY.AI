@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUserAsync } from '@/lib/api-server';
-import { canAccess, FEATURE_MIN_PLAN } from '@/lib/plan-gating';
+import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, nowISO } from '@/lib/db';
 
 const VALID_STATUSES = ['active', 'completed', 'abandoned'];
@@ -12,10 +11,8 @@ export async function PATCH(
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
-    const userPlan = (user.plan || 'FREE') as any;
-    if (!canAccess(userPlan, 'missions')) {
-      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['missions'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
-    }
+    const denied = requirePlan(user, 'missions');
+    if (denied) return denied;
     const userId = user.id;
 
     const { id } = await params;
@@ -65,10 +62,8 @@ export async function DELETE(
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
-    const userPlan = (user.plan || 'FREE') as any;
-    if (!canAccess(userPlan, 'missions')) {
-      return NextResponse.json({ error: 'PLAN_REQUIRED', requiredPlan: FEATURE_MIN_PLAN['missions'], message: 'Esta funcionalidade requer o plano Samurai ou superior.' }, { status: 403 });
-    }
+    const denied = requirePlan(user, 'missions');
+    if (denied) return denied;
     const userId = user.id;
 
     const { id } = await params;

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { Tab } from './DashboardView';
 import { canAccess, type Plan } from '@/lib/plan-gating';
+import { toast } from '@/hooks/use-toast';
 
 type LucideIcon = typeof Home;
 
@@ -67,7 +68,8 @@ interface MobileNavBarProps {
 export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpgrade }: MobileNavBarProps) {
   const { data: session } = useSession();
   const user = session?.user as any;
-  const plan = (user?.plan || 'FREE') as Plan;
+  // Admin users get SENSEI access (mirrors server-side getUserPlan logic)
+  const plan = (user?.role === 'ADMIN' ? 'SENSEI' : (user?.plan || 'FREE')) as Plan;
   const [moreOpen, setMoreOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
@@ -102,7 +104,13 @@ export function MobileNavBar({ activeTab, onTabChange, isAdmin, isPremium, onUpg
       const { apiFetch } = await import('@/lib/api');
       const data = await apiFetch('/api/stripe/portal', { method: 'POST' });
       if (data.url) window.location.href = data.url;
-    } catch {}
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao abrir portal',
+        description: err?.message || 'Nao foi possivel abrir o portal de assinatura.',
+        variant: 'destructive',
+      });
+    }
     setMoreOpen(false);
   };
 
