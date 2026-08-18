@@ -24,8 +24,8 @@ export async function GET(_request: Request) {
 
     return NextResponse.json({ teachings });
   } catch (error) {
-    console.error('Route error:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    console.error('[Teach GET] Route error:', error);
+    return NextResponse.json({ error: 'Erro ao carregar historico' }, { status: 500 });
   }
 }
 
@@ -202,10 +202,10 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
     try {
       const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       analysis = JSON.parse(jsonStr);
-    } catch {
+    } catch (parseErr) {
+      console.error('[Teach] AI response parse error:', parseErr);
       return NextResponse.json({
-        error: 'Erro ao analisar a explicacao. Tente novamente.',
-        rawResponse: aiResponse,
+        error: 'A IA nao conseguiu gerar uma analise valida. Tente novamente com uma explicacao mais detalhada.',
       }, { status: 500 });
     }
 
@@ -282,7 +282,11 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
       notebookNoteCount,
     });
   } catch (error) {
-    console.error('Route error:', error);
+    console.error('[Teach POST] Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

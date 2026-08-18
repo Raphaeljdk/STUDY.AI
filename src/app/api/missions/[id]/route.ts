@@ -28,7 +28,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
     }
 
-    const { title, description, subject, status, steps, completedSteps } = body;
+    const { title, description, subject, status, steps, completedSteps, stepId } = body;
 
     const data: any = { updatedAt: nowISO() };
     if (typeof title === 'string' && title.trim()) data.title = title.trim();
@@ -41,6 +41,28 @@ export async function PATCH(
     }
     if (typeof completedSteps === 'number' && completedSteps >= 0) {
       data.completedSteps = Math.min(completedSteps, existing.totalSteps);
+    }
+
+    // Handle step completion
+    if (stepId && typeof stepId === 'string') {
+      try {
+        const currentSteps = JSON.parse(existing.steps || '[]');
+        const stepIndex = currentSteps.findIndex((s: any) => s.id === stepId);
+        if (stepIndex >= 0 && !currentSteps[stepIndex].completed) {
+          currentSteps[stepIndex].completed = true;
+          currentSteps[stepIndex].completedAt = nowISO();
+          data.steps = JSON.stringify(currentSteps);
+          data.completedSteps = (existing.completedSteps || 0) + 1;
+
+          // Auto-complete mission if all steps done
+          if (data.completedSteps >= (existing.totalSteps || currentSteps.length)) {
+            data.status = 'completed';
+            data.completedAt = nowISO();
+          }
+        }
+      } catch (err) {
+        console.error('[Missions] Error parsing steps:', err);
+      }
     }
 
     const mission = await db.mission.update({

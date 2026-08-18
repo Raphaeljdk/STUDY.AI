@@ -117,15 +117,16 @@ O guia deve me preparar para explicar esse conceito usando a Tecnica de Feynman.
       const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       guide = JSON.parse(jsonStr);
     } catch {
-      return NextResponse.json({
-        error: 'Erro ao gerar o guia. Tente novamente.',
-        rawResponse: aiResponse,
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Erro ao gerar o guia. Tente novamente.' }, { status: 500 });
     }
 
     return NextResponse.json({ guide });
   } catch (error) {
-    console.error('Route error:', error);
+    console.error('[Teach Guide] Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

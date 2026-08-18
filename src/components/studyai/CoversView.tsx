@@ -1,203 +1,1011 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Download, Type, Search, Sparkles } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Download, Type, Search, ChevronDown } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+
+/* ============================================================
+   SEEDED RANDOM — deterministic pseudo-random from seed
+   ============================================================ */
+function seededRandom(seed: number) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function seededRandom2(seed: number) {
+  const x = Math.sin(seed * 269.5 + 183.3) * 28461.7231;
+  return x - Math.floor(x);
+}
+
+function hsl(h: number, s: number, l: number): string {
+  return `hsl(${h % 360}, ${s}%, ${l}%)`;
+}
+
+function hsla(h: number, s: number, l: number, a: number): string {
+  return `hsla(${h % 360}, ${s}%, ${l}%, ${a})`;
+}
+
+/* ============================================================
+   COLOR PALETTE GENERATION
+   ============================================================ */
+function generatePalette(seed: number, style: 'warm' | 'cool' | 'earth' | 'neon' | 'pastel' | 'dark' | 'mono' | 'japan') {
+  const r1 = seededRandom(seed);
+  const r2 = seededRandom(seed + 1);
+  const r3 = seededRandom(seed + 2);
+
+  let bgH1: number, bgH2: number, bgH3: number;
+  let bgS1: number, bgS2: number, bgS3: number;
+  let bgL1: number, bgL2: number, bgL3: number;
+  let txtH: number, txtS: number, txtL: number;
+  let accH: number, accS: number, accL: number;
+
+  switch (style) {
+    case 'warm':
+      bgH1 = r1 * 60; bgH2 = bgH1 + 15 + r2 * 20; bgH3 = bgH2 + 10 + r3 * 15;
+      bgS1 = 50 + r2 * 30; bgS2 = 55 + r3 * 25; bgS3 = 45 + r1 * 30;
+      bgL1 = 25 + r3 * 30; bgL2 = 35 + r1 * 25; bgL3 = 45 + r2 * 20;
+      txtL = 85 + r1 * 15; txtS = 10;
+      txtH = bgH1 + 180;
+      accH = bgH1 + 30; accS = 60 + r2 * 30; accL = 65 + r3 * 20;
+      break;
+    case 'cool':
+      bgH1 = 180 + r1 * 80; bgH2 = bgH1 + 15 + r2 * 20; bgH3 = bgH2 + 10 + r3 * 15;
+      bgS1 = 40 + r2 * 35; bgS2 = 45 + r3 * 30; bgS3 = 35 + r1 * 35;
+      bgL1 = 20 + r3 * 30; bgL2 = 30 + r1 * 25; bgL3 = 40 + r2 * 20;
+      txtL = 80 + r1 * 20; txtS = 15;
+      txtH = bgH1 + 180;
+      accH = bgH1 + 25; accS = 50 + r2 * 30; accL = 60 + r3 * 25;
+      break;
+    case 'earth':
+      bgH1 = 15 + r1 * 35; bgH2 = bgH1 + 8 + r2 * 15; bgH3 = bgH2 + 5 + r3 * 12;
+      bgS1 = 25 + r2 * 35; bgS2 = 20 + r3 * 30; bgS3 = 30 + r1 * 30;
+      bgL1 = 15 + r3 * 35; bgL2 = 25 + r1 * 30; bgL3 = 35 + r2 * 25;
+      txtL = 75 + r1 * 20; txtS = 15;
+      txtH = bgH1;
+      accH = bgH1 + 20; accS = 40 + r2 * 30; accL = 55 + r3 * 25;
+      break;
+    case 'neon':
+      bgH1 = r1 * 360; bgH2 = (bgH1 + 120 + r2 * 60) % 360; bgH3 = (bgH2 + 120 + r3 * 60) % 360;
+      bgS1 = bgS2 = bgS3 = 80 + r2 * 20;
+      bgL1 = 8 + r3 * 7; bgL2 = 12 + r1 * 8; bgL3 = 15 + r2 * 8;
+      txtL = 85 + r1 * 15; txtS = 5;
+      txtH = bgH1;
+      accH = bgH2; accS = 90; accL = 65 + r3 * 15;
+      break;
+    case 'pastel':
+      bgH1 = r1 * 360; bgH2 = bgH1 + 20 + r2 * 30; bgH3 = bgH2 + 15 + r3 * 25;
+      bgS1 = 40 + r2 * 25; bgS2 = 45 + r3 * 20; bgS3 = 35 + r1 * 25;
+      bgL1 = 80 + r3 * 12; bgL2 = 75 + r1 * 12; bgL3 = 70 + r2 * 12;
+      txtL = 20 + r1 * 15; txtS = 20;
+      txtH = bgH1 + 180;
+      accH = bgH1 + 30; accS = 50 + r2 * 25; accL = 40 + r3 * 15;
+      break;
+    case 'dark':
+      bgH1 = r1 * 360; bgH2 = bgH1 + 10 + r2 * 20; bgH3 = bgH2 + 8 + r3 * 15;
+      bgS1 = 15 + r2 * 20; bgS2 = 20 + r3 * 15; bgS3 = 10 + r1 * 20;
+      bgL1 = 8 + r3 * 7; bgL2 = 12 + r1 * 8; bgL3 = 16 + r2 * 8;
+      txtL = 75 + r1 * 20; txtS = 10;
+      txtH = bgH1;
+      accH = bgH1 + 20; accS = 40 + r2 * 30; accL = 60 + r3 * 20;
+      break;
+    case 'mono':
+      bgH1 = 0; bgH2 = 0; bgH3 = 0;
+      bgS1 = 0; bgS2 = 0; bgS3 = 0;
+      bgL1 = 90 + r3 * 8; bgL2 = 75 + r1 * 10; bgL3 = 60 + r2 * 12;
+      txtL = 15 + r1 * 15; txtS = 5;
+      txtH = 0;
+      accH = 0; accS = 0; accL = 50 + r3 * 20;
+      break;
+    case 'japan': {
+      const japanHues = [0, 120, 200, 340, 35, 280, 50, 160];
+      bgH1 = japanHues[Math.floor(r1 * japanHues.length)] + (r2 - 0.5) * 20;
+      bgH2 = bgH1 + 15 + r3 * 20;
+      bgH3 = bgH1 + 5 + r2 * 15;
+      bgS1 = 35 + r2 * 35; bgS2 = 30 + r3 * 30; bgS3 = 40 + r1 * 30;
+      bgL1 = 20 + r3 * 25; bgL2 = 30 + r1 * 20; bgL3 = 35 + r2 * 20;
+      txtL = 80 + r1 * 18; txtS = 12;
+      txtH = bgH1 + 180;
+      accH = bgH1 + 25; accS = 45 + r2 * 30; accL = 60 + r3 * 20;
+      break;
+    }
+    default:
+      bgH1 = r1 * 360; bgH2 = bgH1 + 30; bgH3 = bgH1 + 60;
+      bgS1 = 50; bgS2 = 50; bgS3 = 50;
+      bgL1 = 30; bgL2 = 40; bgL3 = 50;
+      txtL = 80; txtS = 10; txtH = 0;
+      accH = bgH1; accS = 60; accL = 60;
+  }
+
+  return {
+    bg1: hsl(bgH1, bgS1, bgL1),
+    bg2: hsl(bgH2, bgS2, bgL2),
+    bg3: hsl(bgH3, bgS3, bgL3),
+    textColor: hsl(txtH, txtS, txtL),
+    accentColor: hsl(accH, accS, accL),
+    accentH: accH,
+    accentS: accS,
+    accentL: accL,
+  };
+}
+
+/* ============================================================
+   PATTERN DRAWING FUNCTIONS (Canvas)
+   Each takes ctx, w, h, seed — all deterministic
+   ============================================================ */
+
+function drawJapanesePattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const variant = Math.floor(r(seed) * 4);
+  const accentH = (r(seed + 100) * 360) | 0;
+  const accentS = 40 + (r(seed + 101) * 30) | 0;
+  const accentL = 55 + (r(seed + 102) * 20) | 0;
+  const color = hsl(accentH, accentS, accentL);
+  ctx.globalAlpha = 0.18;
+
+  if (variant === 0) {
+    // Cherry blossoms
+    ctx.fillStyle = color;
+    for (let i = 0; i < 12; i++) {
+      const cx = r(seed + i * 3) * w;
+      const cy = r(seed + i * 3 + 1) * h;
+      const size = 8 + r(seed + i * 3 + 2) * 18;
+      const petals = 5;
+      for (let p = 0; p < petals; p++) {
+        const angle = (p / petals) * Math.PI * 2 + r(seed + i) * 0.5;
+        ctx.beginPath();
+        ctx.ellipse(cx + Math.cos(angle) * size * 0.6, cy + Math.sin(angle) * size * 0.6, size * 0.5, size * 0.25, angle, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (variant === 1) {
+    // Seigaiha (wave circles)
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    const rowH = 50 + r(seed + 10) * 30;
+    const radius = rowH * 0.45;
+    for (let y = -radius; y < h + radius; y += rowH) {
+      const offset = (Math.floor(y / rowH) % 2) * radius;
+      for (let x = -radius + offset; x < w + radius; x += radius * 2) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI, false);
+        ctx.stroke();
+      }
+    }
+  } else if (variant === 2) {
+    // Bamboo
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 8; i++) {
+      const x = r(seed + i * 2) * w;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      // Nodes
+      const nodeCount = 4 + (r(seed + i * 2 + 1) * 5) | 0;
+      ctx.lineWidth = 1.5;
+      for (let n = 0; n < nodeCount; n++) {
+        const ny = (n + 0.5) * (h / nodeCount);
+        ctx.beginPath();
+        ctx.moveTo(x - 8, ny);
+        ctx.quadraticCurveTo(x, ny + 4, x + 8, ny);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 2.5;
+    }
+  } else {
+    // Torii gate silhouettes
+    ctx.fillStyle = color;
+    for (let i = 0; i < 3; i++) {
+      const gx = r(seed + i * 3) * w * 0.8 + w * 0.1;
+      const gy = r(seed + i * 3 + 1) * h * 0.4 + h * 0.2;
+      const scale = 0.5 + r(seed + i * 3 + 2) * 0.8;
+      // Pillars
+      ctx.fillRect(gx - 30 * scale, gy, 6 * scale, 80 * scale);
+      ctx.fillRect(gx + 24 * scale, gy, 6 * scale, 80 * scale);
+      // Top beam
+      ctx.fillRect(gx - 40 * scale, gy - 4 * scale, 80 * scale, 8 * scale);
+      // Curved top
+      ctx.beginPath();
+      ctx.moveTo(gx - 48 * scale, gy - 12 * scale);
+      ctx.quadraticCurveTo(gx, gy - 20 * scale, gx + 48 * scale, gy - 12 * scale);
+      ctx.lineWidth = 3 * scale;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawGeometricPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 50, 60);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  const variant = (r(seed) * 3) | 0;
+
+  if (variant === 0) {
+    // Triangles grid
+    ctx.globalAlpha = 0.15;
+    ctx.lineWidth = 1;
+    const size = 40 + (r(seed + 1) * 30) | 0;
+    for (let y = 0; y < h + size; y += size) {
+      for (let x = 0; x < w + size; x += size) {
+        const filled = r(seed + x * 7 + y * 13) > 0.65;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + size, y);
+        ctx.lineTo(x + size / 2, y - size * 0.866);
+        ctx.closePath();
+        if (filled) { ctx.globalAlpha = 0.1; ctx.fill(); ctx.globalAlpha = 0.15; }
+        ctx.stroke();
+      }
+    }
+  } else if (variant === 1) {
+    // Hexagons
+    ctx.globalAlpha = 0.15;
+    ctx.lineWidth = 1;
+    const size = 30 + (r(seed + 2) * 25) | 0;
+    const hexH = size * 1.732;
+    for (let row = 0; row < h / hexH + 1; row++) {
+      for (let col = 0; col < w / (size * 3) + 1; col++) {
+        const cx = col * size * 3 + (row % 2) * size * 1.5;
+        const cy = row * hexH * 0.5;
+        const filled = r(seed + row * 17 + col * 31) > 0.7;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 3 * i - Math.PI / 6;
+          const px = cx + Math.cos(a) * size;
+          const py = cy + Math.sin(a) * size;
+          if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+        }
+        ctx.closePath();
+        if (filled) { ctx.globalAlpha = 0.1; ctx.fill(); ctx.globalAlpha = 0.15; }
+        ctx.stroke();
+      }
+    }
+  } else {
+    // Diamond grid
+    ctx.globalAlpha = 0.15;
+    ctx.lineWidth = 1;
+    const size = 35 + (r(seed + 3) * 25) | 0;
+    for (let y = 0; y < h + size * 2; y += size * 2) {
+      for (let x = 0; x < w + size * 2; x += size * 2) {
+        const filled = r(seed + x * 11 + y * 7) > 0.7;
+        ctx.beginPath();
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x - size, y);
+        ctx.closePath();
+        if (filled) { ctx.globalAlpha = 0.1; ctx.fill(); ctx.globalAlpha = 0.15; }
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawWavePattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 45, 60);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.18;
+  const waveCount = 6 + (r(seed + 1) * 8) | 0;
+  const freq = 0.005 + r(seed + 2) * 0.015;
+  const amp = 10 + r(seed + 3) * 25;
+
+  for (let i = 0; i < waveCount; i++) {
+    const yBase = (i + 1) * (h / (waveCount + 1));
+    const phase = r(seed + i * 5) * Math.PI * 2;
+    const lineFreq = freq + r(seed + i * 5 + 1) * 0.005;
+    const lineAmp = amp + r(seed + i * 5 + 2) * 10;
+    ctx.lineWidth = 1 + r(seed + i * 5 + 3) * 1.5;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 3) {
+      const y = yBase + Math.sin(x * lineFreq + phase) * lineAmp;
+      if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawDotPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 45, 60);
+  ctx.fillStyle = color;
+
+  const variant = (r(seed) * 3) | 0;
+  const spacing = 15 + (r(seed + 1) * 20) | 0;
+
+  if (variant === 0) {
+    // Uniform dots
+    ctx.globalAlpha = 0.2;
+    const dotR = 1.5 + r(seed + 2) * 2;
+    for (let y = spacing; y < h; y += spacing) {
+      for (let x = spacing; x < w; x += spacing) {
+        ctx.beginPath();
+        ctx.arc(x, y, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (variant === 1) {
+    // Varying size dots
+    for (let y = spacing; y < h; y += spacing) {
+      for (let x = spacing; x < w; x += spacing) {
+        const size = 1 + r(seed + x * 3 + y * 7) * 4;
+        ctx.globalAlpha = 0.1 + r(seed + x * 5 + y * 11) * 0.2;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else {
+    // Polka dots (large + small)
+    const bigSpace = spacing * 3;
+    ctx.globalAlpha = 0.15;
+    for (let y = bigSpace; y < h; y += bigSpace) {
+      for (let x = bigSpace; x < w; x += bigSpace) {
+        ctx.beginPath();
+        ctx.arc(x, y, 6 + r(seed + x + y) * 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Small surrounding dots
+        ctx.globalAlpha = 0.08;
+        for (let a = 0; a < 4; a++) {
+          const angle = a * Math.PI / 2 + 0.4;
+          ctx.beginPath();
+          ctx.arc(x + Math.cos(angle) * spacing, y + Math.sin(angle) * spacing, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 0.15;
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawGradientPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const variant = (r(seed) * 3) | 0;
+
+  if (variant === 0) {
+    // Radial circles
+    const cx = r(seed + 1) * w;
+    const cy = r(seed + 2) * h;
+    for (let i = 8; i > 0; i--) {
+      const radius = (i / 8) * Math.max(w, h);
+      const hue = (r(seed + i) * 360) | 0;
+      ctx.fillStyle = hsla(hue, 40, 50, 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (variant === 1) {
+    // Diagonal stripes
+    ctx.globalAlpha = 0.08;
+    const stripeW = 20 + (r(seed + 1) * 30) | 0;
+    const angle = r(seed + 2) * Math.PI;
+    const hue = (r(seed + 3) * 360) | 0;
+    ctx.fillStyle = hsl(hue, 40, 60);
+    for (let i = -h; i < w + h; i += stripeW * 2) {
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(angle);
+      ctx.fillRect(i - w, -h, stripeW, h * 3);
+      ctx.restore();
+    }
+  } else {
+    // Concentric rectangles
+    ctx.globalAlpha = 0.06;
+    for (let i = 10; i > 0; i--) {
+      const hue = (r(seed + i) * 360) | 0;
+      ctx.fillStyle = hsl(hue, 35, 50);
+      const margin = i * Math.min(w, h) * 0.05;
+      const rotation = r(seed + i + 50) * 0.1;
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(rotation);
+      ctx.fillRect(-w / 2 + margin, -h / 2 + margin, w - margin * 2, h - margin * 2);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function drawKanjiPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 40, 55);
+  const kanji = '学問道心夢花風月水火山木天人美力理知愛光音';
+
+  const count = 4 + (r(seed + 1) * 6) | 0;
+  for (let i = 0; i < count; i++) {
+    const char = kanji[(r(seed + i * 3) * kanji.length) | 0];
+    const x = r(seed + i * 3 + 1) * w * 0.8 + w * 0.1;
+    const y = r(seed + i * 3 + 2) * h * 0.8 + h * 0.1;
+    const size = 40 + r(seed + i * 5) * 80;
+    const rotation = (r(seed + i * 5 + 1) - 0.5) * 0.5;
+    ctx.globalAlpha = 0.06 + r(seed + i * 5 + 2) * 0.1;
+    ctx.fillStyle = color;
+    ctx.font = `${size}px serif`;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(char, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawNaturePattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 40, 55);
+  const variant = (r(seed) * 4) | 0;
+
+  if (variant === 0) {
+    // Mountains
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.12;
+    for (let layer = 0; layer < 4; layer++) {
+      ctx.globalAlpha = 0.06 + layer * 0.03;
+      const baseY = h * 0.4 + layer * h * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let x = 0; x <= w; x += 3) {
+        const peak = Math.sin(x * 0.008 + r(seed + layer) * 10) * h * 0.15
+          + Math.sin(x * 0.015 + r(seed + layer + 10) * 5) * h * 0.08
+          + Math.sin(x * 0.003 + r(seed + layer + 20) * 3) * h * 0.12;
+        ctx.lineTo(x, baseY - peak);
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (variant === 1) {
+    // Leaves
+    ctx.fillStyle = color;
+    for (let i = 0; i < 15; i++) {
+      const lx = r(seed + i * 3) * w;
+      const ly = r(seed + i * 3 + 1) * h;
+      const size = 10 + r(seed + i * 3 + 2) * 25;
+      const rot = r(seed + i * 4) * Math.PI * 2;
+      ctx.globalAlpha = 0.08 + r(seed + i * 5) * 0.1;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.quadraticCurveTo(size * 0.5, -size * 0.3, 0, size);
+      ctx.quadraticCurveTo(-size * 0.5, -size * 0.3, 0, -size);
+      ctx.fill();
+      // Stem
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.lineTo(0, size * 0.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+  } else if (variant === 2) {
+    // Flowers
+    ctx.fillStyle = color;
+    for (let i = 0; i < 8; i++) {
+      const fx = r(seed + i * 3) * w;
+      const fy = r(seed + i * 3 + 1) * h;
+      const size = 12 + r(seed + i * 3 + 2) * 20;
+      const petals = 5 + (r(seed + i * 4) * 4) | 0;
+      ctx.globalAlpha = 0.1 + r(seed + i * 5) * 0.1;
+      for (let p = 0; p < petals; p++) {
+        const angle = (p / petals) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.ellipse(fx + Math.cos(angle) * size * 0.5, fy + Math.sin(angle) * size * 0.5, size * 0.4, size * 0.2, angle, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Center
+      ctx.globalAlpha = 0.15;
+      ctx.beginPath();
+      ctx.arc(fx, fy, size * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // Stars / sparkles
+    ctx.fillStyle = color;
+    for (let i = 0; i < 25; i++) {
+      const sx = r(seed + i * 2) * w;
+      const sy = r(seed + i * 2 + 1) * h;
+      const size = 2 + r(seed + i * 3) * 5;
+      ctx.globalAlpha = 0.1 + r(seed + i * 4) * 0.15;
+      ctx.beginPath();
+      for (let p = 0; p < 4; p++) {
+        const angle = (p / 4) * Math.PI * 2;
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + Math.cos(angle) * size, sy + Math.sin(angle) * size);
+      }
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx, sy, size * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawAbstractPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const variant = (r(seed) * 3) | 0;
+
+  if (variant === 0) {
+    // Bokeh circles
+    for (let i = 0; i < 20; i++) {
+      const cx = r(seed + i * 3) * w;
+      const cy = r(seed + i * 3 + 1) * h;
+      const radius = 20 + r(seed + i * 3 + 2) * 60;
+      const hue = (r(seed + i * 4) * 360) | 0;
+      ctx.globalAlpha = 0.04 + r(seed + i * 5) * 0.06;
+      ctx.fillStyle = hsl(hue, 50, 60);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = hsl(hue, 50, 70);
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.08;
+      ctx.stroke();
+    }
+  } else if (variant === 1) {
+    // Curves
+    const hue = (r(seed + 100) * 360) | 0;
+    ctx.strokeStyle = hsl(hue, 45, 60);
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 15; i++) {
+      ctx.globalAlpha = 0.08 + r(seed + i) * 0.1;
+      ctx.beginPath();
+      const startY = r(seed + i * 3) * h;
+      ctx.moveTo(0, startY);
+      const cp1x = w * 0.25;
+      const cp1y = r(seed + i * 3 + 1) * h;
+      const cp2x = w * 0.75;
+      const cp2y = r(seed + i * 3 + 2) * h;
+      const endY = r(seed + i * 4) * h;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, w, endY);
+      ctx.stroke();
+    }
+  } else {
+    // Splatter
+    const hue = (r(seed + 100) * 360) | 0;
+    ctx.fillStyle = hsl(hue, 50, 60);
+    for (let i = 0; i < 40; i++) {
+      const sx = r(seed + i * 2) * w;
+      const sy = r(seed + i * 2 + 1) * h;
+      const size = 2 + r(seed + i * 3) * 15;
+      ctx.globalAlpha = 0.05 + r(seed + i * 4) * 0.1;
+      ctx.beginPath();
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // A few bigger ones
+    for (let i = 0; i < 5; i++) {
+      const sx = r(seed + 200 + i * 2) * w;
+      const sy = r(seed + 200 + i * 2 + 1) * h;
+      const size = 25 + r(seed + 200 + i * 3) * 40;
+      ctx.globalAlpha = 0.03 + r(seed + 200 + i * 4) * 0.04;
+      ctx.beginPath();
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawMinimalPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 30, 50);
+  const variant = (r(seed) * 3) | 0;
+
+  if (variant === 0) {
+    // Single horizontal line
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.2;
+    const y = h * 0.3 + r(seed + 1) * h * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.1, y);
+    ctx.lineTo(w * 0.9, y);
+    ctx.stroke();
+  } else if (variant === 1) {
+    // Corner accent
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.2;
+    const len = 40 + r(seed + 1) * 60;
+    // Top-left
+    ctx.beginPath();
+    ctx.moveTo(w * 0.05, w * 0.05 + len);
+    ctx.lineTo(w * 0.05, w * 0.05);
+    ctx.lineTo(w * 0.05 + len, w * 0.05);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(w * 0.95 - len, h * 0.95);
+    ctx.lineTo(w * 0.95, h * 0.95);
+    ctx.lineTo(w * 0.95, h * 0.95 - len);
+    ctx.stroke();
+  } else {
+    // Thin ruled lines
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.15;
+    const spacing = 25 + (r(seed + 1) * 15) | 0;
+    for (let y = spacing; y < h; y += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(w * 0.08, y);
+      ctx.lineTo(w * 0.92, y);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawAcademicPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 30, 55);
+  const variant = (r(seed) * 3) | 0;
+
+  if (variant === 0) {
+    // Ruled notebook lines
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = 0.15;
+    const spacing = 28;
+    const margin = w * 0.12;
+    for (let y = h * 0.15; y < h * 0.85; y += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(margin, y);
+      ctx.lineTo(w - margin, y);
+      ctx.stroke();
+    }
+    // Red margin line
+    ctx.strokeStyle = hsl(0, 50, 50);
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.12;
+    ctx.beginPath();
+    ctx.moveTo(margin + 30, h * 0.15);
+    ctx.lineTo(margin + 30, h * 0.85);
+    ctx.stroke();
+  } else if (variant === 1) {
+    // Book spine pattern
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.15;
+    // Spine on left
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.08;
+    ctx.fillRect(0, 0, w * 0.06, h);
+    // Lines on right
+    ctx.globalAlpha = 0.12;
+    for (let y = h * 0.1; y < h * 0.9; y += 30) {
+      ctx.beginPath();
+      ctx.moveTo(w * 0.15, y);
+      ctx.lineTo(w * 0.85, y);
+      ctx.stroke();
+    }
+  } else {
+    // Grid + margin
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.1;
+    const gridSize = 25;
+    for (let x = gridSize; x < w; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = gridSize; y < h; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+    // Heavier lines every 5
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.12;
+    for (let x = gridSize * 5; x < w; x += gridSize * 5) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = gridSize * 5; y < h; y += gridSize * 5) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   COLLECTION DEFINITIONS
+   ============================================================ */
+
+interface CoverCollection {
+  name: string;
+  colorStyle: 'warm' | 'cool' | 'earth' | 'neon' | 'pastel' | 'dark' | 'mono' | 'japan';
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) => void;
+}
+
+const COLLECTIONS: CoverCollection[] = [
+  { name: 'Japonês', colorStyle: 'japan', draw: drawJapanesePattern },
+  { name: 'Geométrico', colorStyle: 'cool', draw: drawGeometricPattern },
+  { name: 'Ondas', colorStyle: 'cool', draw: drawWavePattern },
+  { name: 'Pontilhismo', colorStyle: 'pastel', draw: drawDotPattern },
+  { name: 'Gradiente', colorStyle: 'warm', draw: drawGradientPattern },
+  { name: 'Kanji', colorStyle: 'dark', draw: drawKanjiPattern },
+  { name: 'Natureza', colorStyle: 'earth', draw: drawNaturePattern },
+  { name: 'Abstrato', colorStyle: 'neon', draw: drawAbstractPattern },
+  { name: 'Minimalista', colorStyle: 'mono', draw: drawMinimalPattern },
+  { name: 'Acadêmico', colorStyle: 'dark', draw: drawAcademicPattern },
+];
+
+const COVERS_PER_COLLECTION = 120;
+const TOTAL_COVERS = COLLECTIONS.length * COVERS_PER_COLLECTION;
+
+/* ============================================================
+   COVER OBJECT INTERFACE
+   ============================================================ */
 
 interface CoverPreset {
   id: string;
   name: string;
   category: string;
-  gradient: string;
-  pattern: string;
+  bg1: string;
+  bg2: string;
+  bg3: string;
   textColor: string;
   accentColor: string;
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 }
 
-function g(a: string, b: string, c: string, d = '135deg') {
-  return `linear-gradient(${d}, ${a} 0%, ${b} 50%, ${c} 100%)`;
-}
-function g2(a: string, b: string, d = '135deg') {
-  return `linear-gradient(${d}, ${a} 0%, ${b} 100%)`;
+/* Generate covers lazily — build full list only when category/search filters it */
+let _allCovers: CoverPreset[] | null = null;
+
+function getAllCovers(): CoverPreset[] {
+  if (_allCovers) return _allCovers;
+  const covers: CoverPreset[] = [];
+  COLLECTIONS.forEach((col, colIdx) => {
+    for (let i = 0; i < COVERS_PER_COLLECTION; i++) {
+      const seed = colIdx * 10000 + i;
+      const palette = generatePalette(seed, col.colorStyle);
+      covers.push({
+        id: `cover-${seed}`,
+        name: `${col.name} #${i + 1}`,
+        category: col.name,
+        bg1: palette.bg1,
+        bg2: palette.bg2,
+        bg3: palette.bg3,
+        textColor: palette.textColor,
+        accentColor: palette.accentColor,
+        draw: (ctx, w, h) => col.draw(ctx, w, h, seed),
+      });
+    }
+  });
+  _allCovers = covers;
+  return covers;
 }
 
-const COVERS: CoverPreset[] = [
-  // ===== JAPONÊS (20) =====
-  { id: 'washi', name: 'Washi Paper', category: 'Japonês', gradient: g2('#f5f0e8', '#e8dfd0'), pattern: 'zen', textColor: '#2c1810', accentColor: '#8B4513' },
-  { id: 'sumi', name: 'Sumi Ink', category: 'Japonês', gradient: g2('#1a1a2e', '#16213e'), pattern: 'waves', textColor: '#e0d5c1', accentColor: '#c9b896' },
-  { id: 'sakura', name: 'Sakura', category: 'Japonês', gradient: g('#fce4ec', '#f8bbd0', '#f48fb1'), pattern: 'sakura', textColor: '#880e4f', accentColor: '#e91e63' },
-  { id: 'bamboo', name: 'Bamboo', category: 'Japonês', gradient: g('#1b5e20', '#2e7d32', '#4caf50'), pattern: 'bamboo', textColor: '#e8f5e9', accentColor: '#a5d6a7' },
-  { id: 'kintsugi', name: 'Kintsugi', category: 'Japonês', gradient: g2('#2c1810', '#3e2723'), pattern: 'lines', textColor: '#ffd54f', accentColor: '#ffb300' },
-  { id: 'ryoanji', name: 'Ryoanji', category: 'Japonês', gradient: g2('#d7ccc8', '#bcaaa4'), pattern: 'zen', textColor: '#424242', accentColor: '#757575' },
-  { id: 'torii', name: 'Torii', category: 'Japonês', gradient: g('#c62828', '#b71c1c', '#8e0000'), pattern: 'zen', textColor: '#ffcdd2', accentColor: '#ff8a80' },
-  { id: 'matcha', name: 'Matcha', category: 'Japonês', gradient: g('#689f38', '#558b2f', '#33691e'), pattern: 'dots', textColor: '#f1f8e9', accentColor: '#c5e1a5' },
-  { id: 'umeshu', name: 'Umeshu', category: 'Japonês', gradient: g('#880e4f', '#ad1457', '#d81b60'), pattern: 'circles', textColor: '#fce4ec', accentColor: '#f48fb1' },
-  { id: 'shoji', name: 'Shoji', category: 'Japonês', gradient: g2('#efebe9', '#d7ccc8'), pattern: 'grid', textColor: '#3e2723', accentColor: '#8d6e63' },
-  { id: 'yukata', name: 'Yukata', category: 'Japonês', gradient: g('#e1bee7', '#ce93d8', '#ba68c8'), pattern: 'sakura', textColor: '#4a148c', accentColor: '#9c27b0' },
-  { id: 'fuji', name: 'Fuji', category: 'Japonês', gradient: g('#5c6bc0', '#7986cb', '#9fa8da'), pattern: 'waves', textColor: '#e8eaf6', accentColor: '#c5cae9' },
-  { id: 'nori', name: 'Nori', category: 'Japonês', gradient: g2('#1b1b2f', '#162447'), pattern: 'lines', textColor: '#a8dadc', accentColor: '#457b9d' },
-  { id: 'sushi', name: 'Sushi', category: 'Japonês', gradient: g('#ff7043', '#ff5722', '#e64a19'), pattern: 'circles', textColor: '#fbe9e7', accentColor: '#ffab91' },
-  { id: 'origami', name: 'Origami', category: 'Japonês', gradient: g('#fff176', '#ffee58', '#fdd835'), pattern: 'grid', textColor: '#f57f17', accentColor: '#f9a825' },
-  { id: 'bonsai2', name: 'Bonsai', category: 'Japonês', gradient: g('#2e7d32', '#1b5e20', '#0d3b0d'), pattern: 'bamboo', textColor: '#a5d6a7', accentColor: '#66bb6a' },
-  { id: 'enso', name: 'Enso', category: 'Japonês', gradient: g2('#fafafa', '#eeeeee'), pattern: 'zen', textColor: '#212121', accentColor: '#9e9e9e' },
-  { id: 'koi', name: 'Koi', category: 'Japonês', gradient: g('#ff6f00', '#ff8f00', '#ffa000'), pattern: 'waves', textColor: '#fff8e1', accentColor: '#ffe082' },
-  { id: 'yuzu', name: 'Yuzu', category: 'Japonês', gradient: g('#f9a825', '#f57f17', '#e65100'), pattern: 'dots', textColor: '#fffde7', accentColor: '#fff59d' },
-  { id: 'shinkansen', name: 'Shinkansen', category: 'Japonês', gradient: g2('#263238', '#37474f'), pattern: 'lines', textColor: '#80cbc4', accentColor: '#4db6ac' },
-  // ===== MINIMALISTA (15) =====
-  { id: 'clean', name: 'Clean White', category: 'Minimalista', gradient: g2('#ffffff', '#f5f5f5'), pattern: 'dots', textColor: '#212121', accentColor: '#9e9e9e' },
-  { id: 'noir', name: 'Noir', category: 'Minimalista', gradient: g2('#212121', '#424242'), pattern: 'grid', textColor: '#fafafa', accentColor: '#e0e0e0' },
-  { id: 'cream', name: 'Cream', category: 'Minimalista', gradient: g2('#fff8e1', '#ffecb3'), pattern: 'none', textColor: '#5d4037', accentColor: '#a1887f' },
-  { id: 'ivory', name: 'Ivory', category: 'Minimalista', gradient: g2('#fffff0', '#f5f5dc'), pattern: 'none', textColor: '#333', accentColor: '#999' },
-  { id: 'slate', name: 'Slate', category: 'Minimalista', gradient: g2('#607d8b', '#455a64'), pattern: 'lines', textColor: '#cfd8dc', accentColor: '#90a4ae' },
-  { id: 'pebble', name: 'Pebble', category: 'Minimalista', gradient: g2('#9e9e9e', '#757575'), pattern: 'dots', textColor: '#fafafa', accentColor: '#e0e0e0' },
-  { id: 'sand', name: 'Sand', category: 'Minimalista', gradient: g2('#e8d5b7', '#d4b896'), pattern: 'none', textColor: '#4e342e', accentColor: '#8d6e63' },
-  { id: 'snow', name: 'Snow', category: 'Minimalista', gradient: g2('#eceff1', '#cfd8dc'), pattern: 'dots', textColor: '#37474f', accentColor: '#78909c' },
-  { id: 'charcoal', name: 'Charcoal', category: 'Minimalista', gradient: g2('#333', '#1a1a1a'), pattern: 'grid', textColor: '#eee', accentColor: '#888' },
-  { id: 'linen', name: 'Linen', category: 'Minimalista', gradient: g2('#f5f0eb', '#e8e0d8'), pattern: 'lines', textColor: '#3e2723', accentColor: '#8d6e63' },
-  { id: 'fog', name: 'Fog', category: 'Minimalista', gradient: g2('#cfd8dc', '#b0bec5'), pattern: 'none', textColor: '#263238', accentColor: '#546e7a' },
-  { id: 'bone', name: 'Bone', category: 'Minimalista', gradient: g2('#e0d6c8', '#d1c4b0'), pattern: 'none', textColor: '#3e2723', accentColor: '#795548' },
-  { id: 'ash', name: 'Ash', category: 'Minimalista', gradient: g2('#bdbdbd', '#9e9e9e'), pattern: 'grid', textColor: '#212121', accentColor: '#424242' },
-  { id: 'pearl', name: 'Pearl', category: 'Minimalista', gradient: g2('#f8f8f8', '#e8e8e8'), pattern: 'dots', textColor: '#444', accentColor: '#aaa' },
-  { id: 'graphite', name: 'Graphite', category: 'Minimalista', gradient: g2('#555', '#333'), pattern: 'lines', textColor: '#ddd', accentColor: '#999' },
-  // ===== CORES VIVAS (25) =====
-  { id: 'ocean', name: 'Ocean', category: 'Cores', gradient: g('#0d47a1', '#1976d2', '#42a5f5'), pattern: 'waves', textColor: '#e3f2fd', accentColor: '#90caf9' },
-  { id: 'sunset', name: 'Sunset', category: 'Cores', gradient: g('#bf360c', '#e65100', '#ff9800'), pattern: 'circles', textColor: '#fff3e0', accentColor: '#ffb74d' },
-  { id: 'lavender', name: 'Lavanda', category: 'Cores', gradient: g('#4a148c', '#7b1fa2', '#ab47bc'), pattern: 'circles', textColor: '#f3e5f5', accentColor: '#ce93d8' },
-  { id: 'forest', name: 'Floresta', category: 'Cores', gradient: g('#1b5e20', '#33691e', '#689f38'), pattern: 'bamboo', textColor: '#f1f8e9', accentColor: '#aed581' },
-  { id: 'midnight', name: 'Midnight', category: 'Cores', gradient: g('#0d1b2a', '#1b2838', '#2d4059'), pattern: 'dots', textColor: '#e0e1dd', accentColor: '#778da9' },
-  { id: 'coral', name: 'Coral', category: 'Cores', gradient: g('#ff8a65', '#ff7043', '#f4511e'), pattern: 'sakura', textColor: '#fff3e0', accentColor: '#ffccbc' },
-  { id: 'arctic', name: 'Arctic', category: 'Cores', gradient: g('#e0f7fa', '#b2ebf2', '#80deea'), pattern: 'waves', textColor: '#006064', accentColor: '#00acc1' },
-  { id: 'cherry', name: 'Cherry', category: 'Cores', gradient: g('#c62828', '#d32f2f', '#ef5350'), pattern: 'dots', textColor: '#ffebee', accentColor: '#ef9a9a' },
-  { id: 'emerald', name: 'Esmeralda', category: 'Cores', gradient: g('#004d40', '#00695c', '#00897b'), pattern: 'lines', textColor: '#e0f2f1', accentColor: '#80cbc4' },
-  { id: 'amber', name: 'Amber', category: 'Cores', gradient: g('#e65100', '#ef6c00', '#f57c00'), pattern: 'circles', textColor: '#fff8e1', accentColor: '#ffca28' },
-  { id: 'rose', name: 'Rose', category: 'Cores', gradient: g('#880e4f', '#ad1457', '#c2185b'), pattern: 'sakura', textColor: '#fce4ec', accentColor: '#f06292' },
-  { id: 'teal', name: 'Teal', category: 'Cores', gradient: g('#004d40', '#00796b', '#009688'), pattern: 'waves', textColor: '#e0f2f1', accentColor: '#4db6ac' },
-  { id: 'tangerine', name: 'Tangerina', category: 'Cores', gradient: g('#ef6c00', '#f57c00', '#fb8c00'), pattern: 'dots', textColor: '#fff3e0', accentColor: '#ffb74d' },
-  { id: 'plum', name: 'Plum', category: 'Cores', gradient: g('#4a148c', '#6a1b9a', '#8e24aa'), pattern: 'zen', textColor: '#f3e5f5', accentColor: '#ba68c8' },
-  { id: 'turquoise', name: 'Turquesa', category: 'Cores', gradient: g('#00695c', '#00897b', '#26a69a'), pattern: 'dots', textColor: '#e0f2f1', accentColor: '#80cbc4' },
-  { id: 'ruby', name: 'Ruby', category: 'Cores', gradient: g('#b71c1c', '#c62828', '#e53935'), pattern: 'lines', textColor: '#ffebee', accentColor: '#ef9a9a' },
-  { id: 'jade', name: 'Jade', category: 'Cores', gradient: g('#2e7d32', '#388e3c', '#43a047'), pattern: 'bamboo', textColor: '#e8f5e9', accentColor: '#81c784' },
-  { id: 'sapphire', name: 'Sapphire', category: 'Cores', gradient: g('#1a237e', '#283593', '#3949ab'), pattern: 'circles', textColor: '#e8eaf6', accentColor: '#9fa8da' },
-  { id: 'copper', name: 'Cobre', category: 'Cores', gradient: g('#bf360c', '#d84315', '#e64a19'), pattern: 'lines', textColor: '#fbe9e7', accentColor: '#ff8a65' },
-  { id: 'mint', name: 'Menta', category: 'Cores', gradient: g('#00bfa5', '#1de9b6', '#64ffda'), pattern: 'dots', textColor: '#004d40', accentColor: '#a7ffeb' },
-  { id: 'crimson', name: 'Crimson', category: 'Cores', gradient: g('#880e4f', '#b71c1c', '#d32f2f'), pattern: 'sakura', textColor: '#fce4ec', accentColor: '#f48fb1' },
-  { id: 'olive', name: 'Oliva', category: 'Cores', gradient: g('#558b2f', '#689f38', '#7cb342'), pattern: 'bamboo', textColor: '#f1f8e9', accentColor: '#aed581' },
-  { id: 'magenta', name: 'Magenta', category: 'Cores', gradient: g('#ad1457', '#c2185b', '#d81b60'), pattern: 'circles', textColor: '#fce4ec', accentColor: '#f06292' },
-  { id: 'indigo', name: 'Indigo', category: 'Cores', gradient: g('#1a237e', '#303f9f', '#5c6bc0'), pattern: 'waves', textColor: '#e8eaf6', accentColor: '#9fa8da' },
-  { id: 'bronze', name: 'Bronze', category: 'Cores', gradient: g('#4e342e', '#5d4037', '#6d4c41'), pattern: 'lines', textColor: '#d7ccc8', accentColor: '#bcaaa4' },
-  // ===== ACADÊMICO (15) =====
-  { id: 'classic', name: 'Classico', category: 'Acadêmico', gradient: g2('#3e2723', '#5d4037'), pattern: 'lines', textColor: '#efebe9', accentColor: '#bcaaa4' },
-  { id: 'college', name: 'College', category: 'Acadêmico', gradient: g2('#b71c1c', '#c62828'), pattern: 'grid', textColor: '#ffffff', accentColor: '#ef9a9a' },
-  { id: 'oxford', name: 'Oxford', category: 'Acadêmico', gradient: g2('#1b3a4b', '#274c5b'), pattern: 'lines', textColor: '#cfd8dc', accentColor: '#90a4ae' },
-  { id: 'harvard', name: 'Harvard', category: 'Acadêmico', gradient: g2('#880e4f', '#a31545'), pattern: 'grid', textColor: '#fce4ec', accentColor: '#f48fb1' },
-  { id: 'yale', name: 'Yale', category: 'Acadêmico', gradient: g2('#00356b', '#004f9a'), pattern: 'lines', textColor: '#c5cae9', accentColor: '#7986cb' },
-  { id: 'cambridge', name: 'Cambridge', category: 'Acadêmico', gradient: g2('#a3be8c', '#8fbc6f'), pattern: 'dots', textColor: '#1b3a1b', accentColor: '#6d9b4a' },
-  { id: 'stanford', name: 'Stanford', category: 'Acadêmico', gradient: g2('#8c1515', '#be2e2e'), pattern: 'lines', textColor: '#fce4ec', accentColor: '#ef9a9a' },
-  { id: 'mit', name: 'MIT', category: 'Acadêmico', gradient: g2('#a31f34', '#c32d45'), pattern: 'grid', textColor: '#fce4ec', accentColor: '#ef9a9a' },
-  { id: 'notebook1', name: 'Caderno Azul', category: 'Acadêmico', gradient: g2('#1565c0', '#1976d2'), pattern: 'lines', textColor: '#e3f2fd', accentColor: '#90caf9' },
-  { id: 'notebook2', name: 'Caderno Verde', category: 'Acadêmico', gradient: g2('#2e7d32', '#388e3c'), pattern: 'lines', textColor: '#e8f5e9', accentColor: '#81c784' },
-  { id: 'notebook3', name: 'Caderno Vermelho', category: 'Acadêmico', gradient: g2('#c62828', '#d32f2f'), pattern: 'lines', textColor: '#ffebee', accentColor: '#ef9a9a' },
-  { id: 'notebook4', name: 'Caderno Preto', category: 'Acadêmico', gradient: g2('#212121', '#424242'), pattern: 'lines', textColor: '#fafafa', accentColor: '#e0e0e0' },
-  { id: 'lab', name: 'Laboratorio', category: 'Acadêmico', gradient: g2('#00695c', '#00897b'), pattern: 'grid', textColor: '#e0f2f1', accentColor: '#80cbc4' },
-  { id: 'library', name: 'Biblioteca', category: 'Acadêmico', gradient: g2('#4e342e', '#6d4c41'), pattern: 'lines', textColor: '#d7ccc8', accentColor: '#a1887f' },
-  { id: 'thesis', name: 'Tese', category: 'Acadêmico', gradient: g2('#1a1a2e', '#16213e'), pattern: 'grid', textColor: '#c9b896', accentColor: '#8d7b6a' },
-  // ===== NATUREZA (15) =====
-  { id: 'aurora', name: 'Aurora', category: 'Natureza', gradient: g('#00e676', '#00bfa5', '#2979ff'), pattern: 'waves', textColor: '#ffffff', accentColor: '#b2ff59' },
-  { id: 'desert', name: 'Deserto', category: 'Natureza', gradient: g('#e65100', '#f57c00', '#ffb74d'), pattern: 'dots', textColor: '#fff3e0', accentColor: '#ffe0b2' },
-  { id: 'jungle', name: 'Selva', category: 'Natureza', gradient: g('#1b5e20', '#00695c', '#004d40'), pattern: 'bamboo', textColor: '#a5d6a7', accentColor: '#4db6ac' },
-  { id: 'volcano', name: 'Vulcao', category: 'Natureza', gradient: g('#b71c1c', '#e65100', '#f57c00'), pattern: 'circles', textColor: '#fff3e0', accentColor: '#ffab91' },
-  { id: 'glacier', name: 'Geleira', category: 'Natureza', gradient: g('#e3f2fd', '#bbdefb', '#90caf9'), pattern: 'waves', textColor: '#0d47a1', accentColor: '#42a5f5' },
-  { id: 'canyon', name: 'Canyon', category: 'Natureza', gradient: g('#bf360c', '#8d6e63', '#795548'), pattern: 'lines', textColor: '#fbe9e7', accentColor: '#bcaaa4' },
-  { id: 'tundra', name: 'Tundra', category: 'Natureza', gradient: g('#eceff1', '#cfd8dc', '#b0bec5'), pattern: 'dots', textColor: '#37474f', accentColor: '#78909c' },
-  { id: 'savanna', name: 'Savana', category: 'Natureza', gradient: g('#f9a825', '#f57f17', '#e65100'), pattern: 'lines', textColor: '#3e2723', accentColor: '#8d6e63' },
-  { id: 'reef', name: 'Recife', category: 'Natureza', gradient: g('#0097a7', '#00acc1', '#26c6da'), pattern: 'sakura', textColor: '#e0f7fa', accentColor: '#80deea' },
-  { id: 'meadow', name: 'Prado', category: 'Natureza', gradient: g('#7cb342', '#9ccc65', '#c5e1a5'), pattern: 'dots', textColor: '#1b5e20', accentColor: '#558b2f' },
-  { id: 'storm', name: 'Tempestade', category: 'Natureza', gradient: g('#263238', '#37474f', '#546e7a'), pattern: 'waves', textColor: '#b0bec5', accentColor: '#78909c' },
-  { id: 'dawn', name: 'Aurora', category: 'Natureza', gradient: g('#ff6f00', '#ff8f00', '#ffd54f'), pattern: 'waves', textColor: '#fff8e1', accentColor: '#ffe082' },
-  { id: 'autumn', name: 'Outono', category: 'Natureza', gradient: g('#e65100', '#f57c00', '#ff9800'), pattern: 'sakura', textColor: '#fff3e0', accentColor: '#ffcc80' },
-  { id: 'spring', name: 'Primavera', category: 'Natureza', gradient: g('#66bb6a', '#81c784', '#a5d6a7'), pattern: 'sakura', textColor: '#1b5e20', accentColor: '#4caf50' },
-  { id: 'night-sky', name: 'Ceu Noturno', category: 'Natureza', gradient: g('#0d1b2a', '#1b2838', '#1b3a4b'), pattern: 'dots', textColor: '#e0e1dd', accentColor: '#778da9' },
-  // ===== CRIATIVO (15) =====
-  { id: 'neon', name: 'Neon', category: 'Criativo', gradient: g2('#0a0a0a', '#1a1a2e'), pattern: 'grid', textColor: '#00ff88', accentColor: '#ff00ff' },
-  { id: 'retro', name: 'Retro', category: 'Criativo', gradient: g('#ff6b6b', '#feca57', '#48dbfb'), pattern: 'circles', textColor: '#2c3e50', accentColor: '#636e72' },
-  { id: 'synthwave', name: 'Synthwave', category: 'Criativo', gradient: g('#2d1b69', '#11001c', '#0d0221'), pattern: 'waves', textColor: '#ff71ce', accentColor: '#01cdfe' },
-  { id: 'pixel', name: 'Pixel', category: 'Criativo', gradient: g2('#1a1c2c', '#262b44'), pattern: 'grid', textColor: '#f4f4f4', accentColor: '#94b0c2' },
-  { id: 'pastel', name: 'Pastel', category: 'Criativo', gradient: g('#ffecd2', '#fcb69f', '#a1c4fd'), pattern: 'dots', textColor: '#333', accentColor: '#764ba2' },
-  { id: 'galaxy', name: 'Galaxia', category: 'Criativo', gradient: g('#0f0c29', '#302b63', '#24243e'), pattern: 'dots', textColor: '#e8daef', accentColor: '#af7ac5' },
-  { id: 'candy', name: 'Candy', category: 'Criativo', gradient: g('#ff6b81', '#feca57', '#ff9ff3'), pattern: 'sakura', textColor: '#2f3542', accentColor: '#ff6b81' },
-  { id: 'holographic', name: 'Holografico', category: 'Criativo', gradient: g('#a18cd1', '#fbc2eb', '#a6c1ee'), pattern: 'circles', textColor: '#333', accentColor: '#a18cd1' },
-  { id: 'vaporwave', name: 'Vaporwave', category: 'Criativo', gradient: g('#ff71ce', '#01cdfe', '#05ffa1'), pattern: 'grid', textColor: '#2d1b69', accentColor: '#ff71ce' },
-  { id: 'cyberpunk', name: 'Cyberpunk', category: 'Criativo', gradient: g2('#0d0221', '#150535'), pattern: 'grid', textColor: '#00fff5', accentColor: '#ff00ff' },
-  { id: 'dreamy', name: 'Sonho', category: 'Criativo', gradient: g('#e0c3fc', '#8ec5fc', '#e0c3fc'), pattern: 'sakura', textColor: '#2c3e50', accentColor: '#6c5ce7' },
-  { id: 'sunset2', name: 'Por do Sol', category: 'Criativo', gradient: g('#ee5a24', '#f0932b', '#f6e58d'), pattern: 'waves', textColor: '#2c3e50', accentColor: '#eb4d4b' },
-  { id: 'cosmic', name: 'Cosmico', category: 'Criativo', gradient: g('#141e30', '#243b55', '#141e30'), pattern: 'dots', textColor: '#e8daef', accentColor: '#85c1e9' },
-  { id: 'bubblegum', name: 'Bubblegum', category: 'Criativo', gradient: g('#ff6b81', '#ff9ff3', '#feca57'), pattern: 'sakura', textColor: '#2f3542', accentColor: '#ff6b81' },
-  { id: 'electric', name: 'Eletrico', category: 'Criativo', gradient: g2('#0a0a2a', '#1a1a4a'), pattern: 'lines', textColor: '#00d4ff', accentColor: '#ff00ff' },
-  // ===== PROFISSIONAL (15) =====
-  { id: 'corporate', name: 'Corporativo', category: 'Profissional', gradient: g2('#1a237e', '#283593'), pattern: 'lines', textColor: '#c5cae9', accentColor: '#7986cb' },
-  { id: 'executive', name: 'Executivo', category: 'Profissional', gradient: g2('#263238', '#37474f'), pattern: 'grid', textColor: '#b0bec5', accentColor: '#78909c' },
-  { id: 'lawyer', name: 'Advocacia', category: 'Profissional', gradient: g2('#1b3a4b', '#2c5364'), pattern: 'lines', textColor: '#cfd8dc', accentColor: '#90a4ae' },
-  { id: 'medical', name: 'Medicina', category: 'Profissional', gradient: g2('#00695c', '#00897b'), pattern: 'lines', textColor: '#b2dfdb', accentColor: '#4db6ac' },
-  { id: 'engineering', name: 'Engenharia', category: 'Profissional', gradient: g2('#37474f', '#455a64'), pattern: 'grid', textColor: '#cfd8dc', accentColor: '#90a4ae' },
-  { id: 'finance', name: 'Financas', category: 'Profissional', gradient: g2('#004d40', '#00695c'), pattern: 'lines', textColor: '#a5d6a7', accentColor: '#66bb6a' },
-  { id: 'tech', name: 'Tecnologia', category: 'Profissional', gradient: g2('#0d47a1', '#1565c0'), pattern: 'grid', textColor: '#90caf9', accentColor: '#42a5f5' },
-  { id: 'design', name: 'Design', category: 'Profissional', gradient: g2('#4a148c', '#6a1b9a'), pattern: 'dots', textColor: '#ce93d8', accentColor: '#ab47bc' },
-  { id: 'architecture', name: 'Arquitetura', category: 'Profissional', gradient: g2('#3e2723', '#5d4037'), pattern: 'lines', textColor: '#bcaaa4', accentColor: '#8d6e63' },
-  { id: 'science', name: 'Ciencia', category: 'Profissional', gradient: g2('#01579b', '#0277bd'), pattern: 'grid', textColor: '#81d4fa', accentColor: '#29b6f6' },
-  { id: 'business', name: 'Negocios', category: 'Profissional', gradient: g2('#1a1a2e', '#16213e'), pattern: 'lines', textColor: '#a8dadc', accentColor: '#457b9d' },
-  { id: 'startup', name: 'Startup', category: 'Profissional', gradient: g('#6c5ce7', '#a29bfe', '#dfe6e9'), pattern: 'dots', textColor: '#2d3436', accentColor: '#6c5ce7' },
-  { id: 'consulting', name: 'Consultoria', category: 'Profissional', gradient: g2('#263238', '#455a64'), pattern: 'lines', textColor: '#b0bec5', accentColor: '#78909c' },
-  { id: 'marketing', name: 'Marketing', category: 'Profissional', gradient: g('#e91e63', '#f06292', '#f8bbd0'), pattern: 'circles', textColor: '#880e4f', accentColor: '#ec407a' },
-  { id: 'journalism', name: 'Jornalismo', category: 'Profissional', gradient: g2('#212121', '#424242'), pattern: 'lines', textColor: '#e0e0e0', accentColor: '#9e9e9e' },
-];
+function getCoversByCategory(category: string): CoverPreset[] {
+  const all = getAllCovers();
+  if (category === 'Todos') return all;
+  return all.filter(c => c.category === category);
+}
 
-const CATEGORIES = ['Todos', 'Japonês', 'Minimalista', 'Cores', 'Acadêmico', 'Natureza', 'Criativo', 'Profissional'];
+const CATEGORIES = ['Todos', ...COLLECTIONS.map(c => c.name)];
+
+const PAGE_SIZE = 48;
+
+/* ============================================================
+   COVER PREVIEW (small canvas, renders on mount)
+   ============================================================ */
+
+function CoverPreview({ cover, isSelected, onClick }: { cover: CoverPreset; isSelected: boolean; onClick: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Background gradient
+    const grd = ctx.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, cover.bg1);
+    grd.addColorStop(0.5, cover.bg2);
+    grd.addColorStop(1, cover.bg3);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+
+    // Pattern
+    cover.draw(ctx, w, h);
+  }, [cover]);
+
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative aspect-[3/4] overflow-hidden rounded-lg border-2 transition-all active:scale-95 ${
+        isSelected
+          ? 'border-[var(--ws-accent)] shadow-md'
+          : 'border-transparent hover:border-[var(--ws-glass-border)]'
+      }`}
+    >
+      <canvas
+        ref={canvasRef}
+        width={120}
+        height={160}
+        className="h-full w-full"
+        style={{ imageRendering: 'auto' }}
+      />
+      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent p-1.5">
+        <p className="text-[9px] font-medium text-white truncate">{cover.name}</p>
+      </div>
+    </button>
+  );
+}
+
+/* ============================================================
+   MAIN COMPONENT
+   ============================================================ */
 
 export function CoversView() {
-  const [selectedCover, setSelectedCover] = useState<CoverPreset>(COVERS[0]);
+  const [selectedCover, setSelectedCover] = useState<CoverPreset | null>(() => getAllCovers()[0]);
   const [title, setTitle] = useState('Meu Caderno');
   const [subtitle, setSubtitle] = useState('');
   const [category, setCategory] = useState('Todos');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   const filteredCovers = useMemo(() => {
-    return COVERS.filter(c => {
-      const matchCat = category === 'Todos' || c.category === category;
-      const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
-    });
+    const covers = getCoversByCategory(category);
+    if (!search) return covers;
+    const q = search.toLowerCase();
+    return covers.filter(c => c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q));
   }, [category, search]);
 
+  const visibleCovers = useMemo(() => {
+    return filteredCovers.slice(0, page * PAGE_SIZE);
+  }, [filteredCovers, page]);
+
+  const hasMore = page * PAGE_SIZE < filteredCovers.length;
+
+  const handleLoadMore = useCallback(() => {
+    setPage(prev => prev + 1);
+  }, []);
+
+  const handleCategoryChange = useCallback((cat: string) => {
+    setCategory(cat);
+    setPage(1);
+  }, []);
+
+  const handleSearchChange = useCallback((q: string) => {
+    setSearch(q);
+    setPage(1);
+  }, []);
+
   const downloadCover = () => {
+    if (!selectedCover) return;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
-    canvas.width = 1200; canvas.height = 1600;
-    // Background
-    const colors = extractGradientColors(selectedCover.gradient);
+    canvas.width = 1200;
+    canvas.height = 1600;
+
+    // Background gradient
     const grd = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    grd.addColorStop(0, colors[0]); grd.addColorStop(0.5, colors[1] || colors[0]); grd.addColorStop(1, colors[2] || colors[1] || colors[0]);
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, 1200, 1600);
+    grd.addColorStop(0, selectedCover.bg1);
+    grd.addColorStop(0.5, selectedCover.bg2);
+    grd.addColorStop(1, selectedCover.bg3);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 1200, 1600);
+
     // Pattern
-    drawPattern(ctx, selectedCover.pattern, selectedCover.accentColor);
+    selectedCover.draw(ctx, 1200, 1600);
+
     // Border
-    ctx.strokeStyle = selectedCover.accentColor + '80'; ctx.lineWidth = 3;
+    ctx.strokeStyle = selectedCover.accentColor + '80';
+    ctx.lineWidth = 3;
     ctx.strokeRect(35, 35, 1130, 1530);
+
     // Title
     ctx.fillStyle = selectedCover.textColor;
-    ctx.font = 'bold 64px Georgia, serif'; ctx.textAlign = 'center';
+    ctx.font = 'bold 64px Georgia, serif';
+    ctx.textAlign = 'center';
     ctx.fillText(title, 600, 780);
+
     // Subtitle
     if (subtitle) {
-      ctx.font = '32px sans-serif'; ctx.globalAlpha = 0.7;
-      ctx.fillText(subtitle, 600, 830); ctx.globalAlpha = 1;
+      ctx.font = '32px sans-serif';
+      ctx.globalAlpha = 0.7;
+      ctx.fillText(subtitle, 600, 830);
+      ctx.globalAlpha = 1;
     }
+
     // Download
     const link = document.createElement('a');
     link.download = `capa-${title.toLowerCase().replace(/\s+/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png'); link.click();
+    link.href = canvas.toDataURL('image/png');
+    link.click();
     toast({ title: 'Capa baixada!', description: 'Sua capa de caderno foi salva.' });
   };
+
+  // Preview canvas for the selected cover
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas || !selectedCover) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const grd = ctx.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, selectedCover.bg1);
+    grd.addColorStop(0.5, selectedCover.bg2);
+    grd.addColorStop(1, selectedCover.bg3);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+
+    selectedCover.draw(ctx, w, h);
+
+    // Border
+    ctx.strokeStyle = selectedCover.accentColor + '60';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8, 8, w - 16, h - 16);
+
+    // Title
+    ctx.fillStyle = selectedCover.textColor;
+    ctx.font = 'bold 22px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title || 'Título do Caderno', w / 2, h * 0.48);
+
+    if (subtitle) {
+      ctx.font = '12px sans-serif';
+      ctx.globalAlpha = 0.7;
+      ctx.fillText(subtitle, w / 2, h * 0.52);
+      ctx.globalAlpha = 1;
+    }
+  }, [selectedCover, title, subtitle]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { 'Todos': TOTAL_COVERS };
+    COLLECTIONS.forEach(col => {
+      counts[col.name] = COVERS_PER_COLLECTION;
+    });
+    return counts;
+  }, []);
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -206,7 +1014,7 @@ export function CoversView() {
           Capas de Caderno
         </h1>
         <p className="mt-1 text-sm text-[var(--ws-text-tertiary)]">
-          {COVERS.length} designs disponiveis — Crie capas personalizadas
+          {TOTAL_COVERS} designs disponíveis — Crie capas personalizadas
         </p>
       </div>
 
@@ -217,29 +1025,37 @@ export function CoversView() {
             className="relative mx-auto w-full max-w-[280px] overflow-hidden rounded-lg shadow-xl"
             style={{ aspectRatio: '3/4' }}
           >
-            <div className="absolute inset-0" style={{ background: selectedCover.gradient }} />
-            <div className="absolute inset-0 opacity-20">
-              <PatternSVG pattern={selectedCover.pattern} color={selectedCover.accentColor} />
-            </div>
-            <div className="absolute inset-3 rounded-sm border-2" style={{ borderColor: selectedCover.accentColor + '60' }} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
-              <h2 className="text-center text-2xl font-bold leading-tight" style={{ color: selectedCover.textColor, fontFamily: 'var(--font-serif-jp), serif' }}>
-                {title || 'Titulo do Caderno'}
-              </h2>
-              {subtitle && (
-                <p className="mt-2 text-center text-sm opacity-70" style={{ color: selectedCover.textColor }}>{subtitle}</p>
-              )}
-            </div>
+            <canvas
+              ref={previewCanvasRef}
+              width={300}
+              height={400}
+              className="h-full w-full"
+            />
           </div>
-          <button onClick={downloadCover} className="flex items-center justify-center gap-2 rounded-ws-button bg-[var(--ws-accent)] px-6 py-3 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]">
+          <button
+            onClick={downloadCover}
+            className="flex items-center justify-center gap-2 rounded-ws-button bg-[var(--ws-accent)] px-6 py-3 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
+          >
             <Download size={16} /> Baixar Capa PNG
           </button>
           <div className="flex flex-col gap-3 rounded-lg border border-[var(--ws-glass-border)] bg-[var(--ws-surface)] p-4">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--ws-text-primary)]"><Type size={14} /> Personalizar</h3>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Titulo do caderno"
-              className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none" />
-            <input type="text" value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Subtitulo (opcional)"
-              className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none" />
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--ws-text-primary)]">
+              <Type size={14} /> Personalizar
+            </h3>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Título do caderno"
+              className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none"
+            />
+            <input
+              type="text"
+              value={subtitle}
+              onChange={e => setSubtitle(e.target.value)}
+              placeholder="Subtítulo (opcional)"
+              className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] px-3 py-2 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none"
+            />
           </div>
         </div>
 
@@ -248,68 +1064,57 @@ export function CoversView() {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ws-text-tertiary)]" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar capa..."
-                className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] py-2 pl-9 pr-3 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => handleSearchChange(e.target.value)}
+                placeholder="Buscar capa..."
+                className="w-full rounded-ws-input border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] py-2 pl-9 pr-3 text-sm text-[var(--ws-text-primary)] placeholder:text-[var(--ws-text-tertiary)] focus:border-[var(--ws-accent)] focus:outline-none"
+              />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => setCategory(cat)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${category === cat ? 'bg-[var(--ws-accent)] text-white' : 'bg-[var(--ws-surface)] text-[var(--ws-text-secondary)] hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)]'}`}>
-                {cat} ({cat === 'Todos' ? COVERS.length : COVERS.filter(c => c.category === cat).length})
+              <button
+                key={cat}
+                onClick={() => handleCategoryChange(cat)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  category === cat
+                    ? 'bg-[var(--ws-accent)] text-white'
+                    : 'bg-[var(--ws-surface)] text-[var(--ws-text-secondary)] hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)]'
+                }`}
+              >
+                {cat} ({categoryCounts[cat]})
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1">
-            {filteredCovers.map((cover) => (
-              <motion.button key={cover.id} onClick={() => setSelectedCover(cover)} whileTap={{ scale: 0.95 }}
-                className={`group relative aspect-[3/4] overflow-hidden rounded-lg border-2 transition-all ${selectedCover.id === cover.id ? 'border-[var(--ws-accent)] shadow-md' : 'border-transparent hover:border-[var(--ws-glass-border)]'}`}>
-                <div className="absolute inset-0" style={{ background: cover.gradient }} />
-                <div className="absolute inset-0 opacity-15"><PatternSVG pattern={cover.pattern} color={cover.accentColor} /></div>
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent p-2">
-                  <p className="text-[10px] font-medium text-white truncate">{cover.name}</p>
-                </div>
-              </motion.button>
+          <div className="grid grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1 no-scrollbar">
+            {visibleCovers.map(cover => (
+              <CoverPreview
+                key={cover.id}
+                cover={cover}
+                isSelected={selectedCover?.id === cover.id}
+                onClick={() => setSelectedCover(cover)}
+              />
             ))}
           </div>
+          {hasMore && (
+            <button
+              onClick={handleLoadMore}
+              className="mx-auto flex items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-surface)] px-6 py-2.5 text-sm font-medium text-[var(--ws-text-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)]"
+            >
+              <ChevronDown size={16} />
+              Carregar mais ({filteredCovers.length - page * PAGE_SIZE} restantes)
+            </button>
+          )}
+          {filteredCovers.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-[var(--ws-text-tertiary)]">
+              <Search size={32} className="mb-3 opacity-40" />
+              <p className="text-sm">Nenhuma capa encontrada</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-}
-
-function PatternSVG({ pattern, color }: { pattern: string; color: string }) {
-  const id = Math.random().toString(36).slice(2, 8);
-  const p: Record<string, React.ReactNode> = {
-    none: null,
-    grid: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke={color} strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    dots: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="2" fill={color} /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    lines: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="100%" height="20" patternUnits="userSpaceOnUse"><line x1="0" y1="10" x2="100%" y2="10" stroke={color} strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    waves: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="100" height="40" patternUnits="userSpaceOnUse"><path d="M0 20 Q25 10 50 20 T100 20" fill="none" stroke={color} strokeWidth="1.5" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    circles: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="60" height="60" patternUnits="userSpaceOnUse"><circle cx="30" cy="30" r="20" fill="none" stroke={color} strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    zen: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><circle cx="50%" cy="50%" r="30%" fill="none" stroke={color} strokeWidth="2" opacity="0.5" /><circle cx="50%" cy="50%" r="15%" fill="none" stroke={color} strokeWidth="1" opacity="0.3" /></svg>,
-    sakura: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="80" height="80" patternUnits="userSpaceOnUse"><path d="M40 10 Q45 25 40 35 Q35 25 40 10Z" fill={color} opacity="0.6" /><path d="M20 50 Q30 45 35 50 Q30 55 20 50Z" fill={color} opacity="0.4" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-    bamboo: <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg"><defs><pattern id={id} width="60" height="100" patternUnits="userSpaceOnUse"><line x1="20" y1="0" x2="20" y2="100" stroke={color} strokeWidth="3" /><line x1="50" y1="0" x2="50" y2="100" stroke={color} strokeWidth="2" opacity="0.5" /></pattern></defs><rect width="100%" height="100%" fill={`url(#${id})`} /></svg>,
-  };
-  return <>{p[pattern] || null}</>;
-}
-
-function extractGradientColors(gradient: string): string[] {
-  const m = gradient.match(/#[0-9a-fA-F]{6}/g);
-  return m ? m : ['#333333', '#666666', '#999999'];
-}
-
-function drawPattern(ctx: CanvasRenderingContext2D, pattern: string, color: string) {
-  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.globalAlpha = 0.15;
-  const w = 1200, h = 1600;
-  switch (pattern) {
-    case 'grid': ctx.lineWidth = 1; for (let x = 0; x <= w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); } for (let y = 0; y <= h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); } break;
-    case 'dots': for (let x = 20; x <= w; x += 20) for (let y = 20; y <= h; y += 20) { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill(); } break;
-    case 'lines': ctx.lineWidth = 1; for (let y = 20; y <= h; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); } break;
-    case 'waves': ctx.lineWidth = 1.5; for (let y = 20; y <= h; y += 40) { ctx.beginPath(); for (let x = 0; x <= w; x += 5) ctx.lineTo(x, y + Math.sin(x * 0.05) * 10); ctx.stroke(); } break;
-    case 'zen': ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(600, 800, 300, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(600, 800, 150, 0, Math.PI * 2); ctx.stroke(); break;
-    case 'sakura': { ctx.globalAlpha = 0.2; const pos = [[w*0.3,h*0.2],[w*0.7,h*0.15],[w*0.15,h*0.5],[w*0.8,h*0.45],[w*0.5,h*0.7],[w*0.2,h*0.8],[w*0.75,h*0.8]]; pos.forEach(([px,py]) => { for (let i = 0; i < 5; i++) { const a = (i * Math.PI * 2) / 5; ctx.beginPath(); ctx.ellipse(px + Math.cos(a) * 12, py + Math.sin(a) * 12, 12, 6, a, 0, Math.PI * 2); ctx.fill(); } }); break; }
-    default: break;
-  }
-  ctx.restore();
 }

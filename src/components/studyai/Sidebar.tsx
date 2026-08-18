@@ -9,7 +9,7 @@ import {
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   ChevronLeft, ChevronRight, LogOut, Crown, Shield, ChevronDown,
   BookText, Layers, ScrollText, Lock,
-  PenTool, Palette,
+  Palette,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { UsageBar } from './PremiumUpgrade';
@@ -54,7 +54,6 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'flashcards', label: 'Flashcards', icon: Layers },
       { id: 'timer', label: 'Timer', icon: Timer },
       { id: 'chat', label: 'Sensei AI', icon: MessageCircle },
-      { id: 'drawing', label: 'Desenhos', icon: PenTool },
       { id: 'covers', label: 'Capas', icon: Palette },
     ],
   },

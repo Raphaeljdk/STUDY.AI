@@ -25,6 +25,22 @@ import { MobileNavBar } from './MobileNavBar';
 import { PlanGate } from '@/components/PlanGate';
 import dynamic from 'next/dynamic';
 
+function TabLoadingSkeleton() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-4">
+        <div className="h-6 w-48 animate-pulse rounded bg-[var(--ws-glass-border)]" />
+        <div className="h-4 w-72 animate-pulse rounded bg-[var(--ws-glass-border)]" />
+        <div className="mt-6 space-y-3">
+          <div className="h-32 animate-pulse rounded-lg bg-[var(--ws-surface)]" />
+          <div className="h-32 animate-pulse rounded-lg bg-[var(--ws-surface)]" />
+          <div className="h-32 animate-pulse rounded-lg bg-[var(--ws-surface)]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const StreakWidget = dynamic(() => import('./StreakWidget').then(m => ({ default: m.StreakWidget })), { ssr: false });
 const ReminderCheck = dynamic(() => import('./ReminderCheck').then(m => ({ default: m.ReminderCheck })), { ssr: false });
 
@@ -41,21 +57,21 @@ const CanvasNotebookView = dynamic(
 );
 
 const HomeDashboard = dynamic(() => import('./HomeDashboard'), { ssr: false });
-const SubjectsView = dynamic(() => import('./SubjectsView'), { ssr: false });
-const TasksView = dynamic(() => import('./TasksView'), { ssr: false });
-const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false });
-const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false });
-const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false });
-const DiscoverView = dynamic(() => import('./DiscoverView'), { ssr: false });
-const BattleView = dynamic(() => import('./BattleView'), { ssr: false });
-const MicroLessonView = dynamic(() => import('./MicroLessonView'), { ssr: false });
-const MissionsView = dynamic(() => import('./MissionsView'), { ssr: false });
-const BrainView = dynamic(() => import('./BrainView'), { ssr: false });
-const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false });
-const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false });
-const TeachView = dynamic(() => import('./TeachView'), { ssr: false });
-const DrawingView = dynamic(() => import('./DrawingView'), { ssr: false });
-const CoversView = dynamic(() => import('./CoversView').then(m => ({ default: m.CoversView })), { ssr: false });
+const SubjectsView = dynamic(() => import('./SubjectsView'), { ssr: false, loading: TabLoadingSkeleton });
+const TasksView = dynamic(() => import('./TasksView'), { ssr: false, loading: TabLoadingSkeleton });
+const GoalsView = dynamic(() => import('./GoalsView'), { ssr: false, loading: TabLoadingSkeleton });
+const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false, loading: TabLoadingSkeleton });
+const ProgressView = dynamic(() => import('./ProgressView'), { ssr: false, loading: TabLoadingSkeleton });
+const DiscoverView = dynamic(() => import('./DiscoverView'), { ssr: false, loading: TabLoadingSkeleton });
+const BattleView = dynamic(() => import('./BattleView'), { ssr: false, loading: TabLoadingSkeleton });
+const MicroLessonView = dynamic(() => import('./MicroLessonView'), { ssr: false, loading: TabLoadingSkeleton });
+const MissionsView = dynamic(() => import('./MissionsView'), { ssr: false, loading: TabLoadingSkeleton });
+const BrainView = dynamic(() => import('./BrainView'), { ssr: false, loading: TabLoadingSkeleton });
+const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false, loading: TabLoadingSkeleton });
+const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false, loading: TabLoadingSkeleton });
+const TeachView = dynamic(() => import('./TeachView'), { ssr: false, loading: TabLoadingSkeleton });
+const DrawingView = dynamic(() => import('./DrawingView'), { ssr: false, loading: TabLoadingSkeleton });
+const CoversView = dynamic(() => import('./CoversView').then(m => ({ default: m.CoversView })), { ssr: false, loading: TabLoadingSkeleton });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {

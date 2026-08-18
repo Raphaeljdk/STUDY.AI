@@ -86,7 +86,11 @@ export async function POST(request: Request) {
       questions,
     }, { status: 201 });
   } catch (error) {
-    console.error('Route error:', error);
+    console.error('[Battle POST] Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

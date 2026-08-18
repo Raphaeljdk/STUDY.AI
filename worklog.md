@@ -260,3 +260,106 @@ Stage Summary:
 - ai-proxy now uses ZAI.create() factory method
 - PWAInstallButton had a runtime bug (setCanInstall is not a function) which is now fixed
 - All features verified working in browser
+
+---
+Task ID: 1
+Agent: fullstack-developer
+Task: Fix Battle feature client-server data mismatch
+
+Work Log:
+- Fixed handleStartBattle to properly map API response to BattleState
+- Fixed handleFinishBattle to compute correctAnswers/confidenceAvg and map response to BattleResult
+
+Stage Summary:
+- Battle feature now correctly starts battles and shows results with proper XP
+
+---
+Task ID: 2
+Agent: fullstack-developer
+Task: Fix Missions step completion - server was ignoring stepId
+
+Work Log:
+- Added stepId handling in PATCH /api/missions/[id]
+- Steps are parsed from JSON, target step marked completed, completedSteps incremented
+- Auto-complete mission when all steps done
+
+Stage Summary:
+- Mission step completion now works correctly
+
+---
+Task ID: 4+5
+Agent: fullstack-developer
+Task: Remove Drawing from navigation + Expand Covers to 1000+ options
+
+Work Log:
+- **Task 1 — Remove Drawing from navigation:**
+  - Removed `{ id: 'drawing', label: 'Desenhos', icon: PenTool }` from `Sidebar.tsx` NAV_GROUPS (Estudo section)
+  - Removed `PenTool` import from `Sidebar.tsx`
+  - Removed `{ id: 'drawing', label: 'Desenhos', icon: PenTool, group: 'Estudo' }` from `MobileNavBar.tsx` ALL_ITEMS
+  - Removed `PenTool` import from `MobileNavBar.tsx`
+  - DrawingView.tsx file was NOT deleted (as instructed)
+
+- **Task 2 — Expand Covers to 1000+ options:**
+  - Completely rewrote `CoversView.tsx` with a generative/parametric cover system
+  - Created 10 collection types: Japonês, Geométrico, Ondas, Pontilhismo, Gradiente, Kanji, Natureza, Abstrato, Minimalista, Acadêmico
+  - 120 covers per collection = 1,200 total covers
+  - Implemented `seededRandom()` function for deterministic generation (same seed always produces same cover)
+  - Implemented `generatePalette()` with 8 color styles (warm, cool, earth, neon, pastel, dark, mono, japan)
+  - Created 10 canvas-based pattern drawing functions:
+    - `drawJapanesePattern` — cherry blossoms, seigaiha waves, bamboo, torii gate silhouettes (4 variants)
+    - `drawGeometricPattern` — triangles, hexagons, diamond grids (3 variants)
+    - `drawWavePattern` — layered sine waves with varying amplitude/frequency
+    - `drawDotPattern` — uniform, varying size, and polka dot styles (3 variants)
+    - `drawGradientPattern` — radial circles, diagonal stripes, concentric rectangles (3 variants)
+    - `drawKanjiPattern` — semi-transparent Japanese characters scattered on canvas
+    - `drawNaturePattern` — mountains, leaves, flowers, stars/sparkles (4 variants)
+    - `drawAbstractPattern` — bokeh circles, bezier curves, splatter (3 variants)
+    - `drawMinimalPattern` — single line, corner accents, ruled lines (3 variants)
+    - `drawAcademicPattern` — notebook ruled lines, book spine, graph paper (3 variants)
+  - Cover previews use small canvases (120x160) that render on mount via `CoverPreview` component
+  - Selected cover preview uses a larger canvas (300x400) with border and title text
+  - Performance: only 48 covers rendered at a time with "Carregar mais" (Load more) button
+  - Page-based pagination resets when category or search changes
+  - Full list is lazily generated on first access (cached in module variable)
+  - Download generates 1200x1600 PNG with gradient + pattern + border + title/subtitle
+  - Search and category filtering preserved and working
+  - All lint errors resolved (no-unused-expressions, react-hooks/set-state-in-effect, react-hooks/refs)
+
+Stage Summary:
+- Drawing tab removed from both sidebar and mobile navigation
+- Covers expanded from 17 hardcoded presets to 1,200 generatively produced covers
+- Each cover is visually distinct thanks to seeded random parameterization
+- Pagination (48 per page) keeps the UI responsive with 1000+ items
+- Zero ESLint errors
+
+---
+Task ID: 3b
+Agent: general-purpose
+Task: Improve AI error handling in API routes
+
+Work Log:
+- Updated `src/app/api/microlesson/route.ts` catch block: added AI/network error detection (GROQ_API_KEY, timeout, network, fetch) returning 503 with user-friendly message; improved log prefix to `[MicroLesson]`
+- Updated `src/app/api/battle/route.ts` POST catch block: same AI error detection pattern; improved log prefix to `[Battle POST]`
+- Updated `src/app/api/teach/guide/route.ts` catch block: same AI error detection pattern; improved log prefix to `[Teach Guide]`; removed `rawResponse: aiResponse` from JSON parse error response (was leaking AI output to client)
+- Verified with `bun run lint` — zero errors
+
+Stage Summary:
+- AI/network failures now return 503 with 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' instead of generic 500
+- Non-AI errors still return 500 'Erro interno do servidor'
+- teach/guide no longer leaks raw AI response in error payloads
+
+---
+Task ID: 7
+Agent: general-purpose
+Task: Performance optimization for StudyAI
+
+Work Log:
+- **CoversView.tsx framer-motion removal**: Replaced `motion.button` with `whileTap={{ scale: 0.95 }}` on each CoverPreview grid item with a plain `<button>` using CSS `active:scale-95 transition-all`. This eliminates framer-motion overhead from up to 48 simultaneously-rendered cover thumbnails. Removed the `import { motion } from 'framer-motion'` line entirely from CoversView.tsx.
+- **DashboardView.tsx loading skeletons**: All 15 dynamically imported view components (SubjectsView, TasksView, GoalsView, CalendarView, ProgressView, DiscoverView, BattleView, MicroLessonView, MissionsView, BrainView, RoadmapView, EmergencyView, TeachView, DrawingView, CoversView) now have a `loading: TabLoadingSkeleton` fallback. Previously only CanvasNotebookView had a loading state. The skeleton renders a centered placeholder with animated pulse bars using app CSS variables (min-h-[60vh], --ws-glass-border, --ws-surface). HomeDashboard was left without a skeleton since it loads near-instantly.
+- **Bundle size audit**: Checked for lodash, moment, date-fns, and other heavy libraries — none found in src/ imports. Tree-shaking is already clean.
+- Verified zero ESLint errors with `bun run lint`.
+
+Stage Summary:
+- CoversView grid no longer pays framer-motion per-item cost (removed entire motion import)
+- All tab switches now show a skeleton loading state instead of a blank flash
+- No unnecessary library imports found; bundle is already well tree-shaken

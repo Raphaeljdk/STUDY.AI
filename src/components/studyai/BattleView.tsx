@@ -812,7 +812,17 @@ export function BattleView() {
         method: 'POST',
         body: JSON.stringify({ subject: selectedSubject }),
       });
-      setBattle(data);
+      setBattle({
+        id: data.battle.id,
+        subject: data.battle.subject,
+        questions: data.questions.map((q: any, i: number) => ({
+          id: q.id || String(i),
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+        })),
+        startedAt: data.battle.createdAt,
+      });
       setScreen('battle');
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
@@ -830,14 +840,31 @@ export function BattleView() {
   ) => {
     if (!battle) return;
     try {
+      const correctAnswers = answers.filter((a) => a.correct).length;
+      const confidenceAvg =
+        answers.length > 0
+          ? Math.round(answers.reduce((sum, a) => sum + a.confidence, 0) / answers.length * 10) / 10
+          : 0;
       const data = await apiFetch('/api/battle/finish', {
         method: 'POST',
         body: JSON.stringify({
           battleId: battle.id,
-          answers,
+          correctAnswers,
+          confidenceAvg,
+          timeUsed: 0,
         }),
       });
-      setResult(data);
+      const mappedResult: BattleResult = {
+        id: data.battle.id,
+        score: data.battle.correctAnswers,
+        total: data.battle.totalQuestions,
+        xpEarned: data.xpAwarded,
+        accuracy: data.percentage,
+        avgConfidence: data.battle.confidenceAvg,
+        subject: data.battle.subject,
+        completedAt: data.battle.completedAt,
+      };
+      setResult(mappedResult);
       // Refresh history
       try {
         const histData = await apiFetch('/api/battle');
