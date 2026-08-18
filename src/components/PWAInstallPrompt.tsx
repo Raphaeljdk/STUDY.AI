@@ -262,7 +262,7 @@ export function PWAInstallButton({ collapsed = false }: { collapsed?: boolean })
     if (prompt) {
       await prompt.prompt();
       const { outcome } = await prompt.userChoice;
-      if (outcome === 'accepted') setCanInstall(false);
+      if (outcome === 'accepted') setHasPrompt(false);
       delete (window as any).__pwaDeferredPrompt;
     } else if (isIOS) {
       setShowIOSHint(true);
