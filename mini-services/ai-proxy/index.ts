@@ -1,8 +1,8 @@
+// @ts-nocheck — standalone Bun service, NOT part of the Next.js build
 import ZAI from 'z-ai-web-dev-sdk';
 
 const PORT = 3003;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let zai: any;
 
 const server = Bun.serve({

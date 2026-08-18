@@ -1,0 +1,27 @@
+# Standalone services — NOT part of the Next.js build
+mini-services/
+
+# Local development
+skills/
+examples/
+db/
+*.db
+
+# Z.ai tool artifacts
+tool-results/
+agent-ctx/
+upload/
+worklog.md
+*.log
+dev.log
+
+# Test/build artifacts
+.next/
+out/
+build/
+node_modules/
+
+# Misc
+.claude
+.zscripts/
+.DS_Store
