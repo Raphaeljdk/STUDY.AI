@@ -34,11 +34,11 @@ interface DiscoverItem {
   content: string;
   summary: string | null;
   subject: string | null;
-  difficulty: string;
+  difficulty: string | null;
   duration: number | null;
-  emoji: string;
+  emoji: string | null;
   tags: string | null;
-  isPublic: boolean;
+  isPublic: number | boolean;
   likes: number;
   saves: number;
   userId: string | null;
@@ -447,7 +447,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
 
   // ===== HELPERS =====
   const getTypeConfig = (type: string) => CARD_TYPES[type] || CARD_TYPES.dica;
-  const getDifficultyConfig = (d: string) => DIFFICULTY_CONFIG[d] || DIFFICULTY_CONFIG.medio;
+  const getDifficultyConfig = (d: string | null) => DIFFICULTY_CONFIG[d || ''] || DIFFICULTY_CONFIG.medio;
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return null;
     if (seconds < 60) return `${seconds}s`;
@@ -586,7 +586,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
         <div className="space-y-4">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) => {
-              const typeConf = getTypeConfig(item.type);
+              const typeConf = getTypeConfig(item.type || 'dica');
               const diffConf = getDifficultyConfig(item.difficulty);
               const isExpanded = expandedId === item.id;
               const duration = formatDuration(item.duration);
@@ -622,7 +622,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
                         className="flex h-10 w-10 flex-shrink-0 items-center justify-center text-lg"
                         style={{ background: typeConf.accentBg, borderRadius: '12px 11px 13px 10px' }}
                       >
-                        {item.emoji || typeConf.emoji}
+                        {item.emoji || typeConf.emoji || '💡'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">

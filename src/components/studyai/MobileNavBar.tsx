@@ -9,7 +9,7 @@ import {
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   Shield, Lock, LogOut, Crown,
   BookText, Layers, ScrollText, MessageCircle, ChevronRight, Settings,
-  Palette,
+  Palette, CreditCard,
 } from 'lucide-react';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
@@ -49,6 +49,7 @@ const ALL_ITEMS: NavItem[] = [
   { id: 'brain', label: 'Cérebro', icon: Dna, group: 'Explorar', featureGate: 'brain' },
   { id: 'roadmap', label: 'Roadmap', icon: Route, group: 'Explorar', featureGate: 'roadmapAI' },
   { id: 'discover', label: 'Discover', icon: Compass, group: 'Explorar', featureGate: 'discover' },
+  { id: 'subscription', label: 'Assinatura', icon: CreditCard, group: 'Mais' },
   { id: 'emergency', label: 'Emergência', icon: Siren, group: 'Mais' },
   { id: 'progress', label: 'Progresso', icon: Trophy, group: 'Mais', featureGate: 'dashboardFull' },
 ];

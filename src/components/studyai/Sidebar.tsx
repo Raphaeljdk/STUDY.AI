@@ -9,7 +9,7 @@ import {
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   ChevronLeft, ChevronRight, LogOut, Crown, Shield, ChevronDown,
   BookText, Layers, ScrollText, Lock,
-  Palette,
+  Palette, CreditCard,
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { UsageBar } from './PremiumUpgrade';
@@ -74,6 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Mais',
     defaultOpen: false,
     items: [
+      { id: 'subscription', label: 'Assinatura', icon: CreditCard },
       { id: 'emergency', label: 'Emergência', icon: Siren },
       { id: 'progress', label: 'Progresso', icon: Trophy, featureGate: 'dashboardFull' },
     ],

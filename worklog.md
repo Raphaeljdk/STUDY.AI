@@ -393,3 +393,49 @@ Stage Summary:
 - Smooth tab transitions added
 - Lint passes clean (0 errors, 0 warnings)
 
+---
+Task ID: 2-a
+Agent: full-stack-developer
+Task: Fix Discover tab + Add Subscription Management tab
+
+Work Log:
+
+**TASK 1: Fix Discover (Explorar) tab**
+- Rewrote `/api/discover` GET handler:
+  - Added filter to exclude items with content equal to `{}`, `[]`, or empty string (old broken items)
+  - Eliminated N+1 queries: replaced per-item `db.discoverSave.count()` + `db.user.findUnique()` with a single `db.discoverItem.findMany` using `include: { user, _count: { select: { discoverSaves: true } } }`
+  - Used computed `_count.discoverSaves` for saves count instead of the potentially stale `saves` column
+  - `isPublic: 1` verified consistent for SQLite (both GET filter and POST create use integer 1)
+- Updated `DiscoverView.tsx` to handle null fields gracefully:
+  - Changed `emoji` type from `string` to `string | null` with fallback `|| typeConf.emoji || '💡'`
+  - Changed `difficulty` type from `string` to `string | null` with `getDifficultyConfig` accepting `string | null`
+  - Changed `isPublic` type to `number | boolean`
+  - Added `|| 'dica'` fallback for `getTypeConfig(item.type)`
+
+**TASK 2: Add Subscription Management tab**
+- Created `/src/components/studyai/SubscriptionView.tsx`:
+  - Shows current plan info (FREE/SAMURAI/SENSEI) with appropriate icons and colors
+  - FREE plan: shows upgrade CTA with quick plan comparison (Samurai vs Sensei) and `Fazer upgrade` button that opens PremiumUpgrade modal
+  - Premium plan: shows billing cycle, price, next billing date, Stripe billing portal button, plan change button, and cancel subscription button
+  - Admin: shows admin badge indicating full access
+  - FAQ section with 4 common questions
+  - Uses WabiSabiCard, ZenButton, motion from framer-motion, app CSS variables, apiFetch, toast, useSession
+- Updated `DashboardView.tsx`:
+  - Added `'subscription'` to `Tab` type union
+  - Added `SubscriptionView` dynamic import with TabLoadingSkeleton
+  - Added `'subscription'` to `tabOrder` (between `progress` and `admin`)
+  - Added `subscription: 'Assinatura'` to `TAB_LABELS`
+  - Added subscription tab rendering block with SectionErrorBoundary
+- Updated `Sidebar.tsx`:
+  - Added `CreditCard` import from lucide-react
+  - Added `{ id: 'subscription', label: 'Assinatura', icon: CreditCard }` to 'Mais' NAV_GROUPS
+- Updated `MobileNavBar.tsx`:
+  - Added `CreditCard` import from lucide-react
+  - Added `{ id: 'subscription', label: 'Assinatura', icon: CreditCard, group: 'Mais' }` to ALL_ITEMS
+
+Stage Summary:
+- Discover tab: fixed N+1 performance issue, filtered broken items, handles null fields gracefully
+- Subscription tab: fully functional subscription management page accessible from sidebar and mobile nav
+- TypeScript: zero errors (tsc --noEmit exits 0)
+- ESLint: zero errors/warnings
+

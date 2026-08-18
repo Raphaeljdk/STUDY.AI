@@ -19,7 +19,15 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { isPublic: 1 };
+    // Build where — filter out broken items with empty/default content
+    const where: any = {
+      isPublic: 1,
+      AND: [
+        { content: { not: '{}' } },
+        { content: { not: '[]' } },
+        { content: { not: '' } },
+      ],
+    };
     if (type && VALID_TYPES.includes(type)) {
       where.type = type;
     }
@@ -33,15 +41,34 @@ export async function GET(request: Request) {
 
     const total = await db.discoverItem.count({ where });
 
-    // Get save counts for each item
-    const itemsWithCounts = await Promise.all(items.map(async item => {
-      const saveCount = await db.discoverSave.count({ where: { discoverItemId: item.id } });
-      const author = item.userId ? await db.user.findUnique({ where: { id: item.userId }, select: ['id', 'name'] }) : null;
-      return { ...item, _count: { discoverSaves: saveCount }, user: author };
-    }));
+    if (items.length === 0) {
+      return NextResponse.json({ items: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+    }
 
-    // Check which items the current user saved
+    // Batch: get save counts for all items via single GROUP BY query
     const itemIds = items.map(i => i.id);
+    const idList = itemIds.map((_, i) => `$${i + 1}`).join(', ');
+    const saveCountResult = await sqlite.execute({ sql:
+      `SELECT "discoverItemId", COUNT(*) as cnt FROM "DiscoverSave" WHERE "discoverItemId" IN (${idList}) GROUP BY "discoverItemId"`,
+      args: itemIds
+    });
+    const saveCountMap = new Map<string, number>();
+    for (const row of (saveCountResult.rows || [])) {
+      saveCountMap.set(row.discoverItemId, Number(row.cnt) || 0);
+    }
+
+    // Batch: get all unique author IDs and fetch users
+    const authorIds = [...new Set(items.map(i => i.userId).filter(Boolean))];
+    let userMap = new Map<string, { id: string; name: string }>();
+    if (authorIds.length > 0) {
+      const users = await db.user.findMany({
+        where: { id: { in: authorIds } },
+        select: ['id', 'name'],
+      });
+      for (const u of users) userMap.set(u.id, { id: u.id, name: u.name });
+    }
+
+    // Batch: check which items current user saved
     let savedSet = new Set<string>();
     if (itemIds.length > 0) {
       const savedItems = await db.discoverSave.findMany({
@@ -51,19 +78,17 @@ export async function GET(request: Request) {
       savedSet = new Set(savedItems.map(s => s.discoverItemId));
     }
 
-    const itemsWithSaved = itemsWithCounts.map(item => ({
+    // Assemble response
+    const itemsWithMeta = items.map(item => ({
       ...item,
+      saves: saveCountMap.get(item.id) || 0,
       isSaved: savedSet.has(item.id),
+      user: item.userId ? (userMap.get(item.userId) || null) : null,
     }));
 
     return NextResponse.json({
-      items: itemsWithSaved,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      items: itemsWithMeta,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Route error:', error);
@@ -89,7 +114,6 @@ export async function POST(request: Request) {
     const { type, title, content, summary, subject, difficulty, duration, emoji, tags, generateWithAI } = body;
 
     if (generateWithAI) {
-      // AI-generated discover item
       const itemType = type && VALID_TYPES.includes(type) ? type : 'dica';
       const subjectStr = typeof subject === 'string' ? subject : 'estudos gerais';
 
@@ -98,10 +122,7 @@ export async function POST(request: Request) {
           role: 'system',
           content: `Voce e um educador brasileiro que cria conteudo educacional interessante. Gere um conteudo do tipo "${itemType}" sobre "${subjectStr}". Responda APENAS com um JSON valido (sem markdown) com os campos: title (string, titulo curto e chamativo), content (string, conteudo em markdown detalhado), summary (string, resumo em 1-2 frases), emoji (string, um emoji representativo), tags (string, tags separadas por virgula), difficulty (string: "facil", "medio" ou "dificil"), duration (numero, duracao estimada em segundos). Tudo em portugues brasileiro.`,
         },
-        {
-          role: 'user',
-          content: `Crie um conteudo do tipo ${itemType} sobre ${subjectStr}.`,
-        },
+        { role: 'user', content: `Crie um conteudo do tipo ${itemType} sobre ${subjectStr}.` },
       ], { maxTokens: 2000, temperature: 0.5 });
 
       const aiData = safeParseJSON(aiResponse);
@@ -131,7 +152,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ item, aiGenerated: true }, { status: 201 });
     }
 
-    // Manual creation
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ error: 'Titulo obrigatorio' }, { status: 400 });
     }

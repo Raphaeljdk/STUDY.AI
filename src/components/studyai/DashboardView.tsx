@@ -71,6 +71,7 @@ const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false, loading
 const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false, loading: TabLoadingSkeleton });
 const TeachView = dynamic(() => import('./TeachView'), { ssr: false, loading: TabLoadingSkeleton });
 const CoversView = dynamic(() => import('./CoversView').then(m => ({ default: m.CoversView })), { ssr: false, loading: TabLoadingSkeleton });
+const SubscriptionView = dynamic(() => import('./SubscriptionView'), { ssr: false, loading: TabLoadingSkeleton });
 
 // Lightweight error boundary for individual sections
 class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; name?: string }, { hasError: boolean; error: Error | null }> {
@@ -163,7 +164,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin' | 'covers';
+export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin' | 'covers' | 'subscription';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -211,7 +212,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'covers', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'covers', 'brain', 'roadmap', 'emergency', 'progress', 'subscription', 'admin'];
 
 // Tab labels for mobile header
 const TAB_LABELS: Record<Tab, string> = {
@@ -236,6 +237,7 @@ const TAB_LABELS: Record<Tab, string> = {
   emergency: 'Emergência',
   progress: 'Progresso',
   covers: 'Capas de Caderno',
+  subscription: 'Assinatura',
   admin: 'Admin',
 };
 
@@ -473,6 +475,11 @@ export function DashboardView() {
         {activeTab === 'covers' && (
           <SectionErrorBoundary name='CoversView'>
             <CoversView />
+          </SectionErrorBoundary>
+        )}
+        {activeTab === 'subscription' && (
+          <SectionErrorBoundary name='SubscriptionView'>
+            <SubscriptionView onUpgrade={() => openUpgrade('nav')} />
           </SectionErrorBoundary>
         )}
         {activeTab === 'admin' && isAdmin && <AdminPanel key="adm" />}
