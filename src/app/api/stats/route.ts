@@ -136,7 +136,6 @@ export async function GET() {
       flashcards: totalFlashcards,
       studiedFlashcards,
       dueFlashcards: flashcardDueCount,
-      masteredCards,
       studyTime,
       todayMinutes: todayStudyMinutes,
       chatCount,
@@ -170,7 +169,7 @@ export async function GET() {
       currentStreak: userData.currentStreak,
       longestStreak: userData.longestStreak,
 
-      // Flashcard stats (deduplicated)
+      // Flashcard stats
       flashcardDueCount,
       masteredCards,
 

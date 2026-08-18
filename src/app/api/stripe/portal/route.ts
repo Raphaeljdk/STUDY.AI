@@ -15,7 +15,7 @@ export async function POST() {
     }
 
     const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-12-18.acacia' });
+    const stripe = new Stripe(stripeSecretKey);
 
     const origin = process.env.NEXT_PUBLIC_APP_URL || 'https://study-ai-nine-xi.vercel.app';
 

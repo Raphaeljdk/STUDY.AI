@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const count = await db.user.count();
     health.db_connected = true;
-    health.db_user_count = count;
+    health.db_user_count = String(count);
   } catch (err: any) {
     health.db_connected = false;
     health.db_error = err?.message || 'Unknown';

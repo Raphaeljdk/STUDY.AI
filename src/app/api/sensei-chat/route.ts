@@ -111,7 +111,7 @@ async function extractMemories(userId: string, userMsg: string, reply: string): 
     for (const m of mems.slice(0, 5)) {
       if (!m.content || m.content.length < 5 || m.content.length > 200) continue;
       const cat = valid.includes(m.category?.toLowerCase()) ? m.category.toLowerCase() : 'general';
-      const existing = await db.userMemory.findMany({ where: { userId, category }, select: ['content'] });
+      const existing = await db.userMemory.findMany({ where: { userId, category: cat }, select: ['content'] });
       const dup = existing.some(e => {
         const w1 = e.content.toLowerCase().split(/\s+/);
         const w2 = m.content.toLowerCase().split(/\s+/);

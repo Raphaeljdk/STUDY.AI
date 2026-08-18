@@ -1381,7 +1381,7 @@ function SenseiChat() {
       if (nbData.notebooks) setNotebooks(nbData.notebooks);
       if (memData?.count) {
         const levels = [{min:0,t:'Aprendiz',e:'🌱'},{min:3,t:'Discipulo',e:'🌿'},{min:8,t:'Guardiao',e:'🌳'},{min:15,t:'Sabio',e:'🏛️'},{min:25,t:'Mestre',e:'🧙'},{min:40,t:'Dragao',e:'🐉'},{min:60,t:'Vidente',e:'👁️'},{min:80,t:'Iluminado',e:'🌟'},{min:100,t:'Transcendente',e:'🌌'},{min:150,t:'Infinito',e:'♾️'}];
-        let lvl = levels[0]; let nxt = null;
+        let lvl = levels[0]; let nxt: {min:number,t:string,e:string} | null = null;
         for (const l of levels) { if (memData.count >= l.min) lvl = l; }
         nxt = levels.find(l => l.min > memData.count) || null;
         setWisdom({ level: lvl.min, title: lvl.t, emoji: lvl.e, memoriesCount: memData.count, nextLevel: nxt ? { title: nxt.t, emoji: nxt.e, min: nxt.min } : null });

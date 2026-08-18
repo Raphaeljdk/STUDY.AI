@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getUserPlan, type Plan } from './usage';
-import { canAccess, FEATURE_MIN_PLAN } from './plan-gating';
+import { getUserPlan } from './usage';
+import { type Plan, canAccess, FEATURE_MIN_PLAN } from './plan-gating';
 
 export interface SessionUser {
   id: string;

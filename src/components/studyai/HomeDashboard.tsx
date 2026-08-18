@@ -21,14 +21,14 @@ interface HomeDashboardProps {
   user: {
     name: string;
     email: string;
-    xp: number;
-    level: number;
-    currentStreak: number;
-    longestStreak: number;
-    totalStudyMinutes: number;
-    totalSessions: number;
+    xp?: number;
+    level?: number;
+    currentStreak?: number;
+    longestStreak?: number;
+    totalStudyMinutes?: number;
+    totalSessions?: number;
   };
-  stats: {
+  stats?: {
     minutesToday: number;
     minutesThisWeek: number;
     pendingTasks: number;
@@ -36,14 +36,14 @@ interface HomeDashboardProps {
     subjectCount: number;
     completedToday: number;
   } | null;
-  upcomingEvents: Array<{
+  upcomingEvents?: Array<{
     id: string;
     title: string;
     date: string;
     type: string;
     color?: string | null;
   }>;
-  todayTasks: Array<{
+  todayTasks?: Array<{
     id: string;
     title: string;
     priority: string;
@@ -184,12 +184,12 @@ export function HomeDashboard({
   }, [propsStats, propsTasks, propsEvents]);
 
   // XP calculations
-  const currentLevelXp = getXpForLevel(user.level);
-  const nextLevelXp = getXpForLevel(user.level + 1);
-  const xpInCurrentLevel = user.xp - currentLevelXp;
+  const currentLevelXp = getXpForLevel(user.level ?? 1);
+  const nextLevelXp = getXpForLevel((user.level ?? 1) + 1);
+  const xpInCurrentLevel = (user.xp ?? 0) - currentLevelXp;
   const xpNeededForNext = nextLevelXp - currentLevelXp;
   const xpProgress = xpNeededForNext > 0 ? Math.min((xpInCurrentLevel / xpNeededForNext) * 100, 100) : 100;
-  const levelName = getLevelName(user.level);
+  const levelName = getLevelName(user.level ?? 1);
 
   const firstName = user.name?.split(' ')[0] || 'Estudante';
   const initials = user.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '??';
@@ -403,7 +403,7 @@ export function HomeDashboard({
               >
                 <Flame size={20} className="text-[#F97316]" strokeWidth={1.5} />
               </div>
-              {user.longestStreak > 0 && user.longestStreak > user.currentStreak && (
+              {(user.longestStreak ?? 0) > 0 && (user.longestStreak ?? 0) > (user.currentStreak ?? 0) && (
                 <span className="text-[10px] text-[var(--ws-text-tertiary)]">
                   Recorde: {user.longestStreak} dias
                 </span>

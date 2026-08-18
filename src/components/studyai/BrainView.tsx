@@ -369,23 +369,25 @@ export function BrainView({ onNavigate }: BrainViewProps) {
 
       {/* ===== DISCOVER GAPS BUTTON ===== */}
       <motion.div variants={itemVariants}>
-        <Button
-          onClick={discoverGaps}
-          disabled={loading}
+        <div
           className="w-full rounded-ws-button py-6 text-base font-semibold"
-          style={{
-            background: 'var(--ws-accent)',
-            color: 'var(--ws-text-on-dark)',
-          }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.98 }}
         >
+          <Button
+            onClick={discoverGaps}
+            disabled={loading}
+            className="w-full"
+            style={{
+              background: 'var(--ws-accent)',
+              color: 'var(--ws-text-on-dark)',
+            }}
+          >
           {loading ? (
             <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analisando...</>
           ) : (
             <><Search className="mr-2 h-5 w-5" /> Descobrir minhas lacunas</>
           )}
         </Button>
+        </div>
       </motion.div>
 
       {/* ===== SECTION 2: KNOWLEDGE GAPS ===== */}

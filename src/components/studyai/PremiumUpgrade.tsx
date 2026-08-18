@@ -57,9 +57,9 @@ const PLANS = {
 interface FeatureRow {
   name: string;
   icon: any;
-  shojin: string | false;
-  samurai: string | true;
-  sensei: string | true;
+  shojin: string | boolean;
+  samurai: string | boolean;
+  sensei: string | boolean;
 }
 
 const FEATURES: FeatureRow[] = [
@@ -489,7 +489,7 @@ const SENSEI_FEATURES = [
 
 /* ── Feature Value Cell ── */
 
-function FeatureValue({ value, accent = false }: { value: string | boolean | true; accent?: boolean }) {
+function FeatureValue({ value, accent = false }: { value: string | boolean; accent?: boolean }) {
   if (value === true) {
     return <Check size={16} className={`mx-auto ${accent ? 'text-green-500' : 'text-[var(--ws-verdigris)]'}`} />;
   }

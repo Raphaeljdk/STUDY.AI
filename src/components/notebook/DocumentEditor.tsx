@@ -168,7 +168,7 @@ export default function DocumentEditor({
       const normalizedCurrent = currentHTML.replace(/<p><\/p>/g, '').trim();
       const normalizedNew = (content || '').replace(/<p><\/p>/g, '').trim();
       if (normalizedCurrent !== normalizedNew) {
-        editor.commands.setContent(content || '', true);
+        editor.commands.setContent(content || '', { emitUpdate: true } as any);
       }
     }
   }, [content, editor]);

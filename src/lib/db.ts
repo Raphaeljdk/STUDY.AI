@@ -59,7 +59,7 @@ async function execQuery(queryStr: string, params: any[] = []): Promise<any[]> {
   if (backend === 'postgres' && _neonQuery) {
     // Convert $N placeholders from buildWhere for neon.sql.query()
     const rows = await _neonQuery.query(queryStr, params);
-    return rows || [];
+    return (rows || []) as any[];
   }
 
   // SQLite: convert $N placeholders to ?

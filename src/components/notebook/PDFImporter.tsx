@@ -36,10 +36,10 @@ export default function PDFImporter({ onPDFImported }: PDFImporterProps) {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
-      await page.render({
+      await (page.render({
         canvasContext: context,
         viewport,
-      }).promise;
+      } as any)).promise;
 
       const imageUrl = canvas.toDataURL('image/png');
       onPDFImported(imageUrl, pdf.numPages);
