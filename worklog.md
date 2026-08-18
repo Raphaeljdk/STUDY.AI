@@ -237,3 +237,26 @@ Stage Summary:
 - Eliminated layer system bugs by simplifying to 2-canvas architecture
 - All drawing tools compile and function correctly
 - Clean SWC-compatible JSX (no color-mix, no parenthesized comments)
+---
+Task ID: 1
+Agent: main
+Task: Fix Vercel build errors and verify all changes work
+
+Work Log:
+- Fixed mini-services/ai-proxy/index.ts: replaced `new ZAI({...})` with `ZAI.create()` factory method (constructor is private)
+- Fixed src/components/PWAInstallPrompt.tsx: changed `setCanInstall(false)` to `setHasPrompt(false)` (canInstall is a useMemo, not a state setter)
+- LoadingScreen.tsx was already fixed in previous session with deterministic seed-based petal positions
+- Verified ESLint passes with zero errors
+- Verified dev server compiles successfully (200 on / and /api/auth/session)
+- Verified with agent-browser: landing page renders, no hydration errors, no console errors
+- Verified plan purchase flow: clicking Samurai CTA opens auth modal with "Criar e Assinar Samurai" button
+- Verified billing toggle switches prices between monthly and annual
+- Verified normal "Cadastrar" button opens registration without pre-selected plan
+- Rebased on remote, resolved tsconfig.json conflict preserving mini-services/skills excludes
+- Pushed to GitHub successfully
+
+Stage Summary:
+- Two blocking Vercel build errors resolved
+- ai-proxy now uses ZAI.create() factory method
+- PWAInstallButton had a runtime bug (setCanInstall is not a function) which is now fixed
+- All features verified working in browser
