@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
 import { db } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       ? Math.max(1, Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       : 30;
 
-    const aiResponse = await aiChat([
+    const aiResponse = await aiChatJSON([
       {
         role: 'system',
         content: `Voce e um estrategista de estudos que cria planos de estudo personalizados. O plano deve ser realista e eficaz. Responda APENAS com um JSON valido (sem markdown) com os campos: { "title": "titulo do plano", "summary": "resumo de 2-3 frases da estrategia", "totalDays": ${daysUntilExam}, "dailyHours": ${studyHours}, "phases": [{ "name": "nome da fase", "days": "duracao em dias", "focus": "foco principal", "activities": ["atividade 1", "atividade 2"], "subjects": ["materia 1"] }], "weeklySchedule": [{ "day": "Segunda", "blocks": [{ "time": "08:00-10:00", "subject": "materia", "activity": "atividade" }] }], "milestones": [{ "day": 7, "description": "marco alcançado" }], "tips": ["dica 1", "dica 2", "dica 3"], "estimatedCoverage": "porcentagem estimada de cobertura do conteudo" }. No maximo 4 fases, 7 dias na weeklySchedule, 6 milestones, 5 dicas. Tudo em portugues brasileiro.`,
@@ -54,19 +54,26 @@ export async function POST(request: Request) {
         role: 'user',
         content: `Crie um plano de estudo para a prova de "${exam.trim()}". Materias: ${subjectsStr || 'todas'}. Dias ate a prova: ${daysUntilExam}. Horas por dia: ${studyHours}. Nivel atual: ${level}.${areas ? ` Areas fracas: ${areas}.` : ''} Contexto das minhas materias: ${JSON.stringify(subjectsContext)}.`,
       },
-    ]);
+    ], { maxTokens: 3000, temperature: 0.5 });
 
-    let plan: any;
-    try {
-      const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      plan = JSON.parse(jsonStr);
-    } catch {
+    const plan = safeParseJSON(aiResponse);
+    if (!plan) {
       return NextResponse.json({ error: 'Erro ao gerar plano com IA' }, { status: 500 });
     }
 
     return NextResponse.json({ plan });
   } catch (error) {
     console.error('Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

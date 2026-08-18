@@ -70,7 +70,6 @@ const BrainView = dynamic(() => import('./BrainView'), { ssr: false, loading: Ta
 const RoadmapView = dynamic(() => import('./RoadmapView'), { ssr: false, loading: TabLoadingSkeleton });
 const EmergencyView = dynamic(() => import('./EmergencyView'), { ssr: false, loading: TabLoadingSkeleton });
 const TeachView = dynamic(() => import('./TeachView'), { ssr: false, loading: TabLoadingSkeleton });
-const DrawingView = dynamic(() => import('./DrawingView'), { ssr: false, loading: TabLoadingSkeleton });
 const CoversView = dynamic(() => import('./CoversView').then(m => ({ default: m.CoversView })), { ssr: false, loading: TabLoadingSkeleton });
 
 // Lightweight error boundary for individual sections
@@ -164,7 +163,7 @@ function SafeEditor({ content, onChange, placeholder, onError }: { content: stri
 
 const notebookColors = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#2c3e50', '#f39c12'];
 
-export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin' | 'drawing' | 'covers';
+export type Tab = 'dashboard' | 'discover' | 'battle' | 'microlesson' | 'missions' | 'teach' | 'subjects' | 'tasks' | 'goals' | 'calendar' | 'notebooks' | 'notebook-edit' | 'flashcards' | 'flashcard-review' | 'timer' | 'chat' | 'brain' | 'roadmap' | 'emergency' | 'progress' | 'admin' | 'covers';
 
 interface NotebookItem { id: string; title: string; content: string; color: string; _count?: { flashcards: number }; updatedAt: string; flashcards?: FlashcardItem[]; }
 interface FlashcardItem { id: string; front: string; back: string; notebookId: string | null; easeFactor: number; interval: number; repetitions: number; nextReview: string; }
@@ -212,7 +211,7 @@ function useSwipeGestures(onSwipeLeft: () => void, onSwipeRight: () => void) {
 }
 
 // ========== MAIN ==========
-const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'drawing', 'covers', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
+const tabOrder: Tab[] = ['dashboard', 'discover', 'battle', 'microlesson', 'missions', 'teach', 'subjects', 'tasks', 'goals', 'calendar', 'notebooks', 'flashcards', 'timer', 'chat', 'covers', 'brain', 'roadmap', 'emergency', 'progress', 'admin'];
 
 // Tab labels for mobile header
 const TAB_LABELS: Record<Tab, string> = {
@@ -236,7 +235,6 @@ const TAB_LABELS: Record<Tab, string> = {
   roadmap: 'Roadmap',
   emergency: 'Emergência',
   progress: 'Progresso',
-  drawing: 'Desenhos',
   covers: 'Capas de Caderno',
   admin: 'Admin',
 };
@@ -356,7 +354,7 @@ export function DashboardView() {
       </header>
 
       {/* Main content area */}
-      <main className="dashboard-scroll flex-1 mx-auto w-full max-w-[1440px] px-3 pb-20 pt-3 sm:px-4 sm:pb-20 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8" role="main">
+      <main key={activeTab} className="dashboard-scroll animate-tab-enter flex-1 mx-auto w-full max-w-[1440px] px-3 pb-20 pt-3 sm:px-4 sm:pb-20 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8" role="main">
         {/* Calendar reminder notifications (invisible — fires toasts) */}
         <ReminderCheck />
         {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
@@ -471,11 +469,6 @@ export function DashboardView() {
               <ProgressView user={user} />
             </SectionErrorBoundary>
           </PlanGate>
-        )}
-        {activeTab === 'drawing' && (
-          <SectionErrorBoundary name='DrawingView'>
-            <DrawingView />
-          </SectionErrorBoundary>
         )}
         {activeTab === 'covers' && (
           <SectionErrorBoundary name='CoversView'>

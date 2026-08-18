@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function GET(_request: Request) {
   try {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const questionsCount = typeof numQuestions === 'number' && numQuestions > 0 ? Math.min(numQuestions, 20) : 5;
 
     // Generate questions with AI
-    const aiResponse = await aiChat([
+    const aiResponse = await aiChatJSON([
       {
         role: 'system',
         content: `Voce e um professor que cria avaliacoes diagnosticas. Gere ${questionsCount} questoes de multipla escolha sobre "${topic.trim()}" para um pre-teste (avaliacao inicial). Responda APENAS com um JSON valido (sem markdown) no formato: { "questions": [ { "question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctIndex": 0 } ] }. A "correctIndex" e o indice (0-3) da opcao correta. Tudo em portugues brasileiro.`,
@@ -53,16 +53,13 @@ export async function POST(request: Request) {
         role: 'user',
         content: `Crie ${questionsCount} questoes de pre-teste sobre ${topic.trim()}.`,
       },
-    ]);
+    ], { maxTokens: 3000, temperature: 0.5 });
 
-    let questions: any[];
-    try {
-      const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(jsonStr);
-      questions = parsed.questions || [];
-    } catch {
+    const parsed = safeParseJSON(aiResponse);
+    if (!parsed || !Array.isArray(parsed.questions)) {
       return NextResponse.json({ error: 'Erro ao gerar questoes com IA' }, { status: 500 });
     }
+    const questions = parsed.questions;
 
     const preTest = await db.preTest.create({
       data: {
@@ -82,6 +79,16 @@ export async function POST(request: Request) {
     }, { status: 201 });
   } catch (error) {
     console.error('Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

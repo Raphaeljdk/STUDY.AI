@@ -451,6 +451,25 @@ button, a, [role="button"], input, textarea, select {
 
 /* ===== MOBILE PERFORMANCE OPTIMIZATIONS ===== */
 
+/* GPU-accelerated transitions for smooth 60fps */
+.will-change-transform { will-change: transform; }
+.will-change-opacity { will-change: opacity; }
+
+/* Smooth fade-in for tab content */
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-tab-enter {
+  animation: tabFadeIn 0.2s ease-out both;
+}
+
+/* Content visibility for better rendering performance */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

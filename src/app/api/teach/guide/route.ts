@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 // POST /api/teach/guide - generate a study guide for a topic (Feynman preparation)
 export async function POST(request: Request) {
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       ? `\n\nO aluno tem as seguintes notas em seus cadernos (personalize o guia baseado nisso):\n${notebookContext}`
       : '';
 
-    const aiResponse = await aiChat([
+    const aiResponse = await aiChatJSON([
       {
         role: 'system',
         content: `Voce e um especialista em metodos de estudo e Tecnica de Feynman. Seu trabalho e criar um guia de estudo que ajude um aluno a ENTENDER profundamente um topico, preparando-o para poder EXPLICAR esse topico para outra pessoa.
@@ -110,13 +110,10 @@ Nivel: ${difficultyLabel}
 
 O guia deve me preparar para explicar esse conceito usando a Tecnica de Feynman.`,
       },
-    ]);
+    ], { maxTokens: 3000, temperature: 0.5 });
 
-    let guide: any = null;
-    try {
-      const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      guide = JSON.parse(jsonStr);
-    } catch {
+    const guide = safeParseJSON(aiResponse);
+    if (!guide) {
       return NextResponse.json({ error: 'Erro ao gerar o guia. Tente novamente.' }, { status: 500 });
     }
 
@@ -124,8 +121,14 @@ O guia deve me preparar para explicar esse conceito usando a Tecnica de Feynman.
   } catch (error) {
     console.error('[Teach Guide] Route error:', error);
     const msg = error instanceof Error ? error.message : '';
-    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
+    if (msg.includes('GROQ_API_KEY')) {
       return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
     }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }

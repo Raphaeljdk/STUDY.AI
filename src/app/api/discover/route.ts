@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 const VALID_TYPES = ['mini_aula', 'dica', 'conceito', 'questao', 'resumo', 'curiosidade', 'tecnica', 'codigo', 'formula'];
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       const itemType = type && VALID_TYPES.includes(type) ? type : 'dica';
       const subjectStr = typeof subject === 'string' ? subject : 'estudos gerais';
 
-      const aiResponse = await aiChat([
+      const aiResponse = await aiChatJSON([
         {
           role: 'system',
           content: `Voce e um educador brasileiro que cria conteudo educacional interessante. Gere um conteudo do tipo "${itemType}" sobre "${subjectStr}". Responda APENAS com um JSON valido (sem markdown) com os campos: title (string, titulo curto e chamativo), content (string, conteudo em markdown detalhado), summary (string, resumo em 1-2 frases), emoji (string, um emoji representativo), tags (string, tags separadas por virgula), difficulty (string: "facil", "medio" ou "dificil"), duration (numero, duracao estimada em segundos). Tudo em portugues brasileiro.`,
@@ -102,13 +102,10 @@ export async function POST(request: Request) {
           role: 'user',
           content: `Crie um conteudo do tipo ${itemType} sobre ${subjectStr}.`,
         },
-      ]);
+      ], { maxTokens: 2000, temperature: 0.5 });
 
-      let aiData: any;
-      try {
-        const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        aiData = JSON.parse(jsonStr);
-      } catch {
+      const aiData = safeParseJSON(aiResponse);
+      if (!aiData) {
         return NextResponse.json({ error: 'Erro ao gerar conteudo com IA' }, { status: 500 });
       }
 
@@ -164,6 +161,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     console.error('Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

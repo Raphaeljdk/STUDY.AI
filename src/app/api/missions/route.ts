@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function GET(_request: Request) {
   try {
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
     const { subject, topic, timeAvailable, title, description, steps, estimatedMinutes, xpReward, generateWithAI } = body;
 
-    // Detect AI generation: either explicit flag OR presence of subject+topic+timeAvailable (frontend format)
+    // Detect AI generation
     const isAIGeneration = generateWithAI || (subject && topic && timeAvailable);
 
     if (isAIGeneration) {
@@ -77,40 +77,31 @@ export async function POST(request: Request) {
       const topicStr = typeof topic === 'string' ? topic : 'topico geral';
       const timeAvail = typeof timeAvailable === 'number' ? timeAvailable : (typeof estimatedMinutes === 'number' ? estimatedMinutes : 30);
 
-      const aiResponse = await aiChat([
+      const aiResponse = await aiChatJSON([
         {
           role: 'system',
-          content: `Voce e um professor que cria missoes de estudo estruturadas em portugues brasileiro. Crie uma missao de estudo sobre "${subjectStr}" com foco no topico "${topicStr}". O tempo total disponivel e de ${timeAvail} minutos.
+          content: `Voce e um professor que cria missoes de estudo estruturadas em portugues brasileiro. Crie uma missao sobre "${subjectStr}" foco em "${topicStr}". Tempo: ${timeAvail} minutos.
 
-Responda APENAS com um JSON valido (sem markdown, sem code fences) com os campos:
-- title (string): titulo criativo e motivador da missao
-- description (string): descricao motivadora curta
-- subject (string): a materia/disciplina
-- steps (array de objetos): cada passo com os campos:
-  - id (string): identificador unico como "step_1", "step_2", etc
-  - title (string): titulo curto do passo
-  - emoji (string): um emoji representativo do passo (ex: 📖, ✍️, 🧠, 💡, ⚡, 🎯)
-  - durationMinutes (number): duracao estimada em minutos
-  - completed (boolean): sempre false
-  - description (string): descricao detalhada do que fazer neste passo
+Responda com JSON:
+- title: titulo criativo
+- description: descricao curta
+- subject: materia
+- steps: array com 3-6 objetos, cada um com: id ("step_1"...), title, emoji, durationMinutes (number), completed (false), description
 
-A soma de durationMinutes de todos os steps deve ser aproximadamente ${timeAvail} minutos. Crie de 3 a 6 passos. Tudo em portugues brasileiro.`,
+Soma de durationMinutes = ~${timeAvail} minutos.`,
         },
         {
           role: 'user',
-          content: `Crie uma missao de estudo sobre ${subjectStr} - ${topicStr} com duracao total de ${timeAvail} minutos.`,
+          content: `Crie missao: ${subjectStr} - ${topicStr}, ${timeAvail} minutos.`,
         },
-      ]);
+      ], { maxTokens: 3072, temperature: 0.6 });
 
-      let aiData: any;
-      try {
-        const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        aiData = JSON.parse(jsonStr);
-      } catch {
-        return NextResponse.json({ error: 'Erro ao gerar missao com IA' }, { status: 500 });
+      const aiData = safeParseJSON(aiResponse);
+      if (!aiData || !Array.isArray(aiData.steps) || aiData.steps.length === 0) {
+        return NextResponse.json({ error: 'A IA nao conseguiu gerar uma missao valida. Tente novamente.' }, { status: 500 });
       }
 
-      const stepsArr = Array.isArray(aiData.steps) ? aiData.steps : [];
+      const stepsArr = aiData.steps;
       const totalMinutes = stepsArr.reduce((sum: number, s: any) => sum + (typeof s.durationMinutes === 'number' ? s.durationMinutes : 0), 0);
 
       const created = await db.mission.create({
@@ -134,7 +125,6 @@ A soma de durationMinutes de todos os steps deve ser aproximadamente ${timeAvail
         },
       });
 
-      // Return in frontend-expected format
       const result = {
         id: created.id,
         title: created.title,
@@ -207,7 +197,17 @@ A soma de durationMinutes de todos os steps deve ser aproximadamente ${timeAvail
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error('Route error:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    console.error('[Missions POST] Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA nao configurado. Contate o suporte.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'A IA demorou demais. Tente novamente.' }, { status: 503 });
+    }
+    if (msg.includes('429') || msg.includes('rate')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde e tente novamente.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor. Tente novamente.' }, { status: 500 });
   }
 }

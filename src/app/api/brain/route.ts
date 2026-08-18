@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function GET(_request: Request) {
   try {
@@ -87,11 +87,11 @@ export async function GET(_request: Request) {
       : null;
 
     // Generate AI recommendations
-    let aiRecommendations: string | null = null;
+    let analysis: any = null;
     try {
       const context = `Materias do usuario: ${JSON.stringify(topicMasteryData)}. Media geral de dominio: ${avgMastery}%. Topicos fracos: ${JSON.stringify(weakTopics)}. Topicos fortes: ${JSON.stringify(strongTopics)}. Media de batalhas recentes: ${battleAvg}%. Media de pre-testes: ${preTestAvg}%. Missoes ativas: ${activeMissions.length}.`;
 
-      aiRecommendations = await aiChat([
+      const aiResponse = await aiChatJSON([
         {
           role: 'system',
           content: 'Voce e um tutor inteligente que analisa o desempenho do estudante. Com base nos dados fornecidos, gere analises e recomendacoes personalisadas em portugues brasileiro. Responda APENAS com um JSON valido (sem markdown) com: { "summary": "resumo de 2-3 frases do desempenho geral", "weakPoints": [{"topic": "nome", "reason": "motivo", "suggestion": "sugestao de estudo"}], "strengths": [{"topic": "nome", "praise": "elogio"}], "recommendations": [{"priority": "alta/media/baixa", "action": "acao recomendada", "reason": "motivo"}], "nextSteps": ["proximo passo 1", "proximo passo 2", "proximo passo 3"] }. No maximo 5 weakPoints, 3 strengths, 5 recommendations, 3 nextSteps.',
@@ -100,19 +100,11 @@ export async function GET(_request: Request) {
           role: 'user',
           content: `Analise meu desempenho: ${context}`,
         },
-      ]);
+      ], { maxTokens: 2000, temperature: 0.5 });
+
+      analysis = safeParseJSON(aiResponse);
     } catch {
       // AI may fail, continue with data-only response
-    }
-
-    let analysis: any = null;
-    if (aiRecommendations) {
-      try {
-        const jsonStr = aiRecommendations.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        analysis = JSON.parse(jsonStr);
-      } catch {
-        // ignore parse errors
-      }
     }
 
     return NextResponse.json({
@@ -131,6 +123,16 @@ export async function GET(_request: Request) {
     });
   } catch (error) {
     console.error('Route error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

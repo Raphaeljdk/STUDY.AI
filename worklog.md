@@ -363,3 +363,33 @@ Stage Summary:
 - CoversView grid no longer pays framer-motion per-item cost (removed entire motion import)
 - All tab switches now show a skeleton loading state instead of a blank flash
 - No unnecessary library imports found; bundle is already well tree-shaken
+---
+Task ID: 1
+Agent: main
+Task: Fix Vercel build error + remove Drawing + fix AI features + expand covers + optimize fluidity
+
+Work Log:
+- Fixed tsconfig.json to exclude mini-services and skills from TypeScript compilation
+- Fixed eslint.config.mjs to ignore mini-services
+- Fixed mini-services/ai-proxy/index.ts ZAI type annotation (InstanceType<typeof ZAI> → any)
+- Removed Drawing tab from DashboardView (Tab type, tabOrder, TAB_LABELS, dynamic import, rendering block)
+- Rewrote src/lib/zai.ts: added aiChatJSON() with Groq response_format json_object, retry logic, safeParseJSON()
+- Rewrote src/app/api/battle/route.ts to use aiChatJSON + safeParseJSON
+- Rewrote src/app/api/microlesson/route.ts to use aiChatJSON + safeParseJSON
+- Rewrote src/app/api/missions/route.ts to use aiChatJSON + safeParseJSON
+- Rewrote src/app/api/teach/route.ts to use aiChatJSON + safeParseJSON, fixed notebook page query
+- Updated 7 additional AI routes (pretest, brain, discover, teach/guide, generate-flashcards, autopilot, roadmaps/generate)
+- Expanded CoversView: 5 new pattern functions (Mandala, Constellation, Botanical, Origami, Watercolor) + 5 new collections, now 15x130=1950 covers
+- Added CSS tab transition animation (animate-tab-enter)
+- Added key={activeTab} to main content for smooth tab transitions
+- Added GPU acceleration and content-visibility CSS utilities
+
+Stage Summary:
+- Build error fixed (mini-services excluded from tsconfig + eslint)
+- Drawing tab completely removed
+- All AI features now use Groq json_object mode for reliable JSON parsing
+- All AI routes have specific error messages (503 for unavailable, 429 for rate limit)
+- Covers expanded from 1200 to 1950
+- Smooth tab transitions added
+- Lint passes clean (0 errors, 0 warnings)
+

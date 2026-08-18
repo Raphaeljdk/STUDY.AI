@@ -2,7 +2,8 @@ import ZAI from 'z-ai-web-dev-sdk';
 
 const PORT = 3003;
 
-let zai: InstanceType<typeof ZAI>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let zai: any;
 
 const server = Bun.serve({
   port: PORT,

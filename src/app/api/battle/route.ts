@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, genId, nowISO } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function GET(_request: Request) {
   try {
@@ -48,26 +48,24 @@ export async function POST(request: Request) {
     const numQuestions = typeof totalQuestions === 'number' && totalQuestions > 0 ? Math.min(totalQuestions, 20) : 5;
     const battleDuration = typeof duration === 'number' ? Math.max(30, Math.min(duration, 300)) : 60;
 
-    // Generate questions with AI
-    const aiResponse = await aiChat([
+    // Generate questions with AI (JSON mode for reliable parsing)
+    const aiResponse = await aiChatJSON([
       {
         role: 'system',
-        content: `Voce e um professor que cria questoes de quiz educacional. Gere ${numQuestions} questoes de multipla escolha sobre "${subject.trim()}". Responda APENAS com um JSON valido (sem markdown) no formato: { "questions": [ { "question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctIndex": 0, "explanation": "explicacao curta" } ] }. A "correctIndex" e o indice (0-3) da opcao correta. Tudo em portugues brasileiro.`,
+        content: `Voce e um professor que cria questoes de quiz educacional. Gere ${numQuestions} questoes de multipla escolha sobre "${subject.trim()}". Responda APENAS com um JSON valido no formato: { "questions": [ { "question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctIndex": 0, "explanation": "explicacao curta" } ] }. A "correctIndex" e o indice (0-3) da opcao correta. Tudo em portugues brasileiro.`,
       },
       {
         role: 'user',
         content: `Crie ${numQuestions} questoes sobre ${subject.trim()}.`,
       },
-    ]);
+    ], { maxTokens: 4096, temperature: 0.6 });
 
-    let questions: any[];
-    try {
-      const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(jsonStr);
-      questions = parsed.questions || [];
-    } catch {
-      return NextResponse.json({ error: 'Erro ao gerar questoes com IA' }, { status: 500 });
+    const parsed = safeParseJSON(aiResponse);
+    if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+      return NextResponse.json({ error: 'A IA nao conseguiu gerar questoes validas. Tente novamente.' }, { status: 500 });
     }
+
+    const questions = parsed.questions.slice(0, numQuestions);
 
     const battle = await db.battle.create({
       data: {
@@ -88,9 +86,15 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Battle POST] Route error:', error);
     const msg = error instanceof Error ? error.message : '';
-    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
-      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA nao configurado. Contate o suporte.' }, { status: 503 });
     }
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    if (msg.includes('timeout') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'A IA demorou demais para responder. Tente novamente.' }, { status: 503 });
+    }
+    if (msg.includes('429') || msg.includes('rate')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde alguns segundos e tente novamente.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor. Tente novamente.' }, { status: 500 });
   }
 }

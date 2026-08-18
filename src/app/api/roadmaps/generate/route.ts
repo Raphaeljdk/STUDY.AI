@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
-import ZAI from 'z-ai-web-dev-sdk';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 export async function POST(request: Request) {
   try {
@@ -21,8 +21,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Topico obrigatorio' }, { status: 400 });
     }
 
-    const zai = await ZAI.create();
-
     const prompt = `Voce e um mentor tecnico senior com 15+ anos de experiencia em engenharia de software e educacao tecnologica. Crie um roadmap de aprendizagem DETALHADO e de NIVEL SENIOR para o tema: "${topic.trim()}".
 
 REGRAS ESTRITAS:
@@ -38,38 +36,23 @@ REGRAS ESTRITAS:
 6. Inclua pelo menos 2 etapas de nivel "Especialista"
 7. As descricoes devem ser em portugues brasileiro, tecnicamente precisas
 
-Responda APENAS com um JSON array valido, sem markdown, sem code blocks, sem explicacao.
+Responda APENAS com um JSON valido, sem markdown, sem code blocks, sem explicacao.
+O JSON deve ser um objeto com um campo "steps" contendo o array de etapas.
 Exemplo de formato:
-[{"name":"...","description":"...","estimatedHours":8,"difficulty":"Fundamental"}]`;
+{"steps":[{"name":"...","description":"...","estimatedHours":8,"difficulty":"Fundamental"}]}`;
 
-    const response = await zai.chat.completions.create({
-      model: 'glm-4-plus',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 4000,
-    });
+    const aiResponse = await aiChatJSON([
+      { role: 'user', content: prompt },
+    ], { maxTokens: 4000, temperature: 0.5 });
 
-    let content = response.choices[0]?.message?.content || '';
-
-    // Clean up markdown code blocks if present
-    content = content.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-
-    let steps: any[];
-    try {
-      steps = JSON.parse(content);
-    } catch {
-      // Try to extract JSON array from the response
-      const match = content.match(/\[[\s\S]*\]/);
-      if (match) {
-        steps = JSON.parse(match[0]);
-      } else {
-        return NextResponse.json({ error: 'Erro ao gerar trilha. Tente novamente.' }, { status: 500 });
-      }
+    const parsed = safeParseJSON(aiResponse);
+    if (!parsed || !Array.isArray(parsed.steps)) {
+      return NextResponse.json({ error: 'Erro ao gerar trilha. Tente novamente.' }, { status: 500 });
     }
 
     // Validate steps structure
     const validDifficulties = ['Fundamental', 'Intermediario', 'Avancado', 'Especialista'];
-    const validated = steps.filter((s: any) =>
+    const validated = parsed.steps.filter((s: any) =>
       s.name && s.description && s.estimatedHours && s.difficulty
     ).map((s: any) => ({
       name: String(s.name).trim(),
@@ -83,8 +66,18 @@ Exemplo de formato:
     }
 
     return NextResponse.json({ steps: validated });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Roadmap generate error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('timeout') || msg.includes('network') || msg.includes('fetch') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    }
+    if (msg.includes('429')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde um momento e tente novamente.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

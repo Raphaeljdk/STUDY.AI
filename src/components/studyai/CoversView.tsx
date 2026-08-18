@@ -747,6 +747,220 @@ function drawAcademicPattern(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.restore();
 }
 
+function drawMandalaPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 40, 55);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  const cx = w / 2 + (r(seed + 1) - 0.5) * w * 0.2;
+  const cy = h / 2 + (r(seed + 2) - 0.5) * h * 0.2;
+  const maxR = Math.min(w, h) * 0.42;
+  const layers = 3 + (r(seed + 3) * 3) | 0;
+  const petalsBase = 6 + (r(seed + 4) * 6) | 0;
+
+  ctx.globalAlpha = 0.15;
+  for (let layer = 1; layer <= layers; layer++) {
+    const layerR = (layer / layers) * maxR;
+    const petals = petalsBase + layer;
+    ctx.globalAlpha = 0.06 + (layer / layers) * 0.1;
+    // Draw petal ring
+    for (let p = 0; p < petals; p++) {
+      const angle = (p / petals) * Math.PI * 2 + layer * 0.15;
+      const petalLen = layerR * 0.4;
+      const petalW = layerR * 0.18;
+      const px = cx + Math.cos(angle) * layerR * 0.55;
+      const py = cy + Math.sin(angle) * layerR * 0.55;
+      ctx.beginPath();
+      ctx.ellipse(px, py, petalLen, petalW, angle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Ring circle
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, layerR * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // Center circle
+  ctx.globalAlpha = 0.12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, maxR * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawConstellationPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 45, 65);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  const starCount = 15 + (r(seed + 1) * 20) | 0;
+  const stars: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < starCount; i++) {
+    stars.push({
+      x: r(seed + i * 2 + 10) * w,
+      y: r(seed + i * 2 + 11) * h,
+    });
+  }
+  // Connect nearby stars with lines
+  ctx.globalAlpha = 0.12;
+  ctx.lineWidth = 0.7;
+  for (let i = 0; i < stars.length; i++) {
+    const connections = 1 + (r(seed + i + 100) * 3) | 0;
+    const sorted = stars
+      .map((s, idx) => ({ ...s, idx, dist: Math.hypot(s.x - stars[i].x, s.y - stars[i].y) }))
+      .filter(s => s.idx !== i)
+      .sort((a, b) => a.dist - b.dist);
+    for (let c = 0; c < Math.min(connections, sorted.length); c++) {
+      const maxDist = Math.min(w, h) * 0.4;
+      if (sorted[c].dist < maxDist) {
+        ctx.globalAlpha = 0.05 + (1 - sorted[c].dist / maxDist) * 0.1;
+        ctx.beginPath();
+        ctx.moveTo(stars[i].x, stars[i].y);
+        ctx.lineTo(sorted[c].x, sorted[c].y);
+        ctx.stroke();
+      }
+    }
+  }
+  // Draw star dots
+  for (let i = 0; i < stars.length; i++) {
+    const size = 1.5 + r(seed + i + 200) * 3;
+    ctx.globalAlpha = 0.2 + r(seed + i + 300) * 0.2;
+    ctx.beginPath();
+    ctx.arc(stars[i].x, stars[i].y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBotanicalPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 40, 50);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  const branchCount = 3 + (r(seed + 1) * 4) | 0;
+
+  for (let b = 0; b < branchCount; b++) {
+    const startX = r(seed + b * 5) * w;
+    const startY = h + 10;
+    const endX = startX + (r(seed + b * 5 + 1) - 0.5) * w * 0.4;
+    const endY = r(seed + b * 5 + 2) * h * 0.5;
+    const cpX = (startX + endX) / 2 + (r(seed + b * 5 + 3) - 0.5) * w * 0.3;
+    const cpY = (startY + endY) / 2;
+
+    // Main stem
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.12;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(cpX, cpY, endX, endY);
+    ctx.stroke();
+
+    // Leaves along the stem
+    const leafCount = 4 + (r(seed + b * 5 + 4) * 6) | 0;
+    for (let l = 0; l < leafCount; l++) {
+      const t = (l + 1) / (leafCount + 1);
+      const lx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * cpX + t * t * endX;
+      const ly = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * cpY + t * t * endY;
+      const side = l % 2 === 0 ? 1 : -1;
+      const leafLen = 8 + r(seed + b * 20 + l * 3) * 18;
+      const leafAngle = Math.atan2(endY - startY, endX - startX) + side * (0.4 + r(seed + b * 20 + l * 3 + 1) * 0.6);
+
+      ctx.globalAlpha = 0.08 + r(seed + b * 20 + l * 3 + 2) * 0.08;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(leafAngle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(leafLen * 0.5, -leafLen * 0.25, leafLen, 0);
+      ctx.quadraticCurveTo(leafLen * 0.5, leafLen * 0.25, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function drawOrigamiPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 35, 55);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  const triCount = 12 + (r(seed + 1) * 16) | 0;
+
+  for (let i = 0; i < triCount; i++) {
+    const cx = r(seed + i * 4 + 10) * w;
+    const cy = r(seed + i * 4 + 11) * h;
+    const size = 15 + r(seed + i * 4 + 12) * 45;
+    const rotation = r(seed + i * 4 + 13) * Math.PI * 2;
+    ctx.globalAlpha = 0.06 + r(seed + i * 4 + 14) * 0.1;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotation);
+
+    // Draw a triangle
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.6);
+    ctx.lineTo(-size * 0.5, size * 0.4);
+    ctx.lineTo(size * 0.5, size * 0.4);
+    ctx.closePath();
+
+    if (r(seed + i * 4 + 15) > 0.6) {
+      ctx.fill();
+    }
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Fold line inside
+    ctx.globalAlpha *= 0.7;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.6);
+    ctx.lineTo(0, size * 0.4);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawWatercolorPattern(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+  const r = seededRandom;
+  ctx.save();
+  const accentH = (r(seed + 100) * 360) | 0;
+  const color = hsl(accentH, 45, 60);
+  ctx.fillStyle = color;
+  const blobCount = 10 + (r(seed + 1) * 12) | 0;
+
+  for (let i = 0; i < blobCount; i++) {
+    const cx = r(seed + i * 3 + 10) * w;
+    const cy = r(seed + i * 3 + 11) * h;
+    const radius = 25 + r(seed + i * 3 + 12) * 60;
+    ctx.globalAlpha = 0.03 + r(seed + i * 3 + 13) * 0.06;
+
+    // Soft blob using multiple overlapping circles
+    const subCircles = 5 + (r(seed + i * 3 + 14) * 4) | 0;
+    for (let s = 0; s < subCircles; s++) {
+      const ox = (r(seed + i * 10 + s * 2 + 50) - 0.5) * radius * 0.8;
+      const oy = (r(seed + i * 10 + s * 2 + 51) - 0.5) * radius * 0.8;
+      const subR = radius * (0.4 + r(seed + i * 10 + s * 2 + 52) * 0.6);
+      ctx.beginPath();
+      ctx.arc(cx + ox, cy + oy, subR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 /* ============================================================
    COLLECTION DEFINITIONS
    ============================================================ */
@@ -768,9 +982,14 @@ const COLLECTIONS: CoverCollection[] = [
   { name: 'Abstrato', colorStyle: 'neon', draw: drawAbstractPattern },
   { name: 'Minimalista', colorStyle: 'mono', draw: drawMinimalPattern },
   { name: 'Acadêmico', colorStyle: 'dark', draw: drawAcademicPattern },
+  { name: 'Mandala', colorStyle: 'pastel', draw: drawMandalaPattern },
+  { name: 'Constelação', colorStyle: 'dark', draw: drawConstellationPattern },
+  { name: 'Botânico', colorStyle: 'earth', draw: drawBotanicalPattern },
+  { name: 'Origami', colorStyle: 'cool', draw: drawOrigamiPattern },
+  { name: 'Aquarela', colorStyle: 'pastel', draw: drawWatercolorPattern },
 ];
 
-const COVERS_PER_COLLECTION = 120;
+const COVERS_PER_COLLECTION = 130;
 const TOTAL_COVERS = COLLECTIONS.length * COVERS_PER_COLLECTION;
 
 /* ============================================================

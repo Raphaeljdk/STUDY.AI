@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserAsync, requirePlan } from '@/lib/api-server';
 import { db, genId, nowISO, sqlite } from '@/lib/db';
-import { aiChat } from '@/lib/zai';
+import { aiChatJSON, safeParseJSON } from '@/lib/zai';
 
 // GET /api/teach - fetch teaching history
 export async function GET(_request: Request) {
@@ -55,44 +55,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Explicacao muito curta. Explique com mais detalhes.' }, { status: 400 });
     }
 
-    // Get user's subjects (no include — separate queries)
-    const subjects = await db.subject.findMany({
-      where: { userId },
-      take: 10,
-    });
-
-    // Get topics for each subject separately
-    const subjectsWithTopics = await Promise.all(subjects.map(async s => {
-      const topicWhere: any = { subjectId: s.id };
-      if (topic) topicWhere.name = { contains: topic };
-      const topics = await db.topic.findMany({
-        where: topicWhere,
-        select: ['name', 'mastery'],
-        take: 5,
-      });
-      return { ...s, topics };
-    }));
-
-    const relatedTopics = subjectsWithTopics.flatMap(s => s.topics).filter(t => t.name.toLowerCase().includes(topic.toLowerCase()));
+    // Get user's subjects
+    let relatedTopics: any[] = [];
+    try {
+      const subjects = await db.subject.findMany({ where: { userId }, take: 10 });
+      const subjectsWithTopics = await Promise.all(subjects.map(async (s: any) => {
+        const topicWhere: any = { subjectId: s.id };
+        if (topic) topicWhere.name = { contains: topic };
+        const topics = await db.topic.findMany({ where: topicWhere, select: ['name', 'mastery'], take: 5 });
+        return { ...s, topics };
+      }));
+      relatedTopics = subjectsWithTopics.flatMap((s: any) => s.topics).filter((t: any) => t.name.toLowerCase().includes(topic.toLowerCase()));
+    } catch (err) {
+      console.warn('[Teach] Error fetching topics:', err);
+    }
 
     // Fetch notebook pages related to the topic/subject
     let notebookContext = '';
     let notebookNoteCount = 0;
     try {
-      // Strategy 1: Find notebooks via tags matching the subject
       let relevantNotebookIds: string[] = [];
       if (subject) {
         const matchingTags = await db.notebookTag.findMany({
-          where: {
-            userId,
-            name: { contains: subject },
-          },
+          where: { userId, name: { contains: subject } },
           select: ['notebookId'],
         });
         relevantNotebookIds = matchingTags.map((t: any) => t.notebookId);
       }
 
-      // Strategy 2: Find notebooks by title matching subject or topic
       const allUserNotebooks = await db.notebook.findMany({
         where: { userId },
         select: ['id', 'title'],
@@ -101,11 +91,11 @@ export async function POST(request: Request) {
       const titleMatched = allUserNotebooks.filter((nb: any) => {
         if (!subject && !topic) return false;
         const titleLower = (nb.title || '').toLowerCase();
-        const matched = (
-          (subject && titleLower.includes(subject.toLowerCase())) ||
-          (topic && titleLower.includes(topic.toLowerCase()))
+        return (
+          ((subject && titleLower.includes(subject.toLowerCase())) ||
+          (topic && titleLower.includes(topic.toLowerCase()))) &&
+          !relevantNotebookIds.includes(nb.id)
         );
-        return matched && !relevantNotebookIds.includes(nb.id);
       });
 
       const allRelevantNotebooks = [
@@ -114,15 +104,11 @@ export async function POST(request: Request) {
       ].slice(0, 3);
 
       for (const nb of allRelevantNotebooks) {
-        const pages = await db.notebookPage.findMany({
-          where: {
-            notebookId: nb.id,
-            textContent: { not: '' },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: ['textContent', 'pageNumber'],
-        });
+        // Use raw query to avoid potential issues with { not: '' } operator
+        const pages = await db.notebookPage.query(
+          `SELECT "textContent", "pageNumber" FROM "NotebookPage" WHERE "notebookId" = $1 AND "textContent" != '' ORDER BY "createdAt" DESC LIMIT 5`,
+          nb.id
+        );
         if (pages.length > 0) {
           notebookContext += `\nCaderno "${nb.title}":\n`;
           notebookContext += pages
@@ -140,28 +126,23 @@ export async function POST(request: Request) {
       : difficulty === 'avancado' ? 'avancado'
       : 'intermediario';
 
-    // AI analysis
     const contextStr = relatedTopics.length > 0
-      ? `O usuario ja tem registro de estudo em topicos relacionados: ${relatedTopics.map(t => `${t.name} (${t.mastery}% dominio)`).join(', ')}.`
-      : 'Nenhum registro anterior de estudo deste topico.';
+      ? `O usuario ja estudou: ${relatedTopics.map((t: any) => `${t.name} (${t.mastery}% dominio)`).join(', ')}.`
+      : 'Nenhum registro anterior.';
 
     const notebookStr = notebookContext
-      ? `\n\nNotas do aluno nos cadernos do app (use para contextualizar a avaliacao e verificar se a explicacao condiz com o que o aluno anotou):\n${notebookContext}`
-      : '\n\nNotas do aluno nos cadernos do app: Nenhuma nota encontrada para esta materia.';
+      ? `\n\nNotas do aluno:\n${notebookContext}`
+      : '\n\nNotas do aluno: Nenhuma nota encontrada.';
 
-    const aiResponse = await aiChat([
+    // AI analysis with JSON mode for reliable parsing
+    const aiResponse = await aiChatJSON([
       {
         role: 'system',
-        content: `Voce e um professor universitario rigoroso mas encorajador. Um aluno esta tentando explicar um conceito para voce como se ele fosse o professor. Seu trabalho e avaliar a precisao, profundidade e clareza da explicacao.
+        content: `Voce e um professor universitario que avalia explicacoes de alunos.
+Nivel de dificuldade: ${difficultyLabel}.
+${contextStr}${notebookStr}
 
-Avalie considerando o nivel de dificuldade: ${difficultyLabel}.
-
-${contextStr}
-${notebookStr}
-
-IMPORTANTE: Se o aluno tiver notas em cadernos, compare a explicacao dele com o que ele anotou. Se a explicacao for diferente das notas, note isso como ponto de atencao. Se as notas forem usadas como base, elogie.
-
-Responda APENAS com um JSON valido (sem markdown, sem code fences) com estes campos:
+Responda com JSON contendo:
 {
   "mastery": 0-100,
   "precision": 0-100,
@@ -169,110 +150,105 @@ Responda APENAS com um JSON valido (sem markdown, sem code fences) com estes cam
   "clarity": 0-100,
   "completeness": 0-100,
   "overallGrade": "A"|"B"|"C"|"D"|"F",
-  "summary": "resumo de 1-2 frases sobre a explicacao do aluno",
+  "summary": "resumo de 1-2 frases",
   "strengths": ["ponto forte 1", "ponto forte 2", "ponto forte 3"],
   "weaknesses": ["ponto fraco 1", "ponto fraco 2"],
-  "corrections": ["correcao 1 com detalhes", "correcao 2 com detalhes"],
-  "suggestions": ["sugestao de melhoria 1", "sugestao de melhoria 2"],
-  "questionsToExplore": ["pergunta para aprofundar 1", "pergunta para aprofundar 2"],
-  "nextTopics": ["proximo topico recomendado 1", "proximo topico recomendado 2"],
-  "encouragement": "frase motivadora personalizada",
-  "improvementSteps": ["passo 1 para melhorar - acao concreta", "passo 2 para melhorar - acao concreta", "passo 3 para melhorar - acao concreta"],
-  "relatedTopicsToStudy": ["topico relacionado 1 para estudar", "topico relacionado 2 para estudar"]
+  "corrections": ["correcao 1", "correcao 2"],
+  "suggestions": ["sugestao 1", "sugestao 2"],
+  "questionsToExplore": ["pergunta 1", "pergunta 2"],
+  "nextTopics": ["topico 1", "topico 2"],
+  "encouragement": "frase motivadora",
+  "improvementSteps": ["passo 1", "passo 2", "passo 3"],
+  "relatedTopicsToStudy": ["topico 1", "topico 2"]
 }
 
-Seja justo mas exigente. Nao aceite explicacoes vagas ou superficiais. Elogie sinceramente quando merecido. Tudo em portugues brasileiro.`,
+Seja justo mas exigente. Tudo em portugues brasileiro.`,
       },
       {
         role: 'user',
-        content: `Topico: "${topic}"
-Materia: ${subject || 'Geral'}
-Nivel: ${difficultyLabel}
-
-Explicacao do aluno:
-"""
-${explanation}
-"""
-
-Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
+        content: `Topico: "${topic}"\nMateria: ${subject || 'Geral'}\nNivel: ${difficultyLabel}\n\nExplicacao:\n"""\n${explanation}\n"""\n\nAvalie esta explicacao.`,
       },
-    ]);
+    ], { maxTokens: 4096, temperature: 0.5 });
 
-    let analysis: any = null;
-    try {
-      const jsonStr = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      analysis = JSON.parse(jsonStr);
-    } catch (parseErr) {
-      console.error('[Teach] AI response parse error:', parseErr);
+    const analysis = safeParseJSON(aiResponse);
+    if (!analysis || typeof analysis.mastery !== 'number') {
       return NextResponse.json({
         error: 'A IA nao conseguiu gerar uma analise valida. Tente novamente com uma explicacao mais detalhada.',
       }, { status: 500 });
     }
 
-    // Award XP based on mastery
+    // Award XP
     const xpEarned = Math.round((analysis.mastery || 0) / 10);
     const totalXP = Math.max(5, Math.min(25, xpEarned));
 
-    // Update user XP if earned (increment via raw SQL)
     if (totalXP > 0) {
-      await sqlite.execute({ sql: 'UPDATE "User" SET "xp" = "xp" + $1, "totalQuestionsAnswered" = "totalQuestionsAnswered" + $2, "updatedAt" = $3 WHERE "id" = $4', args: [totalXP, 1, nowISO(), userId] });
+      try {
+        await sqlite.execute({ sql: 'UPDATE "User" SET "xp" = "xp" + $1, "totalQuestionsAnswered" = "totalQuestionsAnswered" + $2, "updatedAt" = $3 WHERE "id" = $4', args: [totalXP, 1, nowISO(), userId] });
+      } catch (xpErr) {
+        console.warn('[Teach] Error updating XP:', xpErr);
+      }
 
-      // Create XP transaction
-      await db.xpTransaction.create({
-        data: {
-          id: genId(),
-          userId,
-          amount: totalXP,
-          source: 'QUIZ_COMPLETED',
-          description: `Ensinar "${topic}" - nota ${analysis.overallGrade || '?'}`,
-          createdAt: nowISO(),
-        },
-      });
+      try {
+        await db.xpTransaction.create({
+          data: {
+            id: genId(),
+            userId,
+            amount: totalXP,
+            source: 'QUIZ_COMPLETED',
+            description: `Ensinar "${topic}" - nota ${analysis.overallGrade || '?'}`,
+            createdAt: nowISO(),
+          },
+        });
+      } catch (xpTxErr) {
+        console.warn('[Teach] Error creating XP transaction:', xpTxErr);
+      }
 
-      // Update related topic mastery if exists
+      // Update related topic mastery
       if (relatedTopics.length > 0) {
-        // Find topic in database by name match
         for (const rel of relatedTopics) {
-          const dbTopic = await db.topic.findFirst({
-            where: { name: rel.name },
-          });
-          if (dbTopic && (analysis.mastery || 0) > dbTopic.mastery) {
-            await db.topic.update({
-              where: { id: dbTopic.id },
-              data: { mastery: analysis.mastery || 0, updatedAt: nowISO() },
-            });
-          }
+          try {
+            const dbTopic = await db.topic.findFirst({ where: { name: (rel as any).name } });
+            if (dbTopic && (analysis.mastery || 0) > dbTopic.mastery) {
+              await db.topic.update({ where: { id: dbTopic.id }, data: { mastery: analysis.mastery || 0, updatedAt: nowISO() } });
+            }
+          } catch { /* skip individual topic updates */ }
         }
       }
     }
 
-    // Save teaching session as memory
-    await db.chatMessage.create({
-      data: {
-        id: genId(),
-        userId,
-        role: 'teaching',
-        content: JSON.stringify({
-          topic,
-          subject: subject || null,
-          difficulty: difficultyLabel,
-          explanation: explanation.substring(0, 500),
-          mastery: analysis.mastery,
-          grade: analysis.overallGrade,
-          xpEarned: totalXP,
-        }),
-        createdAt: nowISO(),
-      },
-    });
+    // Save teaching session
+    try {
+      await db.chatMessage.create({
+        data: {
+          id: genId(),
+          userId,
+          role: 'teaching',
+          content: JSON.stringify({
+            topic,
+            subject: subject || null,
+            difficulty: difficultyLabel,
+            explanation: explanation.substring(0, 500),
+            mastery: analysis.mastery,
+            grade: analysis.overallGrade,
+            xpEarned: totalXP,
+          }),
+          createdAt: nowISO(),
+        },
+      });
+    } catch (saveErr) {
+      console.warn('[Teach] Error saving session:', saveErr);
+    }
 
     // Recalculate level
-    const updatedUser = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
-    if (updatedUser) {
-      const newLevel = Math.floor(updatedUser.xp / 500) + 1;
-      if (newLevel > updatedUser.level) {
-        await db.user.update({ where: { id: userId }, data: { level: newLevel, updatedAt: nowISO() } });
+    try {
+      const updatedUser = await db.user.findUnique({ where: { id: userId }, select: ['xp', 'level'] });
+      if (updatedUser) {
+        const newLevel = Math.floor(updatedUser.xp / 500) + 1;
+        if (newLevel > updatedUser.level) {
+          await db.user.update({ where: { id: userId }, data: { level: newLevel, updatedAt: nowISO() } });
+        }
       }
-    }
+    } catch { /* non-critical */ }
 
     return NextResponse.json({
       analysis,
@@ -284,9 +260,15 @@ Avalie esta explicacao como se eu estivesse ensinando este conceito para voce.`,
   } catch (error) {
     console.error('[Teach POST] Route error:', error);
     const msg = error instanceof Error ? error.message : '';
-    if (msg.includes('GROQ_API_KEY') || msg.includes('timeout') || msg.includes('network') || msg.includes('fetch')) {
-      return NextResponse.json({ error: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.' }, { status: 503 });
+    if (msg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ error: 'Servidor de IA nao configurado. Contate o suporte.' }, { status: 503 });
     }
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    if (msg.includes('timeout') || msg.includes('abort')) {
+      return NextResponse.json({ error: 'A IA demorou demais. Tente novamente.' }, { status: 503 });
+    }
+    if (msg.includes('429') || msg.includes('rate')) {
+      return NextResponse.json({ error: 'Muitas requisicoes. Aguarde e tente novamente.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor. Tente novamente.' }, { status: 500 });
   }
 }
