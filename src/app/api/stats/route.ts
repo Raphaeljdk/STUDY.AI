@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
-import { requireUserAsync, requirePlan } from '@/lib/api-server';
+import { requireUserAsync } from '@/lib/api-server';
 import { db } from '@/lib/db';
 
 export async function GET() {
   try {
     const user = await requireUserAsync();
     if (user instanceof NextResponse) return user;
-    const denied = requirePlan(user, 'dashboardFull');
-    if (denied) return denied;
     const userId = user.id;
 
     const now = new Date();

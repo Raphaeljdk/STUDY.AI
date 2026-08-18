@@ -52,7 +52,7 @@ export async function requireUserAsync(): Promise<NextResponse | SessionUser> {
     return NextResponse.json({ error: 'Sessao invalida', code: 'INVALID_SESSION' }, { status: 401 });
   }
 
-  const userExists = await db.user.findUnique({ where: { id: userId }, select: ['id', 'email', 'name', 'role', 'plan'] });
+  const userExists = await db.user.findUnique({ where: { id: userId }, select: ['id', 'email', 'name', 'role', 'plan', 'stripeSubscriptionId', 'stripeCustomerId'] });
   if (!userExists) {
     return NextResponse.json({ error: 'Sessao expirada. Faca login novamente.', code: 'USER_NOT_FOUND' }, { status: 401 });
   }

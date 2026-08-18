@@ -567,12 +567,14 @@ function DashboardHome({ user, openNotebook, onNavigate }: { user: any; openNote
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/api/stats'),
-      apiFetch('/api/notebooks'),
-    ]).then(([statsData, nbData]) => {
-      if (statsData.notebooks !== undefined) setStats(statsData);
-      if (nbData.notebooks) setRecentNBs(nbData.notebooks.slice(0, 3));
+    Promise.allSettled([
+      apiFetch('/api/stats').catch(() => null),
+      apiFetch('/api/notebooks').catch(() => null),
+    ]).then(([statsResult, nbResult]) => {
+      const statsData = statsResult.status === 'fulfilled' ? statsResult.value : null;
+      const nbData = nbResult.status === 'fulfilled' ? nbResult.value : null;
+      if (statsData && statsData.notebooks !== undefined) setStats(statsData);
+      if (nbData && nbData.notebooks) setRecentNBs(nbData.notebooks.slice(0, 3));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -946,8 +948,13 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
   };
 
   const handleDelete = async (id: string) => {
-    await apiFetch(`/api/flashcards/${id}`, { method: 'DELETE' });
-    setFlashcards(prev => prev.filter(f => f.id !== id));
+    try {
+      await apiFetch(`/api/flashcards/${id}`, { method: 'DELETE' });
+      setFlashcards(prev => prev.filter(f => f.id !== id));
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      toast({ title: 'Erro ao deletar', description: 'Nao foi possivel deletar o flashcard.', variant: 'destructive' });
+    }
   };
 
   const handleAIGenerate = async (e: React.FormEvent) => {
@@ -1452,7 +1459,8 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
         return;
       }
 
-      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, createdAt: new Date().toISOString() };
+      const replyText = data.reply || 'Desculpe, nao consegui gerar uma resposta. Tente novamente.';
+      const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: replyText, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
       if (data.wisdom) setWisdom(data.wisdom);
     } catch {

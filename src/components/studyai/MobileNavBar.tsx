@@ -8,7 +8,7 @@ import {
   Target, CalendarDays,
   Swords, GraduationCap, Rocket, Dna, Route, Compass, Siren, Trophy,
   Shield, Lock, LogOut, Crown,
-  BookText, Layers, ScrollText, MessageCircle, ChevronRight, Settings,
+  BookText, Layers, ScrollText, MessageCircle, ChevronRight,
   Palette, CreditCard,
 } from 'lucide-react';
 import {
