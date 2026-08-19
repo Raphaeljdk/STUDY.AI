@@ -1,7 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Deterministic seeded random — same values on server and client
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
 
 /**
  * Japanese-themed loading screen with cherry blossom petals,
@@ -11,6 +20,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function LoadingScreen() {
   const [visible, setVisible] = useState(true);
   const [hiding, setHiding] = useState(false);
+
+  // Deterministic petal positions — no hydration mismatch
+  const petals = useMemo(() => {
+    const rng = seededRandom(42);
+    return Array.from({ length: 25 }, () => ({
+      left: rng() * 100,
+      delay: rng() * 5,
+      duration: 4 + rng() * 6,
+      opacity: 0.3 + rng() * 0.5,
+      scale: 0.5 + rng() * 0.8,
+      rotate: rng() * 360,
+    }));
+  }, []);
 
   useEffect(() => {
     // Hide loading screen once the page is fully loaded
@@ -43,16 +65,16 @@ export function LoadingScreen() {
         >
           {/* Sakura / Cherry Blossom Petals */}
           <div className="sakura-petals" aria-hidden="true">
-            {Array.from({ length: 25 }).map((_, i) => (
+            {petals.map((p, i) => (
               <div
                 key={i}
                 className="sakura-petal"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 5}s`,
-                  animationDuration: `${4 + Math.random() * 6}s`,
-                  opacity: 0.3 + Math.random() * 0.5,
-                  transform: `scale(${0.5 + Math.random() * 0.8}) rotate(${Math.random() * 360}deg)`,
+                  left: `${p.left}%`,
+                  animationDelay: `${p.delay}s`,
+                  animationDuration: `${p.duration}s`,
+                  opacity: p.opacity,
+                  transform: `scale(${p.scale}) rotate(${p.rotate}deg)`,
                 }}
               />
             ))}

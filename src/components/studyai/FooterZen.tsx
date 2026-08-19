@@ -63,7 +63,7 @@ export function FooterZen() {
 
         {/* Bottom bar */}
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-[var(--ws-glass-border)] pt-8 md:flex-row">
-          <p className="text-xs text-[var(--ws-text-tertiary)]">
+          <p className="text-xs text-[var(--ws-text-tertiary)]" suppressHydrationWarning>
             &copy; {new Date().getFullYear()} StudyAI. Todos os direitos reservados.
           </p>
           <p className="font-serif-jp text-xs text-[var(--ws-text-tertiary)] opacity-40">
