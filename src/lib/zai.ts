@@ -44,7 +44,10 @@ interface GroqOptions {
 
 async function groqChat(messages: { role: string; content: string }[], options: GroqOptions = {}): Promise<string> {
   const apiKey = getGroqApiKey();
-  if (!apiKey) throw new Error('GROQ_API_KEY not set');
+  if (!apiKey) {
+    console.error('[AI] GROQ_API_KEY environment variable is not set. All AI features will fail. Set it in Vercel/Railway environment variables.');
+    throw new Error('GROQ_API_KEY not set');
+  }
 
   const { jsonMode = false, maxTokens = 2048, temperature = 0.7, fast = false } = options;
 
