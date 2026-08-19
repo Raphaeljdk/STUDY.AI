@@ -581,7 +581,7 @@ export function RoadmapView() {
 
       {/* Generate Dialog */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="sm:max-w-md" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
+        <DialogContent className="max-w-md sm:max-w-md mx-auto max-h-[90dvh] overflow-y-auto" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
           <DialogHeader>
             <DialogTitle className="font-serif-jp" style={{ color: 'var(--ws-text-primary)' }}>
               <Sparkles className="mr-2 inline h-5 w-5" style={{ color: 'var(--ws-accent)' }} />
@@ -632,7 +632,7 @@ export function RoadmapView() {
 
       {/* Delete Confirm Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-sm" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
+        <DialogContent className="max-w-sm sm:max-w-sm mx-auto max-h-[90dvh] overflow-y-auto" style={{ background: 'var(--ws-bg)', borderRadius: 'var(--ws-radius-card)' }}>
           <DialogHeader>
             <DialogTitle className="font-serif-jp" style={{ color: 'var(--ws-text-primary)' }}>Excluir trilha?</DialogTitle>
           </DialogHeader>

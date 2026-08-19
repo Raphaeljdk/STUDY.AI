@@ -33,7 +33,12 @@ export async function POST(request: NextRequest) {
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Dados invalidos' }, { status: 400 });
+    }
     const planTier = (body.plan || 'SAMURAI') as PlanTier;
     const billingCycle = (body.billing || 'monthly') as BillingCycle;
 
@@ -125,7 +130,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: 'Erro ao criar sessão de pagamento', details: error.message },
+      { error: 'Erro ao criar sessão de pagamento' },
       { status: 500 }
     );
   }

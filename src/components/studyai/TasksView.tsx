@@ -250,7 +250,7 @@ function TaskFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md"
+        className="max-w-md sm:max-w-md mx-auto max-h-[90dvh] overflow-y-auto"
         style={{ borderRadius: 'var(--ws-radius-card)' }}
       >
         <DialogHeader>

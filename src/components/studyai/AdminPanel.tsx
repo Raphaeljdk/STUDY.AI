@@ -256,10 +256,10 @@ export function AdminPanel() {
                       <button
                         onClick={() => deleteUser(u.id, u.name)}
                         disabled={savingId === u.id}
-                        className="rounded-ws-button p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] disabled:opacity-50"
+                        className="flex h-11 min-w-[44px] items-center justify-center rounded-ws-button text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-accent)_10%,transparent)] hover:text-[var(--ws-accent)] disabled:opacity-50"
                         title="Deletar usuário"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={16} />
                       </button>
                     </td>
                   </tr>

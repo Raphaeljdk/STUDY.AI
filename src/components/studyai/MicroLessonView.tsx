@@ -392,7 +392,7 @@ function LessonScreen({
                           }
                         }}
                         disabled={isSubmitted}
-                        className="w-full flex items-center gap-3 p-3.5 text-left transition-ws"
+                        className="w-full flex items-center gap-3 p-4 text-left transition-ws min-h-[44px]"
                         style={{
                           borderRadius: 'var(--ws-radius-button)',
                           background: bg,
@@ -671,6 +671,7 @@ export function MicroLessonView() {
       toast({
         title: 'Erro ao gerar microaula',
         description: err.message || 'Tente novamente.',
+        variant: 'destructive',
       });
     } finally {
       setGenerating(false);

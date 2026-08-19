@@ -647,7 +647,7 @@ function ExplainScreen({ topic, subject, difficulty, onBack, onSubmit }: {
       }
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro ao gerar guia', description: err instanceof Error ? err.message : 'Tente novamente.' });
+      toast({ title: 'Erro ao gerar guia', description: err instanceof Error ? err.message : 'Tente novamente.', variant: 'destructive' });
     } finally {
       setLoadingGuide(false);
     }
@@ -1287,7 +1287,7 @@ export function TeachView({ onNavigate }: TeachViewProps) {
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
-      toast({ title: 'Erro', description: err instanceof Error ? err.message : 'Tente novamente.' });
+      toast({ title: 'Erro ao analisar explicacao', description: err instanceof Error ? err.message : 'Tente novamente.', variant: 'destructive' });
       setScreen('explain');
     } finally {
       setLoading(false);

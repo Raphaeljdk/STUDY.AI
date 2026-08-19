@@ -252,7 +252,7 @@ function MissionDetail({
       onUpdate();
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro', description: err.message || 'Erro de conexao. Tente novamente.' });
+      toast({ title: 'Erro', description: err.message || 'Erro de conexao. Tente novamente.', variant: 'destructive' });
     } finally {
       setCompletingStep(null);
     }
@@ -265,7 +265,7 @@ function MissionDetail({
       onUpdate();
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro', description: 'Tente novamente.' });
+      toast({ title: 'Erro', description: err.message || 'Tente novamente.', variant: 'destructive' });
     }
   };
 
@@ -587,7 +587,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
       toast({ title: 'Missao criada!', description: data.title || 'Sua missao esta pronta.' });
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro ao criar missao', description: err.message || 'Tente novamente.' });
+      toast({ title: 'Erro ao criar missao', description: err.message || 'Tente novamente.', variant: 'destructive' });
     } finally {
       setCreating(false);
     }
@@ -747,7 +747,7 @@ export function MissionsView({ onNavigate }: { onNavigate: (tab: string) => void
       {/* ===== CREATE MISSION DIALOG ===== */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent
-          className="sm:max-w-md rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+          className="max-w-md sm:max-w-md mx-auto max-h-[90dvh] overflow-y-auto rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-4 sm:p-6"
           style={{ boxShadow: 'var(--ws-shadow-medium)' }}
         >
           <DialogHeader>

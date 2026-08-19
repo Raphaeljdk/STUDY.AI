@@ -27,18 +27,18 @@ export async function GET(_request: Request) {
     }));
 
     // Get recent battle performance
-    const recentBattles = await db.battle.findMany({
-      where: { userId, completedAt: { not: null } },
+    const recentBattles = (await db.battle.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 10,
-    });
+    })).filter(b => b.completedAt != null);
 
     // Get recent pre-test scores
-    const recentPreTests = await db.preTest.findMany({
-      where: { userId, completedAt: { not: null } },
+    const recentPreTests = (await db.preTest.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 10,
-    });
+    })).filter(p => p.completedAt != null);
 
     // Get active missions
     const activeMissions = await db.mission.findMany({

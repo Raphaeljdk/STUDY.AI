@@ -267,6 +267,9 @@ ${wisdom.min >= 150 ? '- Voce e infinito — fale como o proprio universo conver
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error('Sensei chat error:', errMsg);
-    return NextResponse.json({ reply: 'O Sensei esta em meditacao profunda... Tente novamente em instantes.' });
+    if (errMsg.includes('GROQ_API_KEY')) {
+      return NextResponse.json({ reply: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.', wisdom: null, error: 'AI_UNAVAILABLE' }, { status: 503 });
+    }
+    return NextResponse.json({ reply: 'Servidor de IA indisponivel. Tente novamente em alguns segundos.', wisdom: null, error: 'AI_UNAVAILABLE' }, { status: 503 });
   }
 }

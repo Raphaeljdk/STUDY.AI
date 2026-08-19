@@ -356,7 +356,7 @@ export function DashboardView() {
       </header>
 
       {/* Main content area */}
-      <main key={activeTab} className="dashboard-scroll animate-tab-enter flex-1 mx-auto w-full max-w-[1440px] px-3 pb-20 pt-3 sm:px-4 sm:pb-20 sm:pt-4 lg:ml-[240px] lg:px-8 lg:pb-8 lg:py-8" role="main">
+      <main key={activeTab} className="dashboard-scroll animate-tab-enter flex-1 mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-24 pt-3 sm:px-4 sm:pb-24 sm:pt-4 lg:ml-[240px] lg:overflow-x-visible lg:px-8 lg:pb-8 lg:py-8" role="main">
         {/* Calendar reminder notifications (invisible — fires toasts) */}
         <ReminderCheck />
         {/* Usage bars for free users — only visible on mobile/tablet (desktop shows in sidebar) */}
@@ -977,10 +977,12 @@ function FlashcardsManager({ onReview }: { onReview: () => void }) {
         }
         setGenContent('');
         setShowGenForm(false);
+      } else {
+        toast({ title: 'Nenhum flashcard gerado', description: 'A IA nao conseguiu gerar flashcards com esse conteudo. Tente com mais detalhes.', variant: 'destructive' });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[FlashcardsManager] AI generate error:', err);
-      toast({ title: 'Erro ao gerar', description: 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
+      toast({ title: 'Erro ao gerar', description: err?.message || 'Nao foi possivel gerar flashcards com IA.', variant: 'destructive' });
     }
     setGenerating(false);
   };
@@ -1462,7 +1464,15 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
       const replyText = data.reply || 'Desculpe, nao consegui gerar uma resposta. Tente novamente.';
       const assistantMsg = { id: (Date.now() + 1).toString(), role: 'assistant', content: replyText, createdAt: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
-      if (data.wisdom) setWisdom(data.wisdom);
+      if (data.error) {
+        toast({
+          title: 'Servico de IA indisponivel',
+          description: 'O Sensei nao conseguiu processar sua mensagem no momento. Tente novamente em instantes.',
+          variant: 'destructive',
+        });
+      } else {
+        if (data.wisdom) setWisdom(data.wisdom);
+      }
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -1686,10 +1696,10 @@ Upgrade para **Premium** e converse ilimitadamente com o Sensei AI!`, createdAt:
             <button
               onClick={() => handleSend()}
               disabled={isLoading || !input.trim()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--ws-accent)] text-[var(--ws-text-on-dark)] transition-colors hover:bg-[var(--ws-accent-hover)] disabled:opacity-50"
               aria-label="Enviar"
             >
-              <Send size={14} />
+              <Send size={18} />
             </button>
           </div>
           <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">

@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       const subjectsWithTopics = await Promise.all(subjects.map(async (s: any) => {
         const topicWhere: any = { subjectId: s.id };
         if (topic) topicWhere.name = { contains: topic };
-        const topics = await db.topic.findMany({ where: topicWhere, select: ['name', 'mastery'], take: 5 });
+        const topics = await db.topic.findMany({ where: topicWhere, select: ['id', 'name', 'mastery'], take: 5 });
         return { ...s, topics };
       }));
       relatedTopics = subjectsWithTopics.flatMap((s: any) => s.topics).filter((t: any) => t.name.toLowerCase().includes(topic.toLowerCase()));
@@ -207,9 +207,9 @@ Seja justo mas exigente. Tudo em portugues brasileiro.`,
       if (relatedTopics.length > 0) {
         for (const rel of relatedTopics) {
           try {
-            const dbTopic = await db.topic.findFirst({ where: { name: (rel as any).name } });
-            if (dbTopic && (analysis.mastery || 0) > dbTopic.mastery) {
-              await db.topic.update({ where: { id: dbTopic.id }, data: { mastery: analysis.mastery || 0, updatedAt: nowISO() } });
+            // Use topic id directly (already scoped to user via subject)
+            if ((analysis.mastery || 0) > (rel as any).mastery) {
+              await db.topic.update({ where: { id: (rel as any).id }, data: { mastery: analysis.mastery || 0, updatedAt: nowISO() } });
             }
           } catch { /* skip individual topic updates */ }
         }

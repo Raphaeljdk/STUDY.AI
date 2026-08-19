@@ -248,7 +248,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center overflow-y-auto sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -256,7 +256,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!isLoading ? handleClose : undefined} />
 
           <motion.div
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] shadow-[var(--ws-shadow-medium)] max-h-[90vh] overflow-y-auto"
+            className="relative z-10 w-full max-w-md overflow-hidden rounded-t-2xl sm:rounded-ws-organic border border-[var(--ws-glass-border)] bg-[var(--ws-bg)] shadow-[var(--ws-shadow-medium)] max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto"
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -265,13 +265,13 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             <button
               onClick={handleClose}
               disabled={isLoading}
-              className="absolute right-4 top-4 z-20 rounded-full p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_8%,transparent)] hover:text-[var(--ws-text-primary)] disabled:opacity-50"
+              className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full p-1.5 text-[var(--ws-text-tertiary)] transition-colors hover:bg-[color-mix(in_srgb,var(--ws-ink)_8%,transparent)] hover:text-[var(--ws-text-primary)] disabled:opacity-50"
               aria-label="Fechar"
             >
               <X size={18} />
             </button>
 
-            <div className="p-8">
+            <div className="p-5 sm:p-8">
               {/* Free badge (only when no plan selected) */}
               {!planInfo && (
                 <div className="mb-6 flex items-center justify-center gap-2 rounded-ws-button px-3 py-1.5 mx-auto w-fit" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)' }}>
@@ -331,10 +331,10 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]"
                           tabIndex={-1}
                         >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
                     </div>
@@ -514,10 +514,10 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center text-[var(--ws-text-tertiary)] hover:text-[var(--ws-text-secondary)]"
                           tabIndex={-1}
                         >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
                     </div>

@@ -12,7 +12,7 @@ import { useSession } from 'next-auth/react';
 import { WabiSabiCard } from './WabiSabiCard';
 import { ZenButton } from './ZenButton';
 import { PremiumUpgrade } from './PremiumUpgrade';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 // ===== PLAN CONFIG =====
@@ -81,14 +81,22 @@ export function SubscriptionView({ onUpgrade }: SubscriptionViewProps) {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        toast({ title: 'Erro', description: 'Nao foi possivel abrir o portal de gerenciamento.' });
+        toast({ title: 'Portal indisponivel', description: 'Nao foi possivel abrir o portal de gerenciamento. Tente novamente.', variant: 'destructive' });
       }
     } catch (err: any) {
-      toast({
-        title: 'Erro ao abrir portal',
-        description: err?.message || 'Nao foi possivel abrir o portal de assinatura.',
-        variant: 'destructive',
-      });
+      if (err instanceof ApiError && err.status === 404) {
+        toast({
+          title: 'Assinatura nao encontrada',
+          description: 'Sua assinatura nao possui cobranca ativa no Stripe. Faca um novo upgrade para configurar o pagamento.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Erro ao abrir portal',
+          description: err?.message || 'Nao foi possivel abrir o portal de assinatura.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setPortalLoading(false);
     }
@@ -369,9 +377,9 @@ export function SubscriptionView({ onUpgrade }: SubscriptionViewProps) {
                 >
                   <ExternalLink className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--ws-accent)' }} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Portal de cobranca</p>
+                    <p className="text-sm font-medium">Gerenciar cobranca</p>
                     <p className="text-[10px]" style={{ color: 'var(--ws-text-tertiary)' }}>
-                      Gerencie pagamento, faturas e dados no Stripe
+                      Acesse o Stripe para pagamento, faturas e dados
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4" style={{ color: 'var(--ws-text-tertiary)' }} />

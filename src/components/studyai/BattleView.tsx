@@ -829,6 +829,7 @@ export function BattleView() {
       toast({
         title: 'Erro ao iniciar duelo',
         description: err.message || 'Tente novamente.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

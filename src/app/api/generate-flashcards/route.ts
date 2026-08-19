@@ -52,11 +52,14 @@ export async function POST(request: Request) {
     incrementUsage(userId, 'flashcards').catch(() => {});
 
     const parsed = safeParseJSON(reply);
-    if (parsed && Array.isArray(parsed.flashcards)) {
-      const valid = parsed.flashcards.filter((f: any) => f && typeof f.front === 'string' && typeof f.back === 'string').map((f: any) => ({ front: f.front.trim(), back: f.back.trim() }));
-      return NextResponse.json({ flashcards: valid });
+    if (!parsed || !Array.isArray(parsed.flashcards) || parsed.flashcards.length === 0) {
+      return NextResponse.json({ error: 'A IA nao conseguiu gerar flashcards validos. Tente novamente com um conteudo mais detalhado.' }, { status: 500 });
     }
-    return NextResponse.json({ flashcards: [] });
+    const valid = parsed.flashcards.filter((f: any) => f && typeof f.front === 'string' && typeof f.back === 'string').map((f: any) => ({ front: f.front.trim(), back: f.back.trim() }));
+    if (valid.length === 0) {
+      return NextResponse.json({ error: 'A IA nao conseguiu gerar flashcards validos. Tente novamente com um conteudo mais detalhado.' }, { status: 500 });
+    }
+    return NextResponse.json({ flashcards: valid });
   } catch (error) {
     console.error('Route error:', error);
     const msg = error instanceof Error ? error.message : '';

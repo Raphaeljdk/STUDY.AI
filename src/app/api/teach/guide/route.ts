@@ -62,12 +62,11 @@ export async function POST(request: Request) {
       ].slice(0, 3);
 
       for (const nb of allRelevant) {
-        const pages = await db.notebookPage.findMany({
-          where: { notebookId: nb.id, textContent: { not: '' } },
-          orderBy: { createdAt: 'desc' },
-          take: 3,
-          select: ['textContent'],
-        });
+        // Use raw query to avoid ORM { not: '' } operator issues
+        const pages = await db.notebookPage.query(
+          `SELECT "textContent" FROM "NotebookPage" WHERE "notebookId" = $1 AND "textContent" != '' ORDER BY "createdAt" DESC LIMIT 3`,
+          nb.id
+        );
         if (pages.length > 0) {
           notebookContext += `\nCaderno "${nb.title}":\n`;
           notebookContext += pages.map((p: any) => (p.textContent || '').substring(0, 400)).join('\n---\n');

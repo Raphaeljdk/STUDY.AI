@@ -262,7 +262,7 @@ function EventFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md"
+        className="max-w-md sm:max-w-md mx-auto max-h-[90dvh] overflow-y-auto"
         style={{ borderRadius: 'var(--ws-radius-card)' }}
       >
         <DialogHeader>
@@ -943,7 +943,7 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={goToPrevMonth}
-                    className="rounded-lg p-2 transition-colors hover:bg-black/5"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-black/5"
                     style={{ color: 'var(--ws-text-secondary)' }}
                     aria-label="Mês anterior"
                   >
@@ -951,7 +951,7 @@ export function CalendarView({ onNavigate }: CalendarViewProps) {
                   </button>
                   <button
                     onClick={goToNextMonth}
-                    className="rounded-lg p-2 transition-colors hover:bg-black/5"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-black/5"
                     style={{ color: 'var(--ws-text-secondary)' }}
                     aria-label="Próximo mês"
                   >

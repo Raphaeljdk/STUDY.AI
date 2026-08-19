@@ -160,7 +160,7 @@ function OnboardingSection({ onQuickTopic }: { onQuickTopic: (topic: string) => 
           Explore conteudos educacionais gerados por IA ou pela comunidade. Encontre dicas, conceitos e trechos de codigo para ampliar seus estudos.
         </p>
         {/* Feature cards row */}
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {features.map((f) => (
             <div
               key={f.title}
@@ -378,7 +378,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       });
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro', description: 'Nao foi possível salvar o conteudo.' });
+      toast({ title: 'Erro', description: err.message || 'Nao foi possivel salvar o conteudo.', variant: 'destructive' });
     } finally {
       setSavingId(null);
     }
@@ -404,7 +404,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       setAiSubject('');
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro ao gerar', description: err.message || 'Tente novamente.' });
+      toast({ title: 'Erro ao gerar', description: err.message || 'Tente novamente.', variant: 'destructive' });
     } finally {
       setAiGenerating(false);
     }
@@ -786,7 +786,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       {/* ===== AI DIALOG ===== */}
       <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
         <DialogContent
-          className="sm:max-w-md rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+          className="max-w-md sm:max-w-md mx-auto max-h-[90dvh] overflow-y-auto rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-4 sm:p-6"
           style={{ boxShadow: 'var(--ws-shadow-medium)' }}
         >
           <DialogHeader>
@@ -905,7 +905,7 @@ export function DiscoverView({ onNavigate }: DiscoverViewProps) {
       {/* ===== SUBJECT DIALOG ===== */}
       <Dialog open={showSubjectDialog} onOpenChange={setShowSubjectDialog}>
         <DialogContent
-          className="sm:max-w-sm rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-6"
+          className="max-w-sm sm:max-w-sm mx-auto max-h-[90dvh] overflow-y-auto rounded-ws-organic border-[var(--ws-glass-border)] bg-[var(--ws-bg)] p-4 sm:p-6"
           style={{ boxShadow: 'var(--ws-shadow-medium)' }}
         >
           <DialogHeader>

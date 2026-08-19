@@ -129,7 +129,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center overflow-y-auto sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -137,7 +137,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={!loadingPlan ? onClose : undefined} />
 
           <motion.div
-            className="relative z-10 w-full max-w-4xl my-8"
+            className="relative z-10 w-full max-w-4xl mb-0 sm:mb-8 max-h-[100dvh] sm:max-h-none overflow-y-auto rounded-t-2xl sm:rounded-ws-organic"
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -147,7 +147,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
             <button
               onClick={onClose}
               disabled={!!loadingPlan}
-              className="absolute -top-2 -right-2 z-20 rounded-full bg-[var(--ws-glass)] p-2 text-[var(--ws-text-tertiary)] shadow-lg transition-colors hover:text-[var(--ws-text-primary)] disabled:opacity-50"
+              className="absolute top-3 right-3 z-20 rounded-full bg-[var(--ws-glass)] p-2 text-[var(--ws-text-tertiary)] shadow-lg transition-colors hover:text-[var(--ws-text-primary)] disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Fechar"
             >
               <X size={18} />

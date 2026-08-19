@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser, isPremiumUser } from '@/lib/usage';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -17,7 +17,7 @@ export async function POST() {
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(stripeSecretKey);
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL || 'https://study-ai-nine-xi.vercel.app';
+    const origin = process.env.NEXTAUTH_URL || req.headers.get('origin') || 'https://study-ai-nine-xi.vercel.app';
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,

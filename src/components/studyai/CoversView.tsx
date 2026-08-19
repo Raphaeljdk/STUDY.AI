@@ -1307,7 +1307,7 @@ export function CoversView() {
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3 max-h-[500px] overflow-y-auto pr-1 no-scrollbar">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-[500px] overflow-y-auto pr-1 no-scrollbar">
             {visibleCovers.map(cover => (
               <CoverPreview
                 key={cover.id}

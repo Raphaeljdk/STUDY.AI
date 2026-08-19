@@ -143,7 +143,7 @@ Soma de durationMinutes = ~${timeAvail} minutos.`,
         beforeMastery: 0,
       };
 
-      return NextResponse.json(result, { status: 201 });
+      return NextResponse.json({ mission: result }, { status: 201 });
     }
 
     // Manual creation
@@ -195,7 +195,7 @@ Soma de durationMinutes = ~${timeAvail} minutos.`,
       beforeMastery: 0,
     };
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json({ mission: result }, { status: 201 });
   } catch (error) {
     console.error('[Missions POST] Route error:', error);
     const msg = error instanceof Error ? error.message : '';

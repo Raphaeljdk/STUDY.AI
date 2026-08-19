@@ -156,7 +156,7 @@ export function BrainView({ onNavigate }: BrainViewProps) {
       toast({ title: 'Analise concluida', description: 'Seu cerebro foi mapeado com sucesso.' });
     } catch (err: any) {
       if (err instanceof ApiError && err.isSessionExpired) return;
-      toast({ title: 'Erro', description: 'Nao foi possivel analisar seus dados.', variant: 'destructive' });
+      toast({ title: 'Erro na analise', description: err?.message || 'Nao foi possivel analisar seus dados. Tente novamente.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -197,8 +197,9 @@ export function BrainView({ onNavigate }: BrainViewProps) {
       setAnswers(new Array(data.questions?.length || 0).fill(null));
       setPreTestFinished(false);
       setPreTestOpen(true);
-    } catch {
-      toast({ title: 'Erro', description: 'Nao foi possivel gerar o pre-teste.', variant: 'destructive' });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      toast({ title: 'Erro ao gerar pre-teste', description: err?.message || 'Nao foi possivel gerar o pre-teste. Tente novamente.', variant: 'destructive' });
     } finally {
       setPreTestLoading(false);
     }
@@ -218,8 +219,9 @@ export function BrainView({ onNavigate }: BrainViewProps) {
       setPreTestTotal(data.total);
       setPreTestResults(data.results || []);
       setPreTestFinished(true);
-    } catch {
-      toast({ title: 'Erro', description: 'Nao foi possivel finalizar o pre-teste.', variant: 'destructive' });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.isSessionExpired) return;
+      toast({ title: 'Erro ao finalizar pre-teste', description: err?.message || 'Nao foi possivel finalizar o pre-teste. Tente novamente.', variant: 'destructive' });
     } finally {
       setPreTestLoading(false);
     }
