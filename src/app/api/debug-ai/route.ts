@@ -1,53 +1,59 @@
 import { NextResponse } from 'next/server';
 
 // Rota temporária para diagnosticar problemas de IA em produção
-// REMOVER depois de tudo funcionar!
 export async function GET() {
   const isVercel = !!process.env.VERCEL;
-  const nodeEnv = process.env.NODE_ENV;
   const hasGroqKey = !!process.env.GROQ_API_KEY;
   const groqKeyPrefix = process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 8) + '...' : 'NOT SET';
-  const hasPostgres = !!process.env.POSTGRES_URL;
-  const hasAuthSecret = !!process.env.NEXTAUTH_SECRET;
 
-  let groqTest: any = 'not_tested';
+  // 1. List available models
+  let models: any = 'not_tested';
   if (hasGroqKey) {
     try {
-      const start = Date.now();
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: 'Responda apenas: ok' }],
-          max_tokens: 5,
-        }),
-        signal: AbortSignal.timeout(15000),
+      const res = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        signal: AbortSignal.timeout(10000),
       });
-      const elapsed = Date.now() - start;
       const data = await res.json();
-      groqTest = {
+      models = {
         status: res.status,
-        ok: res.ok,
-        elapsed_ms: elapsed,
-        response: data.choices?.[0]?.message?.content || null,
-        error: data.error?.message || null,
+        count: data.data?.length || 0,
+        names: (data.data || []).map((m: any) => m.id).sort(),
       };
     } catch (err: any) {
-      groqTest = { error: err.message };
+      models = { error: err.message };
     }
   }
 
-  return NextResponse.json({
-    environment: { isVercel, nodeEnv },
-    env_vars: {
-      GROQ_API_KEY: hasGroqKey ? groqKeyPrefix : 'NOT SET',
-      POSTGRES_URL: hasPostgres ? 'SET' : 'NOT SET',
-      NEXTAUTH_SECRET: hasAuthSecret ? 'SET' : 'NOT SET',
-    },
-    groq_test: groqTest,
-  });
+  // 2. Test with llama-3.1-70b-versatile
+  let test70b: any = 'not_tested';
+  if (hasGroqKey) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        body: JSON.stringify({ model: 'llama-3.1-70b-versatile', messages: [{ role: 'user', content: 'Diga: ok' }], max_tokens: 5 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json();
+      test70b = { status: res.status, ok: res.ok, reply: data.choices?.[0]?.message?.content, error: data.error?.message };
+    } catch (err: any) { test70b = { error: err.message }; }
+  }
+
+  // 3. Test with llama-3.1-8b-instant
+  let test8b: any = 'not_tested';
+  if (hasGroqKey) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: 'Diga: ok' }], max_tokens: 5 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json();
+      test8b = { status: res.status, ok: res.ok, reply: data.choices?.[0]?.message?.content, error: data.error?.message };
+    } catch (err: any) { test8b = { error: err.message }; }
+  }
+
+  return NextResponse.json({ environment: { isVercel, nodeEnv: process.env.NODE_ENV }, env_vars: { GROQ_API_KEY: groqKeyPrefix, NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET ? 'SET' : 'NOT SET' }, models, test_llama3_1_70b: test70b, test_llama3_1_8b: test8b });
 }
