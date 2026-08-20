@@ -1,6 +1,5 @@
 {
   "framework": "nextjs",
-  "regions": ["gru1"],
   "headers": [
     {
       "source": "/_next/static/:path*",
@@ -56,64 +55,5 @@
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     }
-  ],
-  "functions": {
-    "src/app/api/sensei-chat/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/discover/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/discover/[id]/route.ts": {
-      "maxDuration": 30
-    },
-    "src/app/api/discover/[id]/save/route.ts": {
-      "maxDuration": 30
-    },
-    "src/app/api/flashcards/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/flashcards/[id]/route.ts": {
-      "maxDuration": 30
-    },
-    "src/app/api/battle/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/battle/finish/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/brain/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/teach/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/teach/guide/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/missions/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/missions/[id]/complete/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/autopilot/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/chat/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/pretest/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/pretest/finish/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/roadmaps/route.ts": {
-      "maxDuration": 60
-    },
-    "src/app/api/stripe/webhook/route.ts": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
