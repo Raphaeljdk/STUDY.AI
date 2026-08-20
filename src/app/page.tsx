@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 
-import { DashboardView } from '@/components/studyai/DashboardView';
 import { AuthModal } from '@/components/studyai/AuthModal';
 import { HeaderZen } from '@/components/studyai/HeaderZen';
 import { HeroSection } from '@/components/studyai/HeroSection';
@@ -11,6 +11,18 @@ import { FeaturesSection } from '@/components/studyai/FeaturesSection';
 import { PricingSection } from '@/components/studyai/PricingSection';
 import { FooterZen } from '@/components/studyai/FooterZen';
 import { Loader2 } from 'lucide-react';
+
+const DashboardView = dynamic(
+  () => import('@/components/studyai/DashboardView').then(mod => ({ default: mod.DashboardView })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--ws-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--ws-accent)]" />
+      </div>
+    ),
+  }
+);
 
 export type OpenAuthOptions = {
   mode?: 'login' | 'register';

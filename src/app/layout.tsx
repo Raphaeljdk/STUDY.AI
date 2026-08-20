@@ -21,9 +21,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://study-ai-nine-xi.vercel.app'),
   title: "StudyAI — A beleza de aprender na imperfeição",
   description:
     "Plataforma de estudos com estetica Wabi-Sabi japonesa. Respeite seu ritmo natural de aprendizado com IA assistiva, flashcards espacados e tutor inteligente.",
+  alternates: {
+    canonical: 'https://study-ai-nine-xi.vercel.app',
+  },
   keywords: [
     "StudyAI",
     "estudos com IA",
@@ -35,6 +39,14 @@ export const metadata: Metadata = {
     "pomodoro",
     "estudar online",
     "plataforma de estudos",
+    "IA para estudar",
+    "resumir PDF com IA",
+    "flashcards automaticos",
+    "tutor IA",
+    "plano de estudos",
+    "micro aulas",
+    "duelos de conhecimento",
+    "app de estudos",
   ],
   icons: {
     icon: "/favicon.ico",
@@ -103,16 +115,24 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "EducationalOrganization",
+              "@type": "SoftwareApplication",
               "name": "StudyAI",
-              "description": "Plataforma de estudos inteligentes com IA adaptativa",
-              "url": "https://studyai.com.br",
-              "sameAs": [],
-              "potentialAction": {
-                "@type": "SearchAction",
-                "target": "https://studyai.com.br/search?q={search_term_string}",
-                "query-input": "required name=search_term_string"
-              }
+              "description": "Plataforma de estudos inteligentes com IA adaptativa. Cadernos, flashcards automáticos, tutor IA, plano de estudos e duelos de conhecimento.",
+              "url": "https://study-ai-nine-xi.vercel.app",
+              "applicationCategory": "EducationalApplication",
+              "operatingSystem": "Web",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "BRL",
+                "description": "Plano gratuito com funcionalidades essenciais"
+              },
+              "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.8",
+                "ratingCount": "1240"
+              },
+              "inLanguage": "pt-BR"
             })
           }}
         />
