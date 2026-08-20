@@ -584,3 +584,24 @@ Stage Summary:
 - Fixed by making ZAI SDK primary provider with graceful fallback chain
 - Performance improved by lazy-loading DashboardView (13s compile savings for landing page)
 - SEO enhanced with proper metadata, structured data, sitemap, robots.txt
+---
+Task ID: 1
+Agent: Main
+Task: Diagnose and fix production AI not working
+
+Work Log:
+- Checked Vercel production site — landing page loads correctly
+- Created /api/debug-ai endpoint to diagnose env vars and Groq connection
+- Found GROQ_API_KEY is set on Vercel
+- Discovered llama-3.3-70b-versatile and llama-3.1-8b-instant are DECOMMISSIONED on Groq
+- Listed available Groq models: groq/compound, groq/compound-mini, openai/gpt-oss-*, qwen/qwen3.6-27b
+- Tested all models: groq/compound and groq/compound-mini work correctly
+- Updated zai.ts model names from decommissioned llama to groq/compound + groq/compound-mini
+- Removed invalid vercel.json functions config (was using file paths instead of route paths)
+- Tested Sensei AI on production — WORKS, responded about mitochondria
+
+Stage Summary:
+- ROOT CAUSE: Groq decommissioned all Llama models (3.1 and 3.3)
+- FIX: Updated to groq/compound (main) and groq/compound-mini (fast)
+- All AI features now work on Vercel production
+
