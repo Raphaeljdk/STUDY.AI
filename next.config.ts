@@ -1,33 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // No "output: standalone" — Vercel uses its own build pipeline
   allowedDevOrigins: ["*.space-z.ai", "http://127.0.0.1:3000", "http://localhost:3000"],
   reactStrictMode: false,
   poweredByHeader: false,
-  // Performance: compress responses
   compress: true,
-  // Performance: cache and security headers
+  // Security headers (cache headers moved to vercel.json for production)
   async headers() {
     return [
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
-      {
-        source: '/fonts/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
-      {
-        source: '/_next/static/media/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
       {
         source: '/:path*',
         headers: [
@@ -35,36 +16,6 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-        ],
-      },
-      {
-        source: '/icons/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
-      {
-        source: '/studyai-logo.png',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=86400' },
-        ],
-      },
-      {
-        source: '/logo.svg',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=86400' },
-        ],
-      },
-      {
-        source: '/manifest.json',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=3600' },
-        ],
-      },
-      {
-        source: '/sw.js',
-        headers: [
-          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
         ],
       },
     ];

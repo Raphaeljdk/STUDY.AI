@@ -1,18 +1,26 @@
 // @ts-nocheck — ZAI SDK constructor is private in types but works at runtime
 
-// ═══════════════════════════════════════════
-// ZAI SDK (primary AI provider in Z.ai sandbox)
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ENVIRONMENT DETECTION
+// ═══════════════════════════════════════════════════════════════
+
+// On Vercel/Railway, ZAI SDK is never available — skip it entirely.
+// On Z.ai sandbox, ZAI SDK is the primary provider.
+const IS_SANDBOX = !(process.env.VERCEL || process.env.RAILWAY || process.env.NODE_ENV === 'production');
+
+// ═══════════════════════════════════════════════════════
+// ZAI SDK (primary AI provider in Z.ai sandbox ONLY)
+// ═══════════════════════════════════════════════════════
 
 let zaiInstance: any = null;
 let zaiLoadFailed = false;
 let zaiReady = false;
 
 async function getZAI(): Promise<any> {
+  if (!IS_SANDBOX) return null; // Skip on Vercel/production entirely
   if (zaiReady) return zaiInstance;
   if (zaiLoadFailed) return null;
   try {
-    // Dynamic import to avoid bundling issues in Next.js
     const mod = await import('z-ai-web-dev-sdk');
     const ZAI = mod.default || mod.ZAI || mod;
     zaiInstance = await ZAI.create();
@@ -26,9 +34,9 @@ async function getZAI(): Promise<any> {
   }
 }
 
-// ═══════════════════════════════════════════
-// Groq fallback (public API — works on Vercel/Railway)
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// Groq — primary provider for Vercel/Railway/production
+// ═══════════════════════════════════════════════════════
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -83,9 +91,9 @@ async function groqChat(messages: { role: string; content: string }[], options: 
   return data.choices?.[0]?.message?.content || '';
 }
 
-// ═══════════════════════════════════════════
-// AI Proxy fallback (mini-service on port 3003)
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// AI Proxy fallback (mini-service on port 3003 — sandbox only)
+// ═══════════════════════════════════════════════════════
 
 async function proxyChat(messages: { role: string; content: string }[]): Promise<string> {
   const proxyUrl = process.env.AI_PROXY_URL;
@@ -109,13 +117,13 @@ async function proxyChat(messages: { role: string; content: string }[]): Promise
   return data.reply || '';
 }
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // Error classification
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 
 function isRetryableError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
- const lower = msg.toLowerCase();
+  const lower = msg.toLowerCase();
   return (
     lower.includes('timeout') ||
     lower.includes('fetch failed') ||
@@ -130,15 +138,20 @@ function isRetryableError(err: unknown): boolean {
   );
 }
 
-// ═══════════════════════════════════════════
-// Main AI call — tries ZAI SDK first, then proxy, then Groq
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// Main AI call — automatic environment-based routing
+// ═══════════════════════════════════════════════════════
 
 /**
- * Smart AI text call with automatic fallback:
- * 1. ZAI SDK -> direct internal API (Z.ai sandbox)
- * 2. AI_PROXY_URL -> proxy service (sandbox ai-proxy)
- * 3. Groq -> public fallback (Vercel, Railway, etc.)
+ * Smart AI text call with automatic environment-based routing:
+ *
+ * PRODUCTION (Vercel/Railway):
+ *   1. Groq (primary & only)
+ *
+ * SANDBOX (Z.ai local):
+ *   1. ZAI SDK (primary)
+ *   2. AI Proxy (if configured)
+ *   3. Groq (fallback)
  */
 export async function aiChat(
   messages: { role: string; content: string }[],
@@ -146,19 +159,40 @@ export async function aiChat(
 ): Promise<string> {
   const { maxTokens = 2048, temperature = 0.7, fast = false } = options;
 
-  // 1. Try ZAI SDK (primary in Z.ai sandbox)
+  // ─── PRODUCTION: Groq only ───
+  if (!IS_SANDBOX) {
+    const apiKey = getGroqApiKey();
+    if (!apiKey) {
+      throw new Error(
+        'AI_UNAVAILABLE: GROQ_API_KEY não configurada. ' +
+        'Defina GROQ_API_KEY nas variáveis de ambiente do Vercel.'
+      );
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await groqChat(messages, { maxTokens, temperature, fast });
+      } catch (err) {
+        if (attempt === 0 && isRetryableError(err)) {
+          console.warn(`[AI] Groq attempt ${attempt + 1} failed, retrying...`);
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  // ─── SANDBOX: ZAI SDK → Proxy → Groq ───
+  // 1. Try ZAI SDK
   try {
     const zai = await getZAI();
     if (zai) {
-      const completion = await zai.chat.completions.create({
-        messages,
-      });
+      const completion = await zai.chat.completions.create({ messages });
       const reply = completion?.choices?.[0]?.message?.content;
       if (reply) return reply;
     }
   } catch (err) {
     console.warn('[AI] ZAI SDK failed:', err instanceof Error ? err.message : err);
-    // Don't throw — fall through to next provider
   }
 
   // 2. Try proxy if configured
@@ -186,7 +220,6 @@ export async function aiChat(
     }
   }
 
-  // All providers failed
   throw new Error(
     'AI_UNAVAILABLE: Nenhum provedor de IA disponível. ' +
     'No Z.ai sandbox, o ZAI SDK deve funcionar. ' +
@@ -196,8 +229,8 @@ export async function aiChat(
 
 /**
  * AI call for structured JSON output.
- * Uses ZAI SDK with JSON-enforcing prompt, then parses with safeParseJSON.
- * Falls back to Groq json_object mode when available.
+ * PRODUCTION: Groq with json_object response format.
+ * SANDBOX: ZAI SDK with prompt-based JSON, then Groq fallback.
  */
 export async function aiChatJSON(
   messages: { role: string; content: string }[],
@@ -205,13 +238,35 @@ export async function aiChatJSON(
 ): Promise<string> {
   const { maxTokens = 2048, temperature = 0.5, fast = false } = options;
 
-  // 1. Try ZAI SDK (primary) — uses prompt-based JSON enforcement
+  // ─── PRODUCTION: Groq with json_object mode ───
+  if (!IS_SANDBOX) {
+    const apiKey = getGroqApiKey();
+    if (!apiKey) {
+      throw new Error(
+        'AI_UNAVAILABLE: GROQ_API_KEY não configurada. ' +
+        'Defina GROQ_API_KEY nas variáveis de ambiente do Vercel.'
+      );
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await groqChat(messages, { jsonMode: true, maxTokens, temperature, fast });
+      } catch (err) {
+        if (attempt === 0 && isRetryableError(err)) {
+          console.warn(`[AI-JSON] Groq attempt ${attempt + 1} failed, retrying...`);
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  // ─── SANDBOX: ZAI SDK → Proxy → Groq (json mode) ───
+  // 1. Try ZAI SDK
   try {
     const zai = await getZAI();
     if (zai) {
-      const completion = await zai.chat.completions.create({
-        messages,
-      });
+      const completion = await zai.chat.completions.create({ messages });
       const reply = completion?.choices?.[0]?.message?.content;
       if (reply) return reply;
     }
@@ -228,7 +283,7 @@ export async function aiChatJSON(
     }
   }
 
-  // 3. Groq with json_object response format + retry
+  // 3. Groq with json_object + retry
   if (getGroqApiKey()) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
