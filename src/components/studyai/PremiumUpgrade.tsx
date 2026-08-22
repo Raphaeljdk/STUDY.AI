@@ -6,6 +6,7 @@ import {
   Crown, Zap, Check, X, Loader2, Sparkles,
   Swords, GraduationCap, Brain, Target, Route,
   MessageCircle, BarChart3, Shield, ChevronDown, ExternalLink, Star, Flame,
+  CreditCard, QrCode,
 } from 'lucide-react';
 import { ZenButton } from './ZenButton';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -310,10 +311,23 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                   </motion.p>
                 )}
 
-                {/* Footer note */}
-                <p className="mt-6 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-                  Pagamento seguro via Stripe · 7 dias grátis · Cancele a qualquer momento
-                </p>
+                {/* Payment methods */}
+                <div className="mt-6 flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 text-[var(--ws-text-tertiary)]">
+                      <CreditCard size={16} />
+                      <span className="text-xs">Cartão de crédito</span>
+                    </div>
+                    <div className="h-3 w-px bg-[var(--ws-glass-border)]" />
+                    <div className="flex items-center gap-1.5 text-[var(--ws-text-tertiary)]">
+                      <QrCode size={16} />
+                      <span className="text-xs">PIX</span>
+                    </div>
+                  </div>
+                  <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
+                    Pagamento seguro via Stripe · 7 dias grátis · Cancele a qualquer momento
+                  </p>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -435,7 +449,7 @@ function PlanCard({
         ) : (
           <span className="flex items-center justify-center gap-2">
             <Zap size={16} />
-            {isSensei ? 'Quero ser Sensei' : 'Começar com Samurai'}
+            {isSensei ? 'Assinar Sensei' : 'Assinar Samurai'}
           </span>
         )}
       </button>

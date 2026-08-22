@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
+      payment_method_types: ['card', 'pix'],
       line_items: [
         {
           price_data: {
@@ -124,6 +125,8 @@ export async function POST(request: NextRequest) {
         metadata: { userId: user.id, planTier, billingCycle },
       },
       allow_promotion_codes: true,
+      // Brazilian locale for Stripe Checkout
+      locale: 'pt-BR',
     });
 
     return NextResponse.json({ url: session.url });

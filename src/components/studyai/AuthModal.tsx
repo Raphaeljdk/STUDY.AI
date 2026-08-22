@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
-import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle, Swords, GraduationCap, Crown } from 'lucide-react';
+import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle, Swords, GraduationCap, Crown, CreditCard, QrCode } from 'lucide-react';
 import { ZenButton } from './ZenButton';
 import { apiFetch } from '@/lib/api';
 
@@ -555,7 +555,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                         ) : planInfo ? (
                           <span className="flex items-center justify-center gap-2">
                             <Crown size={14} />
-                            Criar e Assinar {planInfo.name}
+                            Criar conta e pagar
                           </span>
                         ) : (
                           'Criar Conta Gratis'
@@ -564,9 +564,22 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                     </div>
 
                     {planInfo && (
-                      <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
-                        7 dias grátis · Cancele quando quiser · Pagamento seguro via Stripe
-                      </p>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 text-[var(--ws-text-tertiary)]">
+                            <CreditCard size={13} />
+                            <span className="text-[10px]">Cartão</span>
+                          </div>
+                          <div className="h-2.5 w-px bg-[var(--ws-glass-border)]" />
+                          <div className="flex items-center gap-1 text-[var(--ws-text-tertiary)]">
+                            <QrCode size={13} />
+                            <span className="text-[10px]">PIX</span>
+                          </div>
+                        </div>
+                        <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
+                          7 dias grátis · Cancele quando quiser · Pagamento seguro
+                        </p>
+                      </div>
                     )}
                   </form>
 

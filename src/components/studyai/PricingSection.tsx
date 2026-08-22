@@ -7,7 +7,7 @@ import { SectionHeading } from './SectionHeading';
 import { ZenButton } from './ZenButton';
 import {
   Check, Star, Sparkles, BookOpen, Swords, GraduationCap,
-  ChevronDown, X,
+  ChevronDown, X, CreditCard, QrCode,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -65,7 +65,7 @@ const PLANS = [
       'Acesso pelo celular e computador',
       'Limite maior de interações com IA',
     ],
-    cta: 'Começar com Samurai',
+    cta: 'Assinar Samurai',
     ctaVariant: 'primary' as const,
     highlighted: true,
   },
@@ -98,7 +98,7 @@ const PLANS = [
       'Flashcards automáticos com IA',
       'Prioridade no processamento da IA',
     ],
-    cta: 'Quero ser Sensei',
+    cta: 'Assinar Sensei',
     ctaVariant: 'secondary' as const,
   },
 ];
@@ -330,10 +330,23 @@ export function PricingSection() {
           )}
         </AnimatePresence>
 
-        {/* Bottom trust */}
-        <p className="mt-10 text-center text-xs text-[var(--ws-text-tertiary)]">
-          Pagamento seguro via Stripe · Precios em Reais (BRL) · Cancele a qualquer momento
-        </p>
+        {/* Bottom trust + payment methods */}
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-1.5 text-[var(--ws-text-tertiary)]">
+              <CreditCard size={15} />
+              <span className="text-xs">Cartão de crédito</span>
+            </div>
+            <div className="h-3 w-px bg-[var(--ws-glass-border)]" />
+            <div className="flex items-center gap-1.5 text-[var(--ws-text-tertiary)]">
+              <QrCode size={15} />
+              <span className="text-xs">PIX</span>
+            </div>
+          </div>
+          <p className="text-center text-xs text-[var(--ws-text-tertiary)]">
+            Pagamento seguro via Stripe · Preços em Reais (BRL) · Cancele a qualquer momento
+          </p>
+        </div>
       </div>
     </section>
   );
