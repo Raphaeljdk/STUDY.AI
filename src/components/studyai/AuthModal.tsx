@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import { X, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, AlertCircle, Swords, GraduationCap, Crown, CreditCard, QrCode } from 'lucide-react';
 import { ZenButton } from './ZenButton';
+import { PaymentModal } from './PaymentModal';
 import { apiFetch } from '@/lib/api';
 
 /* ── Plan config for the modal ── */
@@ -64,6 +65,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   // Plan state for registration with plan
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | undefined>(pendingPlan);
   const [selectedBilling, setSelectedBilling] = useState<'monthly' | 'annual'>(pendingBilling);
+
+  // Payment modal state
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -183,41 +187,16 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         });
 
         if (loginRes?.ok) {
-          // Step 3: If plan selected, redirect to checkout
+          // Step 3: If plan selected, show payment modal
           if (selectedPlan) {
-            setSuccessMsg('Redirecionando para o pagamento...');
-            try {
-              const checkoutRes = await apiFetch('/api/checkout', {
-                method: 'POST',
-                body: JSON.stringify({
-                  plan: selectedPlan,
-                  billing: selectedBilling,
-                }),
-                raw: true,
-              });
-              const checkoutData = await checkoutRes.json();
-
-              if (checkoutRes.ok && checkoutData.url) {
-                // Redirect to Stripe
-                window.location.href = checkoutData.url;
-                return;
-              } else {
-                // Checkout failed but account created — go to dashboard
-                console.error('[Checkout after register]', checkoutData);
-                setSuccessMsg('Conta criada! Redirecionando...');
-                setTimeout(() => {
-                  onClose();
-                  window.location.reload();
-                }, 800);
-              }
-            } catch {
-              // Checkout failed but account created
-              setSuccessMsg('Conta criada! Redirecionando...');
-              setTimeout(() => {
-                onClose();
-                window.location.reload();
-              }, 800);
-            }
+            setStatus('success');
+            setSuccessMsg('Conta criada com sucesso!');
+            // Small delay then show payment
+            setTimeout(() => {
+              setStatus('idle');
+              setSuccessMsg('');
+              setPaymentOpen(true);
+            }, 800);
           } else {
             // No plan selected — go to dashboard
             setSuccessMsg('Bem-vindo(a)! Entrando...');
@@ -598,6 +577,25 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {/* Payment Modal — shown after successful registration with plan */}
+      {selectedPlan && (
+        <PaymentModal
+          isOpen={paymentOpen}
+          onClose={() => {
+            setPaymentOpen(false);
+            onClose();
+            window.location.reload();
+          }}
+          plan={selectedPlan}
+          billing={selectedBilling}
+          onPaymentSuccess={() => {
+            setPaymentOpen(false);
+            onClose();
+            window.location.reload();
+          }}
+        />
       )}
     </AnimatePresence>
   );

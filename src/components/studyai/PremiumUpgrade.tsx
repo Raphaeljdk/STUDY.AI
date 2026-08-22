@@ -9,7 +9,7 @@ import {
   CreditCard, QrCode,
 } from 'lucide-react';
 import { ZenButton } from './ZenButton';
-import { apiFetch, ApiError } from '@/lib/api';
+import { PaymentModal } from './PaymentModal';
 
 /* ── Types ── */
 
@@ -84,36 +84,25 @@ const FEATURES: FeatureRow[] = [
 
 export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeProps) {
   const [billing, setBilling] = useState<BillingCycle>('monthly');
-  const [loadingPlan, setLoadingPlan] = useState<PlanTier | null>(null);
   const [error, setError] = useState('');
   const [showComparison, setShowComparison] = useState(false);
 
+  // Payment modal state
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier | null>(null);
+
   const isAnnual = billing === 'annual';
 
-  const handleCheckout = async (planTier: PlanTier) => {
-    setLoadingPlan(planTier);
-    setError('');
-    try {
-      const data = await apiFetch('/api/checkout', {
-        method: 'POST',
-        body: JSON.stringify({ plan: planTier, billing }),
-      });
+  const handleCheckout = (planTier: PlanTier) => {
+    setSelectedPlan(planTier);
+    setPaymentOpen(true);
+  };
 
-      if (data.code === 'STRIPE_NOT_CONFIGURED') {
-        setError('Pagamento em configuração. A página de cartão e PIX estará disponível em breve.');
-        return;
-      }
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setError(data.error || 'Não foi possível iniciar o pagamento.');
-      }
-    } catch (err: any) {
-      if (err instanceof ApiError && err.isSessionExpired) return;
-      setError('Erro de conexão. Tente novamente.');
-    } finally {
-      setLoadingPlan(null);
-    }
+  const handlePaymentSuccess = () => {
+    setPaymentOpen(false);
+    setSelectedPlan(null);
+    onClose();
+    window.location.reload();
   };
 
   const triggerMessages: Record<string, { title: string; desc: string }> = {
@@ -135,7 +124,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={!loadingPlan ? onClose : undefined} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
           <motion.div
             className="relative z-10 w-full max-w-4xl mb-0 sm:mb-8 max-h-[100dvh] sm:max-h-none overflow-y-auto rounded-t-2xl sm:rounded-ws-organic"
@@ -147,7 +136,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
             {/* Close button */}
             <button
               onClick={onClose}
-              disabled={!!loadingPlan}
+              disabled={false}
               className="absolute top-3 right-3 z-20 rounded-full bg-[var(--ws-glass)] p-2 text-[var(--ws-text-tertiary)] shadow-lg transition-colors hover:text-[var(--ws-text-primary)] disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Fechar"
             >
@@ -211,7 +200,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                   <PlanCard
                     plan={PLANS.SAMURAI}
                     isAnnual={isAnnual}
-                    loading={loadingPlan === 'SAMURAI'}
+                    loading={false}
                     onSelect={() => handleCheckout('SAMURAI')}
                     trialDays={trialDays}
                     highlighted={false}
@@ -221,7 +210,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                   <PlanCard
                     plan={PLANS.SENSEI}
                     isAnnual={isAnnual}
-                    loading={loadingPlan === 'SENSEI'}
+                    loading={false}
                     onSelect={() => handleCheckout('SENSEI')}
                     trialDays={trialDays}
                     highlighted={true}
@@ -325,12 +314,24 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                     </div>
                   </div>
                   <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
-                    Pagamento seguro via Stripe · 7 dias grátis · Cancele a qualquer momento
+                    Pagamento seguro · 7 dias grátis · Cancele a qualquer momento
                   </p>
                 </div>
               </div>
             </div>
           </motion.div>
+
+          {/* Payment Modal */}
+          {selectedPlan && (
+            <PaymentModal
+              key={`${selectedPlan}-${billing}-${paymentOpen}`}
+              isOpen={paymentOpen}
+              onClose={() => { setPaymentOpen(false); setSelectedPlan(null); }}
+              plan={selectedPlan}
+              billing={billing}
+              onPaymentSuccess={handlePaymentSuccess}
+            />
+          )}
         </motion.div>
       )}
     </AnimatePresence>
