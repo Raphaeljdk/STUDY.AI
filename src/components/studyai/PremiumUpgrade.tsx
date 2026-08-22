@@ -100,7 +100,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
       });
 
       if (data.code === 'STRIPE_NOT_CONFIGURED') {
-        setError('Pagamento indisponível no momento. Tente novamente mais tarde.');
+        setError('Pagamento em configuração. A página de cartão e PIX estará disponível em breve.');
         return;
       }
       if (data.url) {
