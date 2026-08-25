@@ -39,8 +39,8 @@ async function getZAI(): Promise<any> {
 // ═══════════════════════════════════════════════════════
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'groq/compound';
-const GROQ_MODEL_FAST = 'groq/compound-mini';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL_FAST = 'llama-3.1-8b-instant';
 
 function getGroqApiKey(): string | null {
   return process.env.GROQ_API_KEY || null;

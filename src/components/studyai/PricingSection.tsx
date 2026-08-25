@@ -344,7 +344,7 @@ export function PricingSection() {
             </div>
           </div>
           <p className="text-center text-xs text-[var(--ws-text-tertiary)]">
-            Pagamento seguro via Stripe · Preços em Reais (BRL) · Cancele a qualquer momento
+            Pagamento seguro · PIX e Cartão de crédito · Preços em Reais (BRL) · Cancele a qualquer momento
           </p>
         </div>
       </div>
