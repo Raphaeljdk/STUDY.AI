@@ -65,7 +65,7 @@ const PLANS = [
       'Acesso pelo celular e computador',
       'Limite maior de interações com IA',
     ],
-    cta: 'Assinar Samurai',
+    cta: 'Em breve',
     ctaVariant: 'primary' as const,
     highlighted: true,
   },
@@ -98,7 +98,7 @@ const PLANS = [
       'Flashcards automáticos com IA',
       'Prioridade no processamento da IA',
     ],
-    cta: 'Assinar Sensei',
+    cta: 'Em breve',
     ctaVariant: 'secondary' as const,
   },
 ];
@@ -106,7 +106,7 @@ const PLANS = [
 /* ── Feature Comparison ── */
 const COMPARISON = [
   { name: 'Resumos com IA', shojin: false, samurai: 'Básicos', sensei: 'Avançados' },
-  { name: 'IA para dúvidas', shojin: '20 msgs/dia', samurai: 'Ilimitado', sensei: 'IA avançada' },
+  { name: 'IA para dúvidas', shojin: '20 msgs/dia', samurai: 'Uso ampliado', sensei: 'IA avançada' },
   { name: 'Flashcards', shojin: 'Limitados', samurai: true, sensei: 'Automáticos' },
   { name: 'Exercícios', shojin: true, samurai: true, sensei: 'Gerados por IA' },
   { name: 'Plano de estudos', shojin: true, samurai: 'Personalizado', sensei: 'Adaptativo' },
@@ -131,14 +131,14 @@ export function PricingSection() {
         <SectionHeading
           japaneseSubtitle="料金"
           title="Escolha seu caminho"
-          description="Comece de graça. Evolua quando estiver pronto. Cancele a qualquer momento."
+          description="Comece com o plano gratuito. Os planos pagos estão em preparação para uma contratação segura."
           align="center"
         />
 
         {/* Trial badge */}
         <div className="mt-4 flex items-center justify-center gap-2 text-sm">
           <Sparkles size={16} className="text-[var(--ws-verdigris)]" />
-          <span className="font-medium text-[var(--ws-verdigris)]">7 dias grátis para testar</span>
+          <span className="font-medium text-[var(--ws-verdigris)]">Plano gratuito disponível · Assinaturas em preparação</span>
         </div>
 
         {/* Billing toggle */}
@@ -257,7 +257,8 @@ export function PricingSection() {
                       <ZenButton
                         variant={plan.ctaVariant}
                         size="md"
-                        className="w-full"
+                        className="w-full disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={plan.id !== 'shojin'}
                         onClick={() => {
                           if (plan.id === 'shojin') {
                             (window as any).__studyai_openAuth?.('register');
@@ -274,7 +275,7 @@ export function PricingSection() {
                       </ZenButton>
                       {plan.id !== 'shojin' && (
                         <p className="mt-2 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-                          7 dias grátis · Cancele quando quiser
+                          Contratação disponível após habilitação do pagamento seguro
                         </p>
                       )}
                     </div>
