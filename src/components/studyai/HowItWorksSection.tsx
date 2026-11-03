@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import { SectionHeading } from './SectionHeading';
-import { EnsoCircle } from './EnsoCircle';
 import { PenTool, Brain, Sparkles, GraduationCap } from 'lucide-react';
 
 const steps = [
@@ -28,13 +27,13 @@ const steps = [
     num: '04',
     Icon: GraduationCap,
     title: 'Domine o conteúdo',
-    desc: 'Acompanhe seu progresso e revisno nos momentos ideais. A retenção de longo prazo acontece naturalmente.',
+    desc: 'Acompanhe seu progresso e revise nos momentos ideais. A retenção de longo prazo acontece naturalmente.',
   },
 ];
 
 export function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="bg-[var(--ws-bg)] py-24 lg:py-32">
+    <section id="how-it-works" className="scroll-mt-24 bg-[var(--ws-bg)] py-24 lg:py-32">
       <div className="mx-auto max-w-[1440px] px-6 lg:px-24">
         <SectionHeading
           japaneseSubtitle="Michi 道"
