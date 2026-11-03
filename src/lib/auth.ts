@@ -27,10 +27,9 @@ declare module 'next-auth/jwt' {
   }
 }
 
-// Production-safe fallback (same secret used across all serverless instances)
-const FALLBACK_SECRET = '7cbdc4683a81fefe5c509de963299cbf0c103d355fb5ae655173820314cb3162';
-
-const nextAuthSecret = process.env.NEXTAUTH_SECRET || FALLBACK_SECRET;
+// In production, NEXTAUTH_SECRET must be a strong secret configured in the hosting environment.
+// Never use a published fallback, since it would allow session-token forgery.
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 
 export const authOptions: NextAuthOptions = {
   providers: [
