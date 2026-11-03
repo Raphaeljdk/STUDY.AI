@@ -12,26 +12,12 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 
 
 
-// Social proof bar
+// Describe product capabilities without inventing testimonials or user counts.
 function SocialProof() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex -space-x-2">
-        {['#D93838', '#5B8C5A', '#B8A088', '#4A5568'].map((c, i) => (
-          <div
-            key={i}
-            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--ws-bg)] text-[10px] font-bold text-white"
-            style={{ backgroundColor: c, zIndex: 4 - i }}
-          >
-            {['A', 'M', 'L', 'R'][i]}
-          </div>
-        ))}
-      </div>
-      <div className="text-xs">
-        <span className="text-[var(--ws-text-tertiary)]">Plataforma de estudos com IA</span>
-        <span className="live-dot ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--ws-verdigris)]" />
-      </div>
-    </div>
+    <p className="text-xs font-medium tracking-wide text-[var(--ws-text-tertiary)]">
+      Cadernos inteligentes · Tutor IA · Flashcards e revisão
+    </p>
   );
 }
 
@@ -136,10 +122,10 @@ export function HeroSection() {
               className="mt-10 flex flex-wrap gap-4"
             >
               <ZenButton variant="primary" size="lg" gradient onClick={() => (window as any).__studyai_openAuth?.('register')}>
-                Começar Jornada <ArrowRight size={16} />
+                Começar grátis <ArrowRight size={16} />
               </ZenButton>
-              <ZenButton variant="secondary" size="lg" onClick={() => (window as any).__studyai_openAuth?.('login')}>
-                Ver Demonstração
+              <ZenButton variant="secondary" size="lg" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
+                Como funciona
               </ZenButton>
             </motion.div>
 
@@ -162,7 +148,7 @@ export function HeroSection() {
             >
               <div className="inline-flex items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-4 py-2 text-xs text-[var(--ws-text-tertiary)]">
                 <Sparkles size={12} className="text-[var(--ws-accent)]" />
-                <span>Comece grátis — 7 dias de teste em todos os planos</span>
+                <span>Comece grátis — sem precisar de cartão</span>
               </div>
             </motion.div>
           </motion.div>
