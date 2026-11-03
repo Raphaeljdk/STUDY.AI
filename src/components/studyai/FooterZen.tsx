@@ -1,75 +1,52 @@
-'use client';
-
-import { Users } from 'lucide-react';
-
-const footerLinks = {
-  Produto: ['Recursos', 'Roadmap', 'Integrações'],
-  Empresa: ['Sobre', 'Blog', 'Carreiras', 'Contato'],
-  Recursos: ['Documentação', 'Comunidade', 'Tutoriais', 'FAQ'],
-  Legal: ['Privacidade', 'Termos', 'Cookies'],
-};
+const footerLinks = [
+  {
+    title: 'Plataforma',
+    links: [
+      { label: 'Recursos', href: '#features' },
+      { label: 'Como funciona', href: '#how-it-works' },
+      { label: 'Planos', href: '#pricing' },
+    ],
+  },
+  {
+    title: 'Ajuda',
+    links: [
+      { label: 'Perguntas frequentes', href: '#faq' },
+      { label: 'Voltar ao início', href: '#main-content' },
+    ],
+  },
+];
 
 export function FooterZen() {
   return (
     <footer className="border-t border-[var(--ws-glass-border)] bg-[var(--ws-bg-dark)]">
-      <div className="mx-auto max-w-[1440px] px-6 py-16 lg:px-24">
-        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6">
-          {/* Brand column */}
-          <div className="lg:col-span-2">
-            <div className="mb-4 flex items-center gap-3">
-              <img
-                src="/studyai-logo.png"
-                alt="StudyAI Logo"
-                width={32}
-                height={32}
-                className="rounded-full object-cover"
-              />
-              <span className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)]">
-                StudyAI
-              </span>
-            </div>
-            <p className="mb-6 max-w-xs text-sm leading-relaxed text-[var(--ws-text-tertiary)]">
-              A beleza do aprendizado na imperfeição. Uma plataforma que respeita seu ritmo natural de conhecimento.
-            </p>
-            <div className="mb-4 flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
-              <span className="live-dot inline-block h-2 w-2 rounded-full bg-[var(--ws-verdigris)]" />
-              <Users size={12} />
-              <span>Plataforma ativa</span>
-            </div>
-            <div className="font-serif-jp text-2xl text-[var(--ws-text-tertiary)] opacity-30">
-              侘寂
-            </div>
+      <div className="mx-auto grid max-w-[1440px] gap-12 px-6 py-14 md:grid-cols-2 lg:grid-cols-4 lg:px-24">
+        <div className="lg:col-span-2">
+          <div className="mb-4 flex items-center gap-3">
+            <img src="/studyai-logo.png" alt="" width={36} height={36} className="rounded-full object-cover" />
+            <span className="font-serif-jp text-xl font-bold text-[var(--ws-text-primary)]">StudyAI</span>
           </div>
-
-          {/* Link columns */}
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <div key={title}>
-              <h4 className="mb-4 text-sm font-semibold text-[var(--ws-text-primary)]">{title}</h4>
-              <ul className="space-y-2.5">
-                {links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-[var(--ws-text-tertiary)] transition-colors duration-200 hover:text-[var(--ws-accent)] hover:translate-x-1 inline-block"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom bar */}
-        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-[var(--ws-glass-border)] pt-8 md:flex-row">
-          <p className="text-xs text-[var(--ws-text-tertiary)]" suppressHydrationWarning>
-            &copy; {new Date().getFullYear()} StudyAI. Todos os direitos reservados.
-          </p>
-          <p className="font-serif-jp text-xs text-[var(--ws-text-tertiary)] opacity-40">
-            一期一会 — Cada encontro é único
+          <p className="max-w-xs text-sm leading-relaxed text-[var(--ws-text-secondary)]">
+            Um espaço para organizar, aprender e evoluir com apoio da inteligência artificial, respeitando seu ritmo.
           </p>
         </div>
+        {footerLinks.map(({ title, links }) => (
+          <nav key={title} aria-label={title}>
+            <h2 className="mb-4 text-sm font-semibold text-[var(--ws-text-primary)]">{title}</h2>
+            <ul className="space-y-3">
+              {links.map(({ label, href }) => (
+                <li key={href}>
+                  <a href={href} className="text-sm text-[var(--ws-text-tertiary)] transition-colors hover:text-[var(--ws-accent)] hover:underline">
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+      <div className="mx-auto flex max-w-[1440px] flex-wrap justify-between gap-4 border-t border-[var(--ws-glass-border)] px-6 py-6 lg:px-24">
+        <p className="text-xs text-[var(--ws-text-tertiary)]">© {new Date().getFullYear()} StudyAI. Todos os direitos reservados.</p>
+        <p className="font-serif-jp text-xs text-[var(--ws-text-tertiary)]">一期一会 — Cada encontro é único</p>
       </div>
     </footer>
   );
