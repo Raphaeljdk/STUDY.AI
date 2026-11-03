@@ -127,11 +127,6 @@ export default function RootLayout({
                 "priceCurrency": "BRL",
                 "description": "Plano gratuito com funcionalidades essenciais"
               },
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": "4.8",
-                "ratingCount": "1240"
-              },
               "inLanguage": "pt-BR"
             })
           }}

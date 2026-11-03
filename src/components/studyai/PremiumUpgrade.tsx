@@ -106,9 +106,9 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
   };
 
   const triggerMessages: Record<string, { title: string; desc: string }> = {
-    chat: { title: 'Limite de mensagens atingido', desc: 'Desbloqueie conversas ilimitadas com a IA!' },
-    flashcards: { title: 'Limite de flashcards atingido', desc: 'Crie flashcards ilimitados com IA!' },
-    nav: { title: 'Desbloqueie o poder total do StudyAI', desc: 'Escolha o plano perfeito para sua jornada de estudos.' },
+    chat: { title: 'Limite de mensagens atingido', desc: 'Os planos pagos estão em preparação. Seus estudos gratuitos continuam disponíveis dentro do limite do plano.' },
+    flashcards: { title: 'Limite de flashcards atingido', desc: 'Estamos preparando assinaturas com mais recursos e pagamento verificado.' },
+    nav: { title: 'Planos premium em preparação', desc: 'Conheça os futuros planos enquanto finalizamos um checkout seguro.' },
   };
 
   const msg = triggerMessages[triggerType || 'nav'];
@@ -153,7 +153,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                     <Crown size={32} className="text-amber-500" />
                   </div>
                   <h2 className="font-serif-jp text-2xl font-bold text-[var(--ws-text-primary)] sm:text-3xl">
-                    Escolha seu plano
+                    Planos em preparação
                   </h2>
                   <p className="mt-2 text-sm text-[var(--ws-text-secondary)]">
                     {msg.desc}
@@ -314,7 +314,7 @@ export function PremiumUpgrade({ isOpen, onClose, triggerType }: PremiumUpgradeP
                     </div>
                   </div>
                   <p className="text-center text-[10px] text-[var(--ws-text-tertiary)]">
-                    Pagamento seguro · 7 dias grátis · Cancele a qualquer momento
+                    Planos pagos serão disponibilizados após integração de pagamento seguro
                   </p>
                 </div>
               </div>
@@ -439,8 +439,8 @@ function PlanCard({
       {/* CTA */}
       <button
         onClick={onSelect}
-        disabled={loading}
-        className={`w-full rounded-ws-button px-4 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-70 ${btnClass}`}
+        disabled
+        className={`w-full cursor-not-allowed rounded-ws-button px-4 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-55 ${btnClass}`}
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
@@ -450,14 +450,14 @@ function PlanCard({
         ) : (
           <span className="flex items-center justify-center gap-2">
             <Zap size={16} />
-            {isSensei ? 'Assinar Sensei' : 'Assinar Samurai'}
+            Disponível em breve
           </span>
         )}
       </button>
 
       {/* Trial note */}
       <p className="mt-3 text-center text-[10px] text-[var(--ws-text-tertiary)]">
-        {trialDays} dias grátis para testar
+        Pagamento em preparação
       </p>
     </div>
   );

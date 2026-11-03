@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogIn, UserPlus, Users } from 'lucide-react';
+import { LogIn, UserPlus } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { ZenButton } from './ZenButton';
 
 const navLinks = [
   { label: 'Recursos', href: '#features' },
   { label: 'Como Funciona', href: '#how-it-works' },
-  { label: 'Sensei IA', href: '#ai-chat' },
+  { label: 'Planos', href: '#pricing' },
 ];
 
 export function HeaderZen() {
@@ -64,11 +64,7 @@ export function HeaderZen() {
 
         {/* Right side */}
         <div className="hidden items-center gap-3 lg:flex">
-          <div className="mr-2 flex items-center gap-2 text-xs text-[var(--ws-text-tertiary)]">
-            <span className="live-dot inline-block h-2 w-2 rounded-full bg-[var(--ws-verdigris)]" />
-            <Users size={12} />
-            <span className="tabular-nums" id="header-active-users">--</span> online
-          </div>
+          <span className="mr-2 text-xs text-[var(--ws-text-tertiary)]">Comece sem cartão</span>
           <ThemeSelector />
           <ZenButton variant="ghost" size="sm" onClick={() => openAuth('login')}>
             <LogIn size={15} /> Entrar
@@ -82,7 +78,9 @@ export function HeaderZen() {
         <button
           className={`relative flex h-8 w-8 flex-col items-center justify-center gap-[5px] lg:hidden ${mobileOpen ? 'hamburger-active' : ''}`}
           onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Menu"
+          aria-label={mobileOpen ? 'Fechar menu' : 'Abrir menu'}
+          aria-expanded={mobileOpen}
+          aria-controls="studyai-mobile-menu"
         >
           <span className="hamburger-line" />
           <span className="hamburger-line" />
@@ -97,6 +95,7 @@ export function HeaderZen() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
+            id="studyai-mobile-menu"
             className="overflow-hidden border-b border-[var(--ws-glass-border)] bg-[var(--ws-bg)] lg:hidden"
           >
             <nav className="flex flex-col gap-1 px-6 py-4">

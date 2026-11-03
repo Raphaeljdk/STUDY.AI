@@ -255,7 +255,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               {!planInfo && (
                 <div className="mb-6 flex items-center justify-center gap-2 rounded-ws-button px-3 py-1.5 mx-auto w-fit" style={{ backgroundColor: 'color-mix(in srgb, var(--ws-verdigris) 12%, transparent)' }}>
                   <Sparkles size={14} className="text-[var(--ws-verdigris)]" />
-                  <span className="text-xs font-medium text-[var(--ws-verdigris)]">100% Gratuito e Ilimitado</span>
+                  <span className="text-xs font-medium text-[var(--ws-verdigris)]">Plano gratuito disponível</span>
                 </div>
               )}
 
@@ -387,7 +387,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                                   {selectedBilling === 'monthly' ? planInfo.monthly : planInfo.annual}
                                 </span>
                                 <span className="text-[10px] text-[var(--ws-text-tertiary)]">
-                                  7 dias grátis
+                                  Pagamento em preparação
                                 </span>
                               </div>
                             </div>
@@ -427,7 +427,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                   {!planInfo && (
                     <div className="mb-5">
                       <p className="mb-2.5 text-center text-xs text-[var(--ws-text-tertiary)]">
-                        Quer começar com um plano premium?
+                        Planos pagos em preparação
                       </p>
                       <div className="flex gap-2">
                         {(['SAMURAI', 'SENSEI'] as const).map((p) => {
@@ -437,8 +437,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                             <button
                               key={p}
                               type="button"
-                              onClick={() => setSelectedPlan(p)}
-                              className={`flex flex-1 items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-3 py-2.5 text-left transition-all hover:border-[var(--ws-accent)]/30 hover:bg-[var(--ws-accent)]/5`}
+                              disabled
+                              title="Contratação disponível em breve"
+                              className="flex flex-1 cursor-not-allowed items-center gap-2 rounded-ws-button border border-[var(--ws-glass-border)] bg-[var(--ws-glass)] px-3 py-2.5 text-left opacity-55"
                             >
                               <PIcon size={16} className={pi.color} />
                               <div className="min-w-0">
@@ -534,7 +535,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                         ) : planInfo ? (
                           <span className="flex items-center justify-center gap-2">
                             <Crown size={14} />
-                            Criar conta e pagar
+                            Criar conta grátis
                           </span>
                         ) : (
                           'Criar Conta Gratis'

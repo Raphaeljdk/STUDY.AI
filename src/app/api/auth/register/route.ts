@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     const msg = error?.message || 'Unknown error';
     console.error('[Register] Full error:', msg, error);
     return NextResponse.json(
-      { error: 'Erro interno do servidor', details: msg },
+      { error: 'Erro ao criar conta. Tente novamente mais tarde.' },
       { status: 500 }
     );
   }
